@@ -2,23 +2,107 @@
 <html lang="en" data-page="app">
 <head>
   <meta charset="utf-8">
+
   <title>Builder — Universal Creation Engine</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
+  >
+
   <meta name="theme-color" content="#f3f1ea">
-  <meta name="description" content="Builder — Universal Creation Engine. Describe anything. Build it, test it, verify it, ship it.">
-  <meta property="og:type" content="website"><meta property="og:title" content="Builder — Universal Creation Engine"><meta property="og:description" content="Describe anything. Builder figures out what needs to exist."><meta property="og:image" content="/assets/og-image.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=13.0.0"><link rel="stylesheet" href="styles.css?v=13.0.0">
+
+  <meta
+    name="description"
+    content="Builder — Universal Creation Engine. Describe anything. Build it, test it, verify it, ship it."
+  >
+
+  <meta
+    property="og:type"
+    content="website"
+  >
+
+  <meta
+    property="og:title"
+    content="Builder — Universal Creation Engine"
+  >
+
+  <meta
+    property="og:description"
+    content="Describe anything. Builder figures out what needs to exist."
+  >
+
+  <meta
+    property="og:image"
+    content="/assets/og-image.png"
+  >
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  >
+
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
+
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="assets/favicon.svg?v=14.0.0"
+  >
+
+  <link
+    rel="stylesheet"
+    href="styles.css?v=14.0.0"
+  >
 </head>
+
 <body>
+
+  <!-- Authentication UI -->
   <div id="authRoot"></div>
-  <div id="appRoot" class="app hidden"></div>
-  <div id="mobileCta" class="mobile-sticky-cta hidden"><button data-action="newProject">＋ New creation</button></div>
-  <div id="modal"></div><div id="toast" aria-live="polite"></div>
-  <script src="config.js?v=13.0.0"></script>
-  <script src="site.js?v=13.0.0"></script>
+
+  <!-- Main application -->
+  <div
+    id="appRoot"
+    class="app hidden"
+  ></div>
+
+  <!-- Mobile creation CTA -->
+  <div
+    id="mobileCta"
+    class="mobile-sticky-cta hidden"
+  >
+    <button
+      data-action="newProject"
+    >
+      ＋ New creation
+    </button>
+  </div>
+
+  <!-- Global modal -->
+  <div id="modal"></div>
+
+  <!-- Global toast / notification area -->
+  <div
+    id="toast"
+    aria-live="polite"
+  ></div>
+
+  <!-- Runtime configuration -->
+  <script src="config.js?v=14.0.0"></script>
+
+  <!-- Static site helpers -->
+  <script src="site.js?v=14.0.0"></script>
+
+  <!-- Supabase browser SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=13.0.0"></script>
+
+  <!-- Main application -->
+  <script src="app.js?v=14.0.0"></script>
+
 </body>
 </html>
