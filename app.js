@@ -55,7 +55,7 @@
   };
 
   let state = load();
-  let session = CONFIGURED ? null : state.demoSession;
+  let session = null
   let modal = null;
 
   let ui = {
