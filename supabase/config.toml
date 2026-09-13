@@ -1,0 +1,7 @@
+[functions.ai]
+verify_jwt = true
+
+# This function serves authenticated checkout requests and signed Razorpay webhooks.
+# It performs its own JWT and webhook-signature validation.
+[functions.payments]
+verify_jwt = false
