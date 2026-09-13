@@ -1,0 +1,19 @@
+{
+  "name": "builder-universal-v13",
+  "private": true,
+  "version": "13.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "serve": "npx serve .",
+    "check": "node scripts/smoke-test.mjs",
+    "check:app": "node --check app.js",
+    "security:scan": "node scripts/security-scan.mjs",
+    "test:router": "node scripts/model-router-test.mjs",
+    "simulate:all": "node scripts/simulate-all.mjs",
+    "audit:features": "node scripts/simulate-all.mjs"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}

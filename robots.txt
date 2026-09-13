@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /billing.html
+Disallow: /thank-you.html
+Sitemap: https://pushlabs-tech.github.io/projectx/sitemap.xml

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en" data-page="billing">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Manage Builder plans and subscriptions.">
+<meta property="og:title" content="Billing — Builder"><meta property="og:description" content="Manage Builder plans and subscriptions."><meta property="og:image" content="assets/og-image.png">
+<link rel="icon" href="assets/favicon.svg"><link rel="stylesheet" href="styles.css"><title>Billing — Builder</title>
+</head>
+<body class="public-page">
+<main class="public-shell">
+  <a class="back-link" href="./">← Back to Builder</a>
+  <div class="public-head"><div class="eyebrow">BILLING</div><h1>Choose your Builder plan</h1><p>Connect your payment provider once, then manage subscriptions securely from the server.</p></div>
+  <div id="billingNotice" class="public-notice hidden"></div>
+  <section class="pricing-grid">
+    <article class="price-card"><span>Free</span><h2>₹0</h2><p>Explore the workspace.</p><ul><li>Core Builder workspace</li><li>Local project snapshots</li><li>Basic agent routing</li></ul><button class="price-btn secondary" data-plan="free">Current/free</button></article>
+    <article class="price-card featured"><span>Pro</span><h2>₹399<small>/month</small></h2><p>For serious project building.</p><ul><li>Higher AI usage</li><li>Priority model routing</li><li>More project capacity</li></ul><button class="price-btn primary" data-plan="pro">Choose Pro</button></article>
+    <article class="price-card"><span>Max</span><h2>₹999<small>/month</small></h2><p>For heavy AI-assisted work.</p><ul><li>Highest usage tier</li><li>Best available routing</li><li>Expanded workspace capacity</li></ul><button class="price-btn primary" data-plan="max">Choose Max</button></article>
+  </section>
+  <p class="public-foot">Payments are processed by the configured payment provider. Builder does not store card details.</p>
+</main>
+<script src="config.js"></script><script src="site.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="billing.js"></script>
+</body></html>
