@@ -1145,35 +1145,88 @@
   }
 
   async function initAuth(){
-    if(sb){
-      const {
-        data:{session:s}
-      }=await sb.auth.getSession();
+  /*
+   * Render immediately.
+   *
+   * The UI must never depend on Supabase network latency.
+   * This prevents a completely blank page while auth is loading.
+   */
+  render();
 
-      session=s?.user
-        ?{
-          name:s.user.user_metadata?.name||s.user.email.split("@")[0],
-          email:s.user.email
-        }
-        :null;
+  if(!sb){
+    if(session)
+      refreshProviderState(true);
 
-      sb.auth.onAuthStateChange((_e,s2)=>{
-        session=s2?.user
-          ?{
-            name:s2.user.user_metadata?.name||s2.user.email.split("@")[0],
-            email:s2.user.email
-          }
-          :null;
+    return;
+  }
 
-        render();
-      });
+  try{
+    const {
+      data:{session:s},
+      error
+    }=await sb.auth.getSession();
+
+    if(error){
+      console.warn(
+        "Supabase session initialization failed:",
+        error
+      );
+
+      /*
+       * Keep the authentication screen visible.
+       * Do not turn a backend/network problem into
+       * a white screen.
+       */
+      session=null;
+      render();
+
+      return;
     }
+
+    session=s?.user
+      ?{
+        name:
+          s.user.user_metadata?.name ||
+          s.user.email?.split("@")[0] ||
+          "Builder",
+        email:s.user.email || ""
+      }
+      :null;
 
     render();
 
-    if(session&&CONFIGURED)
-      refreshProviderState(true);
+    sb.auth.onAuthStateChange((_event,s2)=>{
+      session=s2?.user
+        ?{
+          name:
+            s2.user.user_metadata?.name ||
+            s2.user.email?.split("@")[0] ||
+            "Builder",
+          email:s2.user.email || ""
+        }
+        :null;
+
+      render();
+    });
+
+  }catch(error){
+    console.error(
+      "Supabase auth initialization failed:",
+      error
+    );
+
+    /*
+     * Auth failure must never prevent the application
+     * from rendering.
+     */
+    session=null;
+    render();
   }
+
+  if(session && CONFIGURED){
+    refreshProviderState(true);
+  }
+}
 
   const ICONS={
     home:'⌂',
