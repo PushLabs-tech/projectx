@@ -1,0 +1,8 @@
+{
+  "name": "Builder — Universal Creation Engine",
+  "description": "Universal Creation Engine. Describe anything. Build it, test it, verify it, ship it.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

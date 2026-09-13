@@ -4,14 +4,17 @@
   "version": "14.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
     "serve": "npx serve .",
     "check": "node scripts/smoke-test.mjs",
     "check:app": "node --check app.js",
     "security:scan": "node scripts/security-scan.mjs",
     "test:router": "node scripts/model-router-test.mjs",
     "simulate:all": "node scripts/simulate-all.mjs",
-    "audit:features": "node scripts/simulate-all.mjs"
+    "test:matrix": "node scripts/engine-test-matrix.mjs",
+    "audit:features": "node scripts/simulate-all.mjs",
+    "test": "npm run check && npm run security:scan && npm run test:router && npm run simulate:all && npm run test:matrix"
   },
   "devDependencies": {
     "vite": "^7.0.0"
