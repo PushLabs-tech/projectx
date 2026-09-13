@@ -1,6 +1,6 @@
 window.BUILDER_CONFIG = {
-  SUPABASE_URL: "YOUR_SUPABASE_URL",
-  SUPABASE_PUBLISHABLE_KEY: "YOUR_SUPABASE_PUBLISHABLE_KEY",
+  SUPABASE_URL: "https://homgaryumqbrnjcfkezi.supabase.co",
+  SUPABASE_PUBLISHABLE_KEY: "sb_publishable_PTIEJYD1xCuxpv2WFXmV4Q_Mg3XTms2",
   GA_MEASUREMENT_ID: "",
   SITE_URL: "https://pushlabs-tech.github.io/projectx/"
 };
