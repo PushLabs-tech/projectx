@@ -665,28 +665,28 @@ import * as Engine from './universal-engine.js';
       reply = `Transformed project into a mobile-first responsive application with touch navigation and responsive viewport.`;
     } else if (/\b(cart|shop|store|checkout|product|inventory|buy|ecommerce)\b/.test(raw) && !currentFiles["index.html"]?.includes("cart-drawer")) {
       const shopProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildCommerceArtifact(shopProj);
+      const arts = Engine.buildStartupArtifact(shopProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
       reply = `Added full ecommerce functionality: interactive product catalog, category filters, cart drawer, and checkout modal flow.`;
     } else if (/\b(game|flappy|canvas|playable|score|arcade)\b/.test(raw) && !currentFiles["game.js"]) {
       const gameProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildGameArtifact(gameProj);
+      const arts = Engine.buildStartupArtifact(gameProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
       reply = `Generated 60fps canvas game engine with physics loop, keyboard and touch controls, score tracking, and persistent best scores.`;
     } else if (/\b(dashboard|chart|csv|data|analytics|metric|table)\b/.test(raw) && !currentFiles["index.html"]?.includes("metricChart")) {
       const dataProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildDataDashboardArtifact(dataProj);
+      const arts = Engine.buildStartupArtifact(dataProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
       reply = `Created interactive analytics dashboard with real-time SVG trend chart, KPI summary cards, filterable data explorer, and CSV export.`;
     } else if (/\b(research|paper|citation|medical|study|journal)\b/.test(raw) && !currentFiles["index.html"]?.includes("Citations")) {
       const resProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildResearchArtifact(resProj);
+      const arts = Engine.buildStudyArtifact(resProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
@@ -1923,8 +1923,8 @@ import * as Engine from './universal-engine.js';
     }
 
     try {
-      if(window.Engine && typeof Engine.synthesizeUniversalProject === "function"){
-        const p = Engine.synthesizeUniversalProject(intent);
+      if(window.Engine && typeof Engine.createProject === "function"){
+        const p = Engine.createProject(intent);
         state.projects = [p, ...(state.projects || [])];
         state.projectId = p.id;
         state.route = "project";
@@ -4795,6 +4795,11 @@ import * as Engine from './universal-engine.js';
     ];
     const ready=checks.every(Boolean);
     return `<div class="ship-panel"><div class="ship-hero ${ready?"ready":""}"><div><span class="section-label">Release control</span><h3>${ready?"Ready for a release check":"Not ready yet"}</h3><p>Ship the correct artifact for this creation: publish, deploy, activate, export or share.</p></div><button class="primary" data-action="ship">${ready?"Ship creation →":"Run readiness →"}</button></div><div class="release-grid">${[["Build quality",checks[0],`${p?.progress||0}% complete`],["Tests",checks[1],"A passing suite is required"],["Security",checks[2],"No obvious high-risk findings"],["Project health",checks[3],`${p?.health||90}% health`]].map(([n,s,d])=>`<div><span class="check-status ${s?"passed":"warn"}">${s?"PASS":"WAIT"}</span><b>${n}</b><small>${d}</small></div>`).join("")}</div></div>`;
+  }
+
+  function newModal(){
+    const types=CREATION_TYPES.map(([t,d])=>`<button class="type-choice" data-type-choice="${esc(t)}"><b>${esc(t)}</b><span>${esc(d)}</span></button>`).join("");
+    return `<div class="modal-backdrop" data-close><div class="modal wide-modal" data-stop><div class="modal-head"><div><b>New creation</b><small>Start with intent. We'll ask only what matters.</small></div><button class="icon-btn" data-close>×</button></div><label>What are you trying to make?</label><textarea id="newText" class="input area" rows="5" placeholder="Describe the outcome, audience and constraints…"></textarea><label>Detected or preferred type</label><div class="type-grid">${types}</div><div class="modal-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="createProjectBtn">Continue →</button></div></div></div>`;
   }
 
   function providerListHTML(){const known=["google","nvidia","openai","anthropic","openrouter","bytez","generic"];const labels={google:"Google Gemini",nvidia:"NVIDIA NIM",openai:"OpenAI",anthropic:"Anthropic",openrouter:"OpenRouter",bytez:"Bytez",generic:"OpenAI-compatible"};return `<div class="provider-grid">${known.map(id=>{const p=state.providers.find(x=>x.provider===id);return `<div class="provider-card ${p?"connected":""}"><div class="provider-top"><span class="provider-logo">${labels[id][0]}</span><div><b>${labels[id]}</b><small>${p?`Connected · ${esc(p.label||"Personal")}`:"Optional"}</small></div><span class="status-dot ${p?"on":""}"></span></div><p>${id==="generic"?"Bring an OpenAI-compatible endpoint.":"Connect this provider with one API key; models stay abstracted behind the router."}</p><div class="provider-actions"><button class="secondary small" data-provider="${id}">${p?"Reconnect":"Connect"}</button>${p?`<button class="secondary small danger-btn" data-provider-remove="${id}">Remove</button>`:""}</div></div>`}).join("")}</div>`}
