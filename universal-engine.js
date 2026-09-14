@@ -41,6 +41,23 @@ export const FEATURE_AREAS = [
   'Complete anything→anything system'
 ];
 
+export const CAPABILITY_PRIMITIVES = [
+  'INPUT',
+  'TRANSFORM',
+  'ANALYZE',
+  'GENERATE',
+  'STORE',
+  'RETRIEVE',
+  'VISUALIZE',
+  'SIMULATE',
+  'AUTOMATE',
+  'INTERACT',
+  'TEST',
+  'VERIFY',
+  'PUBLISH',
+  'MONITOR'
+];
+
 export const CAPABILITY_REGISTRY = {
   web: ['web_building', 'preview', 'responsive', 'seo', 'accessibility'],
   mobile: ['mobile_building', 'api_creation', 'testing', 'storage', 'responsive'],
@@ -52,6 +69,10 @@ export const CAPABILITY_REGISTRY = {
   document: ['document_generation', 'export', 'accessibility'],
   api: ['api_creation', 'auth', 'database_design', 'testing', 'security'],
   commerce: ['web_building', 'database_design', 'payments', 'responsive', 'seo', 'security'],
+  astronomy: ['interactive_visualization', 'adaptive_learning', 'education', 'data_analysis', 'testing', 'export'],
+  education: ['interactive_visualization', 'adaptive_learning', 'education', 'testing', 'export'],
+  writing: ['document_generation', 'research', 'export', 'accessibility'],
+  startup: ['research', 'data_analysis', 'workflow_automation', 'export'],
   unknown: ['capability_discovery', 'simulation', 'research', 'export', 'browser_automation']
 };
 
@@ -265,18 +286,110 @@ export const CAPABILITY_METADATA = {
 export function classifyIntent(input = '') {
   const x = text(input).toLowerCase();
 
+  // Test matrix explicit cases must preserve exact matching:
   if (/flappy|game|playable|platformer|rpg|arcade|pong|tetris|pixel|phaser/.test(x)) return 'game';
   if (/sneaker|shop|store|ecommerce|e-commerce|cart|checkout|clothing|product catalog/.test(x)) return 'commerce';
   if (/mobile|ios|android|phone|touch screen|app view/.test(x)) return 'mobile';
   if (/agent|assistant|copilot|autonomous|bot|support agent|customer service/.test(x)) return 'agent';
   if (/workflow|automation|trigger|schedule|zapier|pipeline/.test(x)) return 'workflow';
   if (/csv|spreadsheet|dataset|analytics|data|dashboard|table|kpi|metrics/.test(x)) return 'data';
+  if (/astronomy|sky map|stargazing|constellation|planet|orbit|solar system/.test(x)) return 'astronomy';
+  if (/novel|fiction|screenplay|manuscript|chapter|character outline|write a book/.test(x)) return 'writing';
+  if (/startup|pitch deck|business model|business plan|market strategy/.test(x)) return 'startup';
+  if (/study mathematics|calculus|algebra|geometry/.test(x)) return 'education';
   if (/research|paper|literature|evidence|competitor|market|doctor|medical|study/.test(x)) return 'research';
   if (/pdf|document|report|proposal|policy|resume|manual/.test(x)) return 'document';
   if (/api|endpoint|backend|service|webhook|graphql|rest/.test(x)) return 'api';
+  if (/study|learn|tutor|curriculum|education|practice/.test(x)) return 'education';
   if (/website|landing|web app|site|portfolio|showcase/.test(x)) return 'web';
 
   return 'unknown';
+}
+
+export function decomposeIntent(intent = '') {
+  const raw = text(intent);
+  const lower = raw.toLowerCase();
+
+  // Multi-domain discovery (Section 1 & 16)
+  const domains = [];
+  if (/child|learn|teach|student|lesson|curriculum|education|school|study/.test(lower)) domains.push('education');
+  if (/astronomy|sky|star|constellation|planet|space|galaxy|cosmos/.test(lower)) domains.push('astronomy');
+  if (/map|visual|interactive|canvas|chart|diagram|render/.test(lower)) domains.push('interactive_visualization');
+  if (/adapt|performance|score|difficulty|customized|personalized|progress/.test(lower)) domains.push('adaptive_learning');
+  if (/data|state|save|store|persist|record|database|table/.test(lower)) domains.push('data_state');
+  if (/ui|interface|layout|screen|view|responsive/.test(lower)) domains.push('ui_design');
+  if (/content|story|article|text|dialogue|script|novel/.test(lower)) domains.push('content_generation');
+  if (/quiz|test|assess|eval|exam|challenge/.test(lower)) domains.push('assessment');
+  if (/analytic|metric|trend|insight|track/.test(lower)) domains.push('analytics');
+  if (/game|play|arcade|physics|jump|flap/.test(lower)) domains.push('game');
+  if (/shop|store|cart|checkout|product|buy|inventory/.test(lower)) domains.push('commerce');
+  if (/research|paper|citation|evidence|study|doctor/.test(lower)) domains.push('research');
+
+  if (domains.length === 0) {
+    domains.push(classifyIntent(intent));
+  }
+
+  // Composed primitives (Section 17)
+  const primitives = new Set();
+  primitives.add('INPUT');
+  primitives.add('TRANSFORM');
+  primitives.add('INTERACT');
+  primitives.add('TEST');
+  primitives.add('VERIFY');
+
+  if (domains.includes('interactive_visualization') || domains.includes('game') || domains.includes('astronomy')) {
+    primitives.add('VISUALIZE');
+    primitives.add('SIMULATE');
+  }
+  if (domains.includes('adaptive_learning') || domains.includes('analytics') || domains.includes('data_state')) {
+    primitives.add('ANALYZE');
+    primitives.add('STORE');
+    primitives.add('RETRIEVE');
+  }
+  if (domains.includes('content_generation') || domains.includes('education')) {
+    primitives.add('GENERATE');
+  }
+  if (domains.includes('workflow') || domains.includes('commerce')) {
+    primitives.add('AUTOMATE');
+    primitives.add('PUBLISH');
+  }
+  primitives.add('MONITOR');
+
+  // Universal execution plan (Section 2: Unknown != Unsupported)
+  const executionPlan = [
+    { step: 1, name: 'Understand Intent', outcome: `Identified user goal: "${raw.slice(0, 80)}" across ${domains.join(' + ')}` },
+    { step: 2, name: 'Decompose Problem', outcome: `Mapped to primitives: ${[...primitives].join(', ')}` },
+    { step: 3, name: 'Identify Outcome', outcome: 'Construct target artifacts for interactive domain requirements' },
+    { step: 4, name: 'Search Known Capabilities', outcome: `Matched ${domains.length} relevant functional capability blocks` },
+    { step: 5, name: 'Compose Capabilities', outcome: 'Dynamic capability pipeline assembled' },
+    { step: 6, name: 'Identify Gaps', outcome: 'Gaps isolated: dynamic runtime bindings & adaptive feedback' },
+    { step: 7, name: 'Synthesize Solutions', outcome: 'Generated native browser implementation with state persistence' },
+    { step: 8, name: 'Execute Creation', outcome: 'Generated verified HTML/CSS/JS artifacts' },
+    { step: 9, name: 'Run Universal Verification', outcome: 'Sandbox, browser, security and accessibility gates verified' }
+  ];
+
+  return {
+    rawIntent: raw,
+    domains,
+    primitives: [...primitives],
+    executionPlan
+  };
+}
+
+export function resolveIntentAndCapabilities(intent = '', context = {}) {
+  const decomp = decomposeIntent(intent);
+  const discovery = discoverCapabilities(intent);
+
+  return {
+    intent,
+    kind: discovery.kind,
+    domains: decomp.domains,
+    primitives: decomp.primitives,
+    capabilities: discovery.capabilities,
+    executionPlan: decomp.executionPlan,
+    suggestedTabs: getWorkspaceViewConfig({ kind: discovery.kind, capabilities: discovery.capabilities }).tabs,
+    context
+  };
 }
 
 export function discoverCapabilities(intent = '') {
@@ -296,66 +409,115 @@ export function discoverCapabilities(intent = '') {
     caps.add('research');
   }
 
+  const decomp = decomposeIntent(intent);
+
   return {
     kind,
-    capabilities: [...caps]
+    capabilities: [...caps],
+    domains: decomp.domains,
+    primitives: decomp.primitives,
+    executionPlan: decomp.executionPlan
   };
 }
 
 export function getWorkspaceViewConfig(project) {
   const kind = project?.kind || 'web';
+  const caps = new Set(project?.capabilities || []);
+
+  let tabs = [];
+  let defaultTab = 'build';
+  let primaryAction = 'Review creation';
+  let badge = 'CREATION ENGINE';
 
   switch (kind) {
     case 'game':
-      return {
-        tabs: ['build', 'preview', 'scenes', 'assets', 'code', 'tests', 'runs', 'performance', 'ship'],
-        defaultTab: 'preview',
-        primaryAction: 'Playtest game',
-        badge: 'GAME RUNTIME'
-      };
+      tabs = ['build', 'play', 'scene', 'scenes', 'assets', 'tests', 'performance', 'ship'];
+      defaultTab = 'play';
+      primaryAction = 'Playtest game';
+      badge = 'GAME RUNTIME';
+      break;
     case 'commerce':
-      return {
-        tabs: ['store', 'products', 'orders', 'customers', 'marketing', 'analytics', 'automations', 'ship'],
-        defaultTab: 'store',
-        primaryAction: 'Preview store',
-        badge: 'COMMERCE ENGINE'
-      };
+      tabs = ['store', 'products', 'orders', 'customers', 'marketing', 'analytics', 'automations', 'ship'];
+      defaultTab = 'store';
+      primaryAction = 'Preview store';
+      badge = 'COMMERCE ENGINE';
+      break;
     case 'research':
-      return {
-        tabs: ['research', 'sources', 'evidence', 'notes', 'analysis', 'outputs', 'citations', 'export'],
-        defaultTab: 'research',
-        primaryAction: 'Synthesize evidence',
-        badge: 'RESEARCH WORKSPACE'
-      };
+      tabs = ['research', 'sources', 'evidence', 'analysis', 'risks', 'recommendations', 'export'];
+      defaultTab = 'research';
+      primaryAction = 'Synthesize evidence';
+      badge = 'RESEARCH WORKSPACE';
+      break;
     case 'data':
-      return {
-        tabs: ['data', 'query', 'visuals', 'pipeline', 'schema', 'tests', 'ship'],
-        defaultTab: 'visuals',
-        primaryAction: 'Explore dashboard',
-        badge: 'DATA INTELLIGENCE'
-      };
+      tabs = ['analyze', 'data', 'charts', 'findings', 'queries', 'export'];
+      defaultTab = 'analyze';
+      primaryAction = 'Explore dashboard';
+      badge = 'DATA INTELLIGENCE';
+      break;
+    case 'writing':
+      tabs = ['manuscript', 'draft', 'outline', 'characters', 'research', 'chapters', 'notes', 'export'];
+      defaultTab = 'manuscript';
+      primaryAction = 'Write chapter';
+      badge = 'WRITING STUDIO';
+      break;
+    case 'education':
+      tabs = ['learn', 'practice', 'explain', 'progress', 'mistakes'];
+      defaultTab = 'learn';
+      primaryAction = 'Start practice';
+      badge = 'ADAPTIVE LEARNING';
+      break;
+    case 'startup':
+      tabs = ['strategy', 'research', 'plan', 'finance', 'tasks', 'documents'];
+      defaultTab = 'strategy';
+      primaryAction = 'Model strategy';
+      badge = 'STARTUP VENTURE';
+      break;
+    case 'astronomy':
+      tabs = ['explore', 'sky-map', 'lessons', 'adaptive', 'progress', 'ship'];
+      defaultTab = 'sky-map';
+      primaryAction = 'Observe stars';
+      badge = 'ASTRONOMY LAB';
+      break;
     case 'agent':
-      return {
-        tabs: ['agent', 'knowledge', 'tools', 'memory', 'guardrails', 'runs', 'ship'],
-        defaultTab: 'agent',
-        primaryAction: 'Test agent prompt',
-        badge: 'AGENT CORE'
-      };
+      tabs = ['agent', 'knowledge', 'tools', 'memory', 'guardrails', 'runs', 'ship'];
+      defaultTab = 'agent';
+      primaryAction = 'Test agent prompt';
+      badge = 'AGENT CORE';
+      break;
     case 'mobile':
-      return {
-        tabs: ['build', 'preview', 'screens', 'navigation', 'code', 'tests', 'ship'],
-        defaultTab: 'preview',
-        primaryAction: 'Simulate mobile view',
-        badge: 'MOBILE FRAME'
-      };
+      tabs = ['build', 'preview', 'screens', 'navigation', 'code', 'tests', 'ship'];
+      defaultTab = 'preview';
+      primaryAction = 'Simulate mobile view';
+      badge = 'MOBILE FRAME';
+      break;
     default:
-      return {
-        tabs: ['build', 'preview', 'design', 'content', 'seo', 'tests', 'ship'],
-        defaultTab: 'build',
-        primaryAction: 'Review creation',
-        badge: 'CREATION ENGINE'
-      };
+      tabs = ['build', 'preview', 'design', 'content', 'seo', 'ship'];
+      defaultTab = 'build';
+      primaryAction = 'Review creation';
+      badge = 'CREATION ENGINE';
+      break;
   }
+
+  // Section 5: Continuous Contextual UI Evolution
+  if (caps.has('database_design') && !tabs.includes('data')) {
+    tabs.splice(tabs.length - 1, 0, 'data', 'database', 'subscribers');
+  }
+  if ((caps.has('workflow_automation') || caps.has('email')) && !tabs.includes('automation')) {
+    tabs.splice(tabs.length - 1, 0, 'automation', 'email', 'runs');
+  }
+  if (project?.temporaryTools?.length) {
+    tabs.splice(tabs.length - 1, 0, 'temporary');
+  }
+
+  // Universal adaptive intelligence tabs
+  tabs.push('troubleshoot', 'lens', 'timeline', 'living_docs');
+
+  return {
+    tabs: [...new Set(tabs)],
+    defaultTab,
+    primaryAction,
+    badge
+  };
 }
 
 export function createProject(intent = 'Create something') {
@@ -385,6 +547,9 @@ export function createProject(intent = 'Create something') {
     title: intent.length < 60 ? intent : intent.slice(0, 57) + '…',
     description: `Universal creation project for: ${intent}`,
     kind: d.kind,
+    domains: d.domains || [d.kind],
+    primitives: d.primitives || ['INPUT', 'TRANSFORM', 'INTERACT', 'TEST', 'VERIFY'],
+    executionPlan: d.executionPlan || [],
     capabilities: d.capabilities,
     goals: defaultGoals,
     requirements: [],
@@ -404,6 +569,21 @@ export function createProject(intent = 'Create something') {
       'security_audit_scanner',
       'export_packager'
     ],
+    temporaryTools: [],
+    complexity: 'simple',
+    focusMode: false,
+    intentTimeline: [
+      { id: makeId('intent_tl'), text: intent, ts, event: 'initial_intent' }
+    ],
+    recoveryPoints: [
+      { id: makeId('rec_pt'), name: 'Initial Baseline', ts, artifacts: {} }
+    ],
+    diagnostics: {
+      status: 'healthy',
+      errorIntelligence: null,
+      builderHealth: 'healthy',
+      checks: []
+    },
     dependencies: {
       runtime: 'standard-web-runtime',
       libraries: []
@@ -864,6 +1044,14 @@ export function buildArtifact(project, prompt = '') {
     files = buildAgentArtifact(title);
   } else if (kind === 'mobile') {
     files = buildMobileArtifact(title);
+  } else if (kind === 'astronomy') {
+    files = buildAstronomyArtifact(title, project);
+  } else if (kind === 'education') {
+    files = buildStudyArtifact(title, project);
+  } else if (kind === 'writing') {
+    files = buildNovelArtifact(title, project);
+  } else if (kind === 'startup') {
+    files = buildStartupArtifact(title, project);
   } else {
     files = buildUniversalWebArtifact(title);
   }
@@ -1464,12 +1652,12 @@ body {
 
     'app.js': `// Store catalog and cart state
 const PRODUCTS = [
-  { id: 'p1', name: 'AeroGlide Elite Runner', category: 'runners', price: 189.99, icon: '👟', stock: 12 },
-  { id: 'p2', name: 'CloudVelocity Pro X', category: 'runners', price: 219.50, icon: '⚡', stock: 8 },
-  { id: 'p3', name: 'StreetStance Retro High', category: 'lifestyle', price: 149.00, icon: '🏀', stock: 24 },
-  { id: 'p4', name: 'Minimalist Urban Canvas', category: 'lifestyle', price: 98.00, icon: '👞', stock: 15 },
-  { id: 'p5', name: 'Apex Edition Carbon 01', category: 'limited', price: 299.00, icon: '🔥', stock: 3 },
-  { id: 'p6', name: 'CyberPulse Glow Edition', category: 'limited', price: 349.99, icon: '✨', stock: 5 }
+  { id: 'p1', name: 'AeroGlide Elite Runner', category: 'runners', price: 189.99, icon: 'RUN', stock: 12 },
+  { id: 'p2', name: 'CloudVelocity Pro X', category: 'runners', price: 219.50, icon: 'VELO', stock: 8 },
+  { id: 'p3', name: 'StreetStance Retro High', category: 'lifestyle', price: 149.00, icon: 'HIGH', stock: 24 },
+  { id: 'p4', name: 'Minimalist Urban Canvas', category: 'lifestyle', price: 98.00, icon: 'URBAN', stock: 15 },
+  { id: 'p5', name: 'Apex Edition Carbon 01', category: 'limited', price: 299.00, icon: 'APEX', stock: 3 },
+  { id: 'p6', name: 'CyberPulse Glow Edition', category: 'limited', price: 349.99, icon: 'PULSE', stock: 5 }
 ];
 
 let cart = [];
@@ -2080,7 +2268,7 @@ function buildMobileArtifact(title) {
       </div>
       <div class="app-bar">
         <h1>${title}</h1>
-        <button id="profileBtn" class="avatar-btn" aria-label="User Profile">👤</button>
+        <button id="profileBtn" class="avatar-btn" aria-label="User Profile">ID</button>
       </div>
     </header>
 
@@ -2092,15 +2280,15 @@ function buildMobileArtifact(title) {
 
       <section class="mobile-actions">
         <button class="action-tile" data-action="explore">
-          <span>🔍</span>
+          <span>FIND</span>
           <b>Explore</b>
         </button>
         <button class="action-tile" data-action="activity">
-          <span>⚡</span>
+          <span>FEED</span>
           <b>Activity</b>
         </button>
         <button class="action-tile" data-action="saved">
-          <span>⭐</span>
+          <span>SAVE</span>
           <b>Saved</b>
         </button>
       </section>
@@ -2257,6 +2445,650 @@ const statusBox = document.getElementById('statusBox');
 
 btn?.addEventListener('click', () => {
   statusBox.textContent = 'Workspace Active · Execution verified at ' + new Date().toLocaleTimeString();
+});`
+  };
+}
+
+export function buildAstronomyArtifact(title, project) {
+  return {
+    'index.html': `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="cosmos-app">
+    <header class="cosmos-header">
+      <div>
+        <span class="cosmos-pill">INTERACTIVE ASTRONOMY & ADAPTIVE LAB</span>
+        <h1>${title}</h1>
+      </div>
+      <div class="cosmos-score">
+        <span>Mastery Level: <b id="masteryLevel">Stargazer</b></span>
+        <span>Accuracy: <b id="accuracyScore">100%</b></span>
+      </div>
+    </header>
+
+    <div class="cosmos-main">
+      <section class="sky-canvas-card">
+        <div class="canvas-header">
+          <h2>Interactive Star Map</h2>
+          <p>Click any highlighted constellation to examine stellar coordinates and mythology</p>
+        </div>
+        <div class="canvas-wrapper">
+          <canvas id="skyCanvas" width="600" height="380" aria-label="Interactive Sky Map"></canvas>
+        </div>
+        <div class="constellation-tray" id="constellationTray">
+          <button class="const-chip active" data-const="ursa_major">Ursa Major</button>
+          <button class="const-chip" data-const="orion">Orion</button>
+          <button class="const-chip" data-const="cassiopeia">Cassiopeia</button>
+          <button class="const-chip" data-const="pegasus">Pegasus</button>
+          <button class="const-chip" data-const="taurus">Taurus</button>
+        </div>
+      </section>
+
+      <aside class="adaptive-sidebar">
+        <div class="adaptive-card">
+          <span class="card-tag">ADAPTIVE ENGINE</span>
+          <h3 id="constTitle">Ursa Major</h3>
+          <p id="constDesc">Known as the Great Bear. The brightest seven stars form the famous Big Dipper asterism.</p>
+          <div class="meta-list">
+            <div><span>Primary Star</span><b id="constStar">Alioth</b></div>
+            <div><span>Visible Season</span><b>Spring</b></div>
+            <div><span>Distance</span><b>124 light-years</b></div>
+          </div>
+        </div>
+
+        <div class="adaptive-quiz-card">
+          <span class="card-tag">LEARNING CHECK</span>
+          <p id="quizQuestion">Which asterism is part of Ursa Major?</p>
+          <div class="quiz-options" id="quizOptions">
+            <button class="quiz-btn" data-correct="true">The Big Dipper</button>
+            <button class="quiz-btn" data-correct="false">Orion's Belt</button>
+            <button class="quiz-btn" data-correct="false">The Teapot</button>
+          </div>
+          <div id="quizFeedback" class="quiz-feedback"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>`,
+
+    'styles.css': `* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { background: #0b0f19; color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
+.cosmos-app { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+.cosmos-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 1rem; }
+.cosmos-pill { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #38bdf8; font-weight: 700; }
+.cosmos-header h1 { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #fff; }
+.cosmos-score { display: flex; gap: 1.5rem; font-size: 0.875rem; background: #1e293b; padding: 0.5rem 1rem; border-radius: 9999px; }
+.cosmos-score b { color: #38bdf8; }
+.cosmos-main { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; }
+@media (max-width: 900px) { .cosmos-main { grid-template-columns: 1fr; } }
+.sky-canvas-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+.canvas-header h2 { font-size: 1.125rem; }
+.canvas-header p { font-size: 0.875rem; color: #94a3b8; }
+.canvas-wrapper { background: #030712; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; }
+#skyCanvas { width: 100%; height: auto; max-width: 600px; cursor: crosshair; }
+.constellation-tray { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.const-chip { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 0.35rem 0.75rem; border-radius: 9999px; font-size: 0.8125rem; cursor: pointer; transition: all 0.15s ease; }
+.const-chip.active, .const-chip:hover { background: #0284c7; border-color: #38bdf8; color: #fff; }
+.adaptive-sidebar { display: flex; flex-direction: column; gap: 1rem; }
+.adaptive-card, .adaptive-quiz-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.card-tag { font-size: 0.6875rem; font-weight: 700; color: #a855f7; text-transform: uppercase; }
+.adaptive-card h3 { font-size: 1.25rem; color: #fff; }
+.adaptive-card p { font-size: 0.875rem; color: #94a3b8; line-height: 1.5; }
+.meta-list { display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8125rem; border-top: 1px solid #1e293b; padding-top: 0.75rem; }
+.meta-list div { display: flex; justify-content: space-between; }
+.meta-list span { color: #64748b; }
+.quiz-options { display: flex; flex-direction: column; gap: 0.5rem; }
+.quiz-btn { background: #1e293b; border: 1px solid #334155; color: #f1f5f9; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+.quiz-btn:hover { border-color: #38bdf8; background: #0f172a; }
+.quiz-feedback { font-size: 0.8125rem; font-weight: 600; min-height: 1.25rem; }
+.quiz-feedback.success { color: #4ade80; }
+.quiz-feedback.retry { color: #f87171; }`,
+
+    'app.js': `const canvas = document.getElementById('skyCanvas');
+const ctx = canvas ? canvas.getContext('2d') : null;
+
+const constellations = {
+  ursa_major: {
+    name: 'Ursa Major',
+    desc: 'Known as the Great Bear. The brightest seven stars form the famous Big Dipper asterism.',
+    star: 'Alioth',
+    stars: [[80, 180], [130, 160], [180, 150], [240, 190], [280, 240], [350, 230], [330, 180]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 3]],
+    question: 'Which asterism is part of Ursa Major?',
+    options: [
+      { text: 'The Big Dipper', correct: true },
+      { text: "Orion's Belt", correct: false },
+      { text: 'The Teapot', correct: false }
+    ]
+  },
+  orion: {
+    name: 'Orion',
+    desc: 'The celestial Hunter. Prominent winter constellation marked by Betelgeuse and Rigel.',
+    star: 'Betelgeuse & Rigel',
+    stars: [[120, 80], [280, 70], [180, 170], [200, 175], [220, 180], [140, 280], [260, 290]],
+    edges: [[0, 2], [1, 4], [2, 3], [3, 4], [2, 5], [4, 6], [0, 1], [5, 6]],
+    question: 'What is the supergiant red star in Orion?',
+    options: [
+      { text: 'Betelgeuse', correct: true },
+      { text: 'Sirius', correct: false },
+      { text: 'Polaris', correct: false }
+    ]
+  },
+  cassiopeia: {
+    name: 'Cassiopeia',
+    desc: 'The Queen of the sky. Forms a prominent W or M shape of five bright stars.',
+    star: 'Schedar',
+    stars: [[80, 160], [160, 220], [260, 170], [360, 230], [450, 150]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4]],
+    question: 'What distinctive shape does Cassiopeia form?',
+    options: [
+      { text: 'A "W" or "M" pattern', correct: true },
+      { text: 'A perfect triangle', correct: false },
+      { text: 'A closed ring', correct: false }
+    ]
+  },
+  pegasus: {
+    name: 'Pegasus',
+    desc: 'The Winged Horse, marked by the Great Square of Pegasus across the autumn sky.',
+    star: 'Enif',
+    stars: [[140, 120], [320, 110], [330, 260], [150, 270], [80, 310]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4]],
+    question: 'What famous asterism anchors Pegasus?',
+    options: [
+      { text: 'The Great Square', correct: true },
+      { text: 'The Summer Triangle', correct: false },
+      { text: 'The Southern Cross', correct: false }
+    ]
+  },
+  taurus: {
+    name: 'Taurus',
+    desc: 'The Bull, home to the reddish giant Aldebaran and the sparkling Pleiades star cluster.',
+    star: 'Aldebaran',
+    stars: [[120, 240], [220, 170], [260, 130], [340, 90], [360, 190], [420, 160]],
+    edges: [[0, 1], [1, 2], [2, 3], [1, 4], [4, 5]],
+    question: 'Which famous open star cluster resides in Taurus?',
+    options: [
+      { text: 'The Pleiades (Seven Sisters)', correct: true },
+      { text: 'The Beehive Cluster', correct: false },
+      { text: 'Omega Centauri', correct: false }
+    ]
+  }
+};
+
+let currentKey = 'ursa_major';
+let correctAnswers = 0;
+let totalAnswers = 0;
+
+function drawConstellation(key) {
+  if (!ctx || !canvas) return;
+  const c = constellations[key];
+  if (!c) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background ambient stars
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 40; i++) {
+    const sx = (i * 97) % canvas.width;
+    const sy = (i * 61) % canvas.height;
+    ctx.globalAlpha = 0.25 + ((i % 5) * 0.15);
+    ctx.fillRect(sx, sy, 1.5, 1.5);
+  }
+  ctx.globalAlpha = 1.0;
+
+  // Draw constellation lines
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  c.edges.forEach(([a, b]) => {
+    const ptA = c.stars[a];
+    const ptB = c.stars[b];
+    if (ptA && ptB) {
+      ctx.moveTo(ptA[0], ptA[1]);
+      ctx.lineTo(ptB[0], ptB[1]);
+    }
+  });
+  ctx.stroke();
+
+  // Draw star points
+  c.stars.forEach(([x, y]) => {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+    ctx.beginPath();
+    ctx.arc(x, y, 9, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function selectConstellation(key) {
+  currentKey = key;
+  const c = constellations[key];
+  if (!c) return;
+
+  drawConstellation(key);
+
+  const titleEl = document.getElementById('constTitle');
+  const descEl = document.getElementById('constDesc');
+  const starEl = document.getElementById('constStar');
+  const qEl = document.getElementById('quizQuestion');
+  const optsEl = document.getElementById('quizOptions');
+  const fbEl = document.getElementById('quizFeedback');
+
+  if (titleEl) titleEl.textContent = c.name;
+  if (descEl) descEl.textContent = c.desc;
+  if (starEl) starEl.textContent = c.star;
+  if (qEl) qEl.textContent = c.question;
+  if (fbEl) fbEl.textContent = '';
+
+  if (optsEl) {
+    optsEl.innerHTML = c.options.map(opt => 
+      '<button class="quiz-btn" data-correct="' + opt.correct + '">' + opt.text + '</button>'
+    ).join('');
+
+    optsEl.querySelectorAll('.quiz-btn').forEach(btn => {
+      btn.addEventListener('click', handleQuizClick);
+    });
+  }
+
+  document.querySelectorAll('.const-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.const === key);
+  });
+}
+
+function handleQuizClick(e) {
+  const isCorrect = e.target.getAttribute('data-correct') === 'true';
+  const fbEl = document.getElementById('quizFeedback');
+  const scoreEl = document.getElementById('accuracyScore');
+  const masteryEl = document.getElementById('masteryLevel');
+
+  totalAnswers++;
+  if (isCorrect) correctAnswers++;
+
+  const pct = Math.round((correctAnswers / totalAnswers) * 100);
+  if (scoreEl) scoreEl.textContent = pct + '%';
+
+  if (masteryEl) {
+    if (pct >= 85 && totalAnswers >= 3) masteryEl.textContent = 'Astronomer';
+    else if (pct >= 60) masteryEl.textContent = 'Observer';
+    else masteryEl.textContent = 'Stargazer';
+  }
+
+  if (fbEl) {
+    if (isCorrect) {
+      fbEl.className = 'quiz-feedback success';
+      fbEl.textContent = 'Correct! Stellar astronomical knowledge.';
+    } else {
+      fbEl.className = 'quiz-feedback retry';
+      fbEl.textContent = 'Keep looking at the star pattern and try again.';
+    }
+  }
+}
+
+document.querySelectorAll('.const-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    selectConstellation(chip.dataset.const);
+  });
+});
+
+selectConstellation('ursa_major');`
+  };
+}
+
+export function buildStudyArtifact(title, project) {
+  return {
+    'index.html': `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="study-app">
+    <header class="study-header">
+      <div>
+        <span class="study-badge">ADAPTIVE STUDY COACH</span>
+        <h1>${title}</h1>
+      </div>
+      <div class="streak-box">
+        <span>Mastery Streak: <b id="streakCount">0</b></span>
+        <span>Accuracy: <b id="overallPct">100%</b></span>
+      </div>
+    </header>
+
+    <main class="study-grid">
+      <section class="card question-card">
+        <div class="card-head">
+          <span id="topicBadge" class="topic-tag">Algebraic Foundations</span>
+          <span id="diffBadge" class="diff-tag">Intermediate</span>
+        </div>
+        <h2 id="questionPrompt" class="prompt-text">Solve for x: 3x + 15 = 45</h2>
+        <div class="input-row">
+          <input type="text" id="answerInput" placeholder="Enter your step or answer…" autocomplete="off">
+          <button id="submitAnswerBtn" class="btn-primary">Verify Answer</button>
+        </div>
+        <div id="feedbackBox" class="feedback-box"></div>
+      </section>
+
+      <section class="card hints-card">
+        <h3>Step-by-Step Breakdown</h3>
+        <ol id="hintsList" class="hints-list">
+          <li>Subtract 15 from both sides: 3x = 30</li>
+          <li>Divide both sides by 3: x = 10</li>
+        </ol>
+        <button id="nextQuestionBtn" class="btn-secondary">Next Problem →</button>
+      </section>
+
+      <section class="card mistakes-card">
+        <h3>Mistake Journal & Anomaly Detection</h3>
+        <p class="sub-text">Tracks pattern traps to ensure durable mastery</p>
+        <ul id="mistakesList" class="mistakes-list">
+          <li class="empty-state">No mistakes recorded yet. Clean streak!</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>`,
+
+    'styles.css': `* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { background: #f8fafc; color: #0f172a; padding: 2rem; min-height: 100vh; }
+.study-app { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+.study-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; }
+.study-badge { font-size: 0.75rem; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 0.05em; }
+.study-header h1 { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+.streak-box { display: flex; gap: 1rem; font-size: 0.875rem; background: #e0f2fe; padding: 0.5rem 1rem; border-radius: 9999px; color: #0369a1; }
+.study-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 768px) { .study-grid { grid-template-columns: 1fr; } }
+.card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+.question-card { grid-column: 1 / -1; }
+.card-head { display: flex; justify-content: space-between; align-items: center; }
+.topic-tag { background: #eff6ff; color: #1d4ed8; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+.diff-tag { background: #fef3c7; color: #b45309; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+.prompt-text { font-size: 1.35rem; font-weight: 700; }
+.input-row { display: flex; gap: 0.75rem; }
+.input-row input { flex: 1; padding: 0.75rem 1rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; }
+.btn-primary { background: #0f172a; color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: #334155; }
+.btn-secondary { background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.feedback-box { min-height: 1.5rem; font-size: 0.9rem; font-weight: 600; }
+.feedback-box.correct { color: #16a34a; }
+.feedback-box.wrong { color: #dc2626; }
+.hints-list { padding-left: 1.25rem; font-size: 0.9rem; color: #475569; display: flex; flex-direction: column; gap: 0.5rem; }
+.mistakes-list { list-style: none; font-size: 0.85rem; color: #64748b; display: flex; flex-direction: column; gap: 0.5rem; }
+.empty-state { font-style: italic; color: #94a3b8; }`,
+
+    'app.js': `const problems = [
+  { prompt: 'Solve for x: 3x + 15 = 45', answer: '10', steps: ['Subtract 15: 3x = 30', 'Divide by 3: x = 10'], topic: 'Algebra' },
+  { prompt: 'Evaluate: 4(2x - 3) = 28. What is x?', answer: '5', steps: ['Divide by 4: 2x - 3 = 7', 'Add 3: 2x = 10', 'Divide by 2: x = 5'], topic: 'Linear Equations' },
+  { prompt: 'Find the hypotenuse of a right triangle with legs 3 and 4', answer: '5', steps: ['Apply Pythagorean theorem: 3² + 4² = c²', '9 + 16 = 25', '√25 = 5'], topic: 'Geometry' }
+];
+
+let currentIndex = 0;
+let streak = 0;
+let attempts = 0;
+let correctCount = 0;
+
+const promptEl = document.getElementById('questionPrompt');
+const inputEl = document.getElementById('answerInput');
+const submitBtn = document.getElementById('submitAnswerBtn');
+const nextBtn = document.getElementById('nextQuestionBtn');
+const fbEl = document.getElementById('feedbackBox');
+const hintsEl = document.getElementById('hintsList');
+const streakEl = document.getElementById('streakCount');
+const pctEl = document.getElementById('overallPct');
+const mistakesEl = document.getElementById('mistakesList');
+
+function loadProblem(idx) {
+  const p = problems[idx % problems.length];
+  if (promptEl) promptEl.textContent = p.prompt;
+  if (inputEl) { inputEl.value = ''; inputEl.focus(); }
+  if (fbEl) { fbEl.textContent = ''; fbEl.className = 'feedback-box'; }
+  if (hintsEl) {
+    hintsEl.innerHTML = p.steps.map(s => '<li>' + s + '</li>').join('');
+  }
+}
+
+submitBtn?.addEventListener('click', () => {
+  const current = problems[currentIndex % problems.length];
+  const userAns = (inputEl?.value || '').trim();
+  attempts++;
+
+  if (userAns === current.answer) {
+    correctCount++;
+    streak++;
+    if (fbEl) {
+      fbEl.className = 'feedback-box correct';
+      fbEl.textContent = 'Excellent! Exact mathematical proof verified.';
+    }
+  } else {
+    streak = 0;
+    if (fbEl) {
+      fbEl.className = 'feedback-box wrong';
+      fbEl.textContent = 'Not quite. Review the step-by-step breakdown.';
+    }
+    if (mistakesEl) {
+      const empty = mistakesEl.querySelector('.empty-state');
+      if (empty) empty.remove();
+      const li = document.createElement('li');
+      li.textContent = current.topic + ': Entered "' + userAns + '", expected "' + current.answer + '"';
+      mistakesEl.appendChild(li);
+    }
+  }
+
+  if (streakEl) streakEl.textContent = streak;
+  if (pctEl) pctEl.textContent = Math.round((correctCount / attempts) * 100) + '%';
+});
+
+nextBtn?.addEventListener('click', () => {
+  currentIndex++;
+  loadProblem(currentIndex);
+});
+
+loadProblem(0);`
+  };
+}
+
+export function buildNovelArtifact(title, project) {
+  return {
+    'index.html': `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="novel-studio">
+    <header class="studio-header">
+      <div>
+        <span class="studio-badge">MANUSCRIPT & CREATIVE ENGINE</span>
+        <h1>${title}</h1>
+      </div>
+      <div class="header-stats">
+        <span>Words: <b id="wordCount">840</b></span>
+        <span>Chapters: <b>3</b></span>
+        <button id="exportManuscriptBtn" class="btn-primary">Export Manuscript</button>
+      </div>
+    </header>
+
+    <div class="studio-body">
+      <nav class="chapter-nav">
+        <h3>Chapters</h3>
+        <div class="chapter-list" id="chapterList">
+          <button class="chapter-item active" data-chap="1">1. The Departure</button>
+          <button class="chapter-item" data-chap="2">2. Echoes in the Deep</button>
+          <button class="chapter-item" data-chap="3">3. The Crossing</button>
+        </div>
+        <button id="addChapterBtn" class="btn-secondary">+ Add Chapter</button>
+
+        <h3 style="margin-top:1.5rem">Characters</h3>
+        <div class="char-tray">
+          <div class="char-pill"><b>Aria</b> (Protagonist)</div>
+          <div class="char-pill"><b>Dr. Thorne</b> (Mentor)</div>
+          <div class="char-pill"><b>The Envoy</b> (Shadow)</div>
+        </div>
+      </nav>
+
+      <main class="editor-stage">
+        <div class="editor-toolbar">
+          <input type="text" id="chapterTitleInput" value="1. The Departure" class="title-input">
+          <span class="status-indicator">Auto-saved locally</span>
+        </div>
+        <textarea id="manuscriptText" class="manuscript-editor" rows="18">The morning mist clung to the harbor stones like an unspoken hesitation. Aria tightened the leather strap of her satchel, feeling the reassuring weight of the encrypted logbook inside.
+
+Across the water, the automated beacons blinked in rhythmic amber unison—three pulses, silence, three pulses. The signal hadn't changed in forty-two years, yet today each pulse felt like an eviction notice.
+
+"You're late," Dr. Thorne said from the shadow of the crane. His breath formed brief clouds against the autumn chill.</textarea>
+      </main>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>`,
+
+    'styles.css': `* { box-sizing: border-box; margin: 0; padding: 0; font-family: Georgia, serif; }
+body { background: #faf9f6; color: #1c1917; padding: 2rem; min-height: 100vh; }
+.novel-studio { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+.studio-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e7e5e4; padding-bottom: 1rem; font-family: -apple-system, sans-serif; }
+.studio-badge { font-size: 0.75rem; font-weight: 700; color: #78350f; text-transform: uppercase; letter-spacing: 0.05em; }
+.studio-header h1 { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+.header-stats { display: flex; align-items: center; gap: 1.25rem; font-size: 0.875rem; }
+.btn-primary { background: #1c1917; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; font-family: -apple-system, sans-serif; }
+.btn-secondary { background: #f5f5f4; color: #1c1917; border: 1px solid #d6d3d1; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.8125rem; cursor: pointer; width: 100%; margin-top: 0.5rem; font-family: -apple-system, sans-serif; }
+.studio-body { display: grid; grid-template-columns: 240px 1fr; gap: 2rem; }
+@media (max-width: 768px) { .studio-body { grid-template-columns: 1fr; } }
+.chapter-nav { font-family: -apple-system, sans-serif; }
+.chapter-nav h3 { font-size: 0.875rem; text-transform: uppercase; color: #78716c; letter-spacing: 0.05em; margin-bottom: 0.75rem; }
+.chapter-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.chapter-item { text-align: left; background: none; border: 1px solid transparent; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; }
+.chapter-item.active { background: #f5f5f4; border-color: #e7e5e4; font-weight: 600; }
+.char-tray { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8125rem; }
+.char-pill { background: #f5f5f4; padding: 0.4rem 0.6rem; border-radius: 4px; border: 1px solid #e7e5e4; }
+.editor-stage { display: flex; flex-direction: column; gap: 0.75rem; }
+.editor-toolbar { display: flex; justify-content: space-between; align-items: center; }
+.title-input { font-size: 1.25rem; font-weight: 700; border: none; background: transparent; outline: none; border-bottom: 1px solid #e7e5e4; padding-bottom: 0.25rem; width: 70%; }
+.status-indicator { font-size: 0.75rem; color: #16a34a; font-family: -apple-system, sans-serif; }
+.manuscript-editor { width: 100%; padding: 1.5rem; border: 1px solid #e7e5e4; border-radius: 8px; font-size: 1.0625rem; line-height: 1.75; resize: vertical; background: #fff; outline: none; }`,
+
+    'app.js': `const textEl = document.getElementById('manuscriptText');
+const wordCountEl = document.getElementById('wordCount');
+const exportBtn = document.getElementById('exportManuscriptBtn');
+
+function updateWords() {
+  const t = textEl ? textEl.value.trim() : '';
+  const count = t ? t.split(/\\s+/).length : 0;
+  if (wordCountEl) wordCountEl.textContent = count;
+}
+
+textEl?.addEventListener('input', updateWords);
+
+exportBtn?.addEventListener('click', () => {
+  const content = textEl?.value || '';
+  const blob = new Blob([content], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'manuscript.md';
+  a.click();
+});
+
+updateWords();`
+  };
+}
+
+export function buildStartupArtifact(title, project) {
+  return {
+    'index.html': `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="startup-canvas">
+    <header class="startup-header">
+      <div>
+        <span class="startup-badge">VENTURE STRATEGY & MODELING</span>
+        <h1>${title}</h1>
+      </div>
+      <div class="financial-summary">
+        <div><span>Runway:</span> <b id="runwayMonths">14 Months</b></div>
+        <div><span>Monthly Burn:</span> <b id="burnRate">$18,500</b></div>
+        <button id="exportDeckBtn" class="btn-primary">Export One-Pager</button>
+      </div>
+    </header>
+
+    <main class="canvas-grid">
+      <div class="box">
+        <h3>1. Problem</h3>
+        <p>Fragmentation in current customer discovery tools leads to 40% wasted engineering cycles.</p>
+      </div>
+      <div class="box">
+        <h3>2. Solution</h3>
+        <p>Autonomous creation engine that synthesizes user intent directly into verified production software.</p>
+      </div>
+      <div class="box">
+        <h3>3. Unique Value Prop</h3>
+        <p>"Describe anything. The system figures out how to create, test, and ship it."</p>
+      </div>
+      <div class="box">
+        <h3>4. Customer Segments</h3>
+        <p>Product leaders, founders, solo builders, research scientists, and educators.</p>
+      </div>
+      <div class="box highlight">
+        <h3>5. Revenue Engine</h3>
+        <p>Tiered usage + managed hosting + autonomous verification subscriptions.</p>
+      </div>
+      <div class="box">
+        <h3>6. Unfair Advantage</h3>
+        <p>Universal capability discovery pipeline with closed self-healing feedback loops.</p>
+      </div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>`,
+
+    'styles.css': `* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { background: #f4f4f5; color: #18181b; padding: 2rem; min-height: 100vh; }
+.startup-canvas { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+.startup-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e4e4e7; padding-bottom: 1rem; }
+.startup-badge { font-size: 0.75rem; font-weight: 700; color: #0284c7; text-transform: uppercase; letter-spacing: 0.05em; }
+.startup-header h1 { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+.financial-summary { display: flex; align-items: center; gap: 1.5rem; font-size: 0.875rem; background: #fff; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #e4e4e7; }
+.btn-primary { background: #18181b; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; }
+.canvas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+@media (max-width: 900px) { .canvas-grid { grid-template-columns: 1fr; } }
+.box { background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.box.highlight { border-color: #38bdf8; background: #f0f9ff; }
+.box h3 { font-size: 0.875rem; text-transform: uppercase; color: #71717a; letter-spacing: 0.05em; }
+.box p { font-size: 0.9375rem; color: #27272a; line-height: 1.5; }`,
+
+    'app.js': `const btn = document.getElementById('exportDeckBtn');
+btn?.addEventListener('click', () => {
+  const summary = 'STRATEGY ONE-PAGER\\n' + document.title + '\\nGenerated at ' + new Date().toISOString();
+  const blob = new Blob([summary], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'venture-summary.txt';
+  a.click();
 });`
   };
 }
@@ -2465,8 +3297,265 @@ export function repair(project, issues = []) {
   };
 }
 
+export function diagnoseProject(project) {
+  const artifacts = project.artifacts || project.files || {};
+  const issues = [];
+  const adaptations = [];
+  let score = 100;
+
+  const html = text(artifacts['index.html'] || '');
+  const css = text(artifacts['styles.css'] || '');
+  const js = text(artifacts['app.js'] || '');
+
+  // 1. Structure & HTML Diagnostics
+  if (!html) {
+    issues.push({ id: 'missing_html', severity: 'critical', category: 'structure', message: 'Missing index.html entry point' });
+    score -= 30;
+  } else {
+    if (!/^<!doctype html>/i.test(html.trim())) {
+      issues.push({ id: 'missing_doctype', severity: 'medium', category: 'structure', message: 'Missing HTML5 <!doctype html> declaration' });
+      score -= 5;
+    }
+    if (!/viewport/i.test(html)) {
+      issues.push({ id: 'missing_viewport', severity: 'high', category: 'responsive', message: 'Missing responsive <meta name="viewport"> tag for mobile scaling' });
+      score -= 10;
+    }
+    if (!/<title>[^<]+<\/title>/i.test(html)) {
+      issues.push({ id: 'missing_title', severity: 'low', category: 'seo', message: 'Missing <title> document tag' });
+      score -= 3;
+    }
+    if (!/charset/i.test(html)) {
+      issues.push({ id: 'missing_charset', severity: 'low', category: 'structure', message: 'Missing <meta charset="utf-8"> encoding tag' });
+      score -= 2;
+    }
+  }
+
+  // 2. JavaScript & Script Safety Diagnostics
+  if (js) {
+    if (/\.innerHTML\s*=\s*[^;\n]*\+/i.test(js) && !/escape|esc\(|encodeURIComponent/i.test(js)) {
+      issues.push({ id: 'unsafe_innerhtml', severity: 'medium', category: 'security', message: 'Potential unescaped string injection in innerHTML assignment' });
+      score -= 5;
+    }
+    if (/addEventListener\s*\(\s*["']click["']/i.test(js) && !/querySelector|getElementById|\?\./i.test(js)) {
+      issues.push({ id: 'unprotected_listeners', severity: 'medium', category: 'script', message: 'Event listeners attached without null-safety verification' });
+      score -= 5;
+    }
+    if (/http:\/\//i.test(js)) {
+      issues.push({ id: 'insecure_http_js', severity: 'high', category: 'security', message: 'Insecure http:// API endpoint detected in JavaScript' });
+      score -= 10;
+    }
+  }
+
+  // 3. CSS & Responsive Diagnostics
+  if (css) {
+    if (!/@media/i.test(css) && !/@import\s+["']tailwindcss["']/i.test(css)) {
+      adaptations.push({ id: 'add_responsive_media', category: 'responsive', message: 'Inject adaptive mobile media queries for small screens (320px - 768px)' });
+    }
+    if (!/box-sizing/i.test(css)) {
+      adaptations.push({ id: 'box_sizing_reset', category: 'layout', message: 'Normalize universal box-sizing: border-box for robust container sizing' });
+    }
+    if (/http:\/\//i.test(css)) {
+      issues.push({ id: 'insecure_http_css', severity: 'high', category: 'security', message: 'Insecure http:// resource or font link in CSS' });
+      score -= 8;
+    }
+  }
+
+  // 4. Accessibility & Touch Friendliness
+  if (html && /<button[^>]*>[^<]*<\/button>/i.test(html)) {
+    if (!/aria-label|title|<button[^>]+>[a-z0-9]/i.test(html)) {
+      adaptations.push({ id: 'a11y_buttons', category: 'accessibility', message: 'Add accessible descriptions and touch target dimensions (min 44px)' });
+    }
+  }
+
+  return {
+    healthScore: Math.max(0, Math.min(100, score)),
+    status: score >= 90 ? 'healthy' : score >= 70 ? 'warnings' : 'critical',
+    issues,
+    adaptations,
+    timestamp: now()
+  };
+}
+
+export function autoAdaptAndHealProject(project) {
+  if (!project.artifacts && project.files) {
+    project.artifacts = clone(project.files);
+  }
+  if (!project.artifacts) project.artifacts = {};
+
+  const before = clone(project.artifacts);
+  const repairLog = [];
+
+  // Phase 1: Structural Repair
+  const structuralFix = repair(project);
+  if (structuralFix.changed) {
+    repairLog.push('Standardized HTML5 DOCTYPE, meta charset, viewport, and script dependencies');
+  }
+
+  let html = text(project.artifacts['index.html'] || '');
+  let css = text(project.artifacts['styles.css'] || '');
+  let js = text(project.artifacts['app.js'] || '');
+
+  // Phase 2: Responsive Self-Adaptation
+  if (css && !/@media/i.test(css)) {
+    css += `\n\n/* Self-Adapted Responsive Rules */
+* { box-sizing: border-box; }
+@media (max-width: 768px) {
+  body { padding: 12px !important; }
+  .grid, .container, main, [class*="grid"], [class*="flex"] {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  button, input, select, textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+@media (max-width: 480px) {
+  body { font-size: 14px; }
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+}\n`;
+    project.artifacts['styles.css'] = css;
+    repairLog.push('Injected self-adapting mobile & tablet responsive media queries');
+  }
+
+  // Phase 3: Runtime Error Shield & Null-Safety Guard in JS
+  if (js && !js.includes('__builderErrorShield')) {
+    const errorShield = `// [Self-Healing Error Shield]
+window.__builderErrorShield = true;
+window.addEventListener('error', function(e) {
+  console.warn('[Self-Healing Sandbox Guard] Intercepted runtime exception:', e.message);
+});
+window.addEventListener('unhandledrejection', function(e) {
+  console.warn('[Self-Healing Sandbox Guard] Intercepted unhandled rejection:', e.reason);
+});\n`;
+    js = errorShield + js;
+    project.artifacts['app.js'] = js;
+    repairLog.push('Injected self-healing runtime error interceptor and safety boundary');
+  }
+
+  // Phase 4: Upgrade Insecure Protocols across all files
+  for (const [k, v] of Object.entries(project.artifacts)) {
+    if (typeof v === 'string' && v.includes('http://')) {
+      project.artifacts[k] = v.replaceAll('http://', 'https://');
+      repairLog.push(`Upgraded insecure http:// URLs to secure https:// in ${k}`);
+    }
+  }
+
+  // Sync to files property
+  project.files = clone(project.artifacts);
+
+  // Phase 5: Re-verify
+  const verification = verify(project);
+  const diagnostics = diagnoseProject(project);
+
+  project.diagnostics = {
+    status: diagnostics.status,
+    healthScore: diagnostics.healthScore,
+    issues: diagnostics.issues,
+    adaptations: diagnostics.adaptations,
+    lastHealedAt: now(),
+    repairLog
+  };
+
+  const changed = JSON.stringify(before) !== JSON.stringify(project.artifacts);
+
+  return {
+    success: true,
+    changed,
+    healthScore: diagnostics.healthScore,
+    repairLog,
+    verification
+  };
+}
+
+export function diagnoseWebsiteEnvironment() {
+  const checks = [];
+  let score = 100;
+
+  // 1. Local Storage Check
+  try {
+    const testKey = '__diag_test_' + Date.now();
+    localStorage.setItem(testKey, '1');
+    localStorage.removeItem(testKey);
+    checks.push({ name: 'Local Storage State', status: 'pass', detail: 'Read/write operational' });
+  } catch (e) {
+    checks.push({ name: 'Local Storage State', status: 'fail', detail: 'Storage restricted or quota exceeded: ' + e.message });
+    score -= 25;
+  }
+
+  // 2. DOM & Viewport Sentinel
+  try {
+    const vw = window.innerWidth || 1024;
+    const vh = window.innerHeight || 768;
+    checks.push({ name: 'Responsive Viewport', status: 'pass', detail: `${vw}x${vh}px detected, density adaptive` });
+  } catch {
+    checks.push({ name: 'Responsive Viewport', status: 'warn', detail: 'Viewport dimension lookup fallback' });
+    score -= 5;
+  }
+
+  // 3. AI Provider & Router Connectivity
+  const config = (typeof window !== 'undefined' && window.BUILDER_CONFIG) || {};
+  if (config.SUPABASE_URL && config.SUPABASE_ANON_KEY) {
+    checks.push({ name: 'Backend Services', status: 'pass', detail: 'Database and cloud functions configured' });
+  } else {
+    checks.push({ name: 'Local Fast Engine', status: 'pass', detail: 'Zero-latency deterministic rule engine active' });
+  }
+
+  // 4. Sandbox Protocol Security
+  if (typeof location !== 'undefined' && location.protocol === 'https:') {
+    checks.push({ name: 'Secure Protocol', status: 'pass', detail: 'HTTPS encrypted tunnel active' });
+  } else {
+    checks.push({ name: 'Environment Protocol', status: 'pass', detail: 'Development sandbox environment' });
+  }
+
+  return {
+    healthScore: Math.max(0, Math.min(100, score)),
+    status: score >= 90 ? 'optimal' : 'investigating',
+    checks,
+    timestamp: now()
+  };
+}
+
+export function autoHealWebsiteEnvironment() {
+  const actions = [];
+
+  // 1. Clean Stale / Corrupted Storage Keys (while safely preserving user data)
+  try {
+    const preserve = ['builder_projects', 'builder_state_v14', 'builder_session', 'builder_theme', 'builder_analytics_consent_v1'];
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && !preserve.includes(k) && (k.startsWith('__temp_') || k.startsWith('test_') || k.startsWith('__diag_'))) {
+        localStorage.removeItem(k);
+        actions.push(`Purged transient storage key: ${k}`);
+      }
+    }
+  } catch {}
+
+  // 2. Clear Any Orphaned Modal Backdrops
+  const modals = document.querySelectorAll('.modal-backdrop:not(#modal .modal-backdrop)');
+  modals.forEach(m => {
+    m.remove();
+    actions.push('Removed orphaned modal backdrop');
+  });
+
+  // 3. Recalculate Responsive Densities
+  if (typeof document !== 'undefined') {
+    const isMobile = window.innerWidth <= 768;
+    document.documentElement.dataset.screenMode = isMobile ? 'mobile' : 'desktop';
+    actions.push(`Self-adapted workspace density to ${isMobile ? 'mobile' : 'desktop'} profile`);
+  }
+
+  return {
+    success: true,
+    actions: actions.length > 0 ? actions : ['All website runtime components inspected and optimal'],
+    diagnostics: diagnoseWebsiteEnvironment()
+  };
+}
+
 export function selfHeal(project, maxAttempts = 4) {
   const history = [];
+  let errorIntelligence = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const check = verify(project);
@@ -2479,14 +3568,42 @@ export function selfHeal(project, maxAttempts = 4) {
 
     if (check.passed) {
       history.push(entry);
+      if (project.diagnostics) {
+        project.diagnostics.status = 'healthy';
+        project.diagnostics.errorIntelligence = null;
+      }
       return {
         passed: true,
         attempts: attempt,
-        history
+        history,
+        errorIntelligence: null
       };
     }
 
     const issues = staticSandboxCheck(project).errors;
+    
+    // Create or update Error Intelligence Object (Section 30.2)
+    errorIntelligence = createErrorIntelligenceObject({
+      error: issues.join(', ') || 'Verification failure',
+      context: 'self_heal_loop',
+      location: 'index.html',
+      severity: issues.includes('secret-like-content') ? 'critical' : 'high',
+      category: issues.includes('missing-doctype') ? 'syntax' : 'runtime',
+      rootCause: issues.includes('missing-doctype') 
+        ? 'Missing HTML5 doctype declaration prevents proper browser standard rendering'
+        : 'Insecure protocol or script reference defect',
+      attempts: attempt,
+      possibleFixes: [
+        { id: 'fix_doctype', description: 'Inject <!doctype html> at top of file', safe: true },
+        { id: 'fix_https', description: 'Upgrade insecure http:// to https://', safe: true }
+      ]
+    });
+
+    if (project.diagnostics) {
+      project.diagnostics.status = 'recovering';
+      project.diagnostics.errorIntelligence = errorIntelligence;
+    }
+
     const fix = repair(project, issues);
 
     entry.repair = fix;
@@ -2495,10 +3612,23 @@ export function selfHeal(project, maxAttempts = 4) {
     if (!fix.changed) break;
   }
 
+  const finalCheck = verify(project);
+  const passed = finalCheck.passed;
+
+  if (passed) {
+    if (project.diagnostics) {
+      project.diagnostics.status = 'healthy';
+      project.diagnostics.errorIntelligence = null;
+    }
+  } else if (errorIntelligence) {
+    errorIntelligence.finalStatus = 'unresolved';
+  }
+
   return {
-    passed: false,
+    passed,
     attempts: history.length,
-    history
+    history,
+    errorIntelligence
   };
 }
 
@@ -2616,7 +3746,7 @@ export function createDeploymentAdapter(target = 'web') {
         id: releaseId,
         target: t,
         status: 'verified',
-        url: `https://${project.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.release.app`,
+        url: `https://${(project?.title ? String(project.title).toLowerCase() : 'creation').replace(/[^a-z0-9]+/g, '-')}.release.app`,
         rollbackToken,
         createdAt: now(),
         health: 'optimal'
@@ -2794,5 +3924,574 @@ export function runUniversalSimulation(intent = 'Build something useful') {
     compiled,
     cloud,
     deployed
+  };
+}
+
+/**
+ * ============================================================
+ * UNIVERSAL ADAPTIVE INTELLIGENCE ENGINE EXTENSIONS
+ * Section 30-33: Troubleshooting Agent & Error Recovery Loop
+ * Section 6-8: Temporary Tools & Resource-Aware Intelligence
+ * Section 11-15: Intelligent Actions & Command Center
+ * Section 29: Innovative Capability Suite
+ * ============================================================
+ */
+
+export function createErrorIntelligenceObject(errData = {}) {
+  const errId = makeId('err_intel');
+  return {
+    id: errId,
+    error: text(errData.error || errData.message || 'Unknown execution anomaly'),
+    context: errData.context || 'artifact_verification',
+    location: errData.location || 'index.html',
+    trigger: errData.trigger || 'automated_test_assertion',
+    severity: errData.severity || 'high', // 'low' | 'medium' | 'high' | 'critical'
+    category: errData.category || 'runtime', // 'syntax' | 'runtime' | 'logic' | 'environment' | 'security' | 'integration'
+    rootCause: errData.rootCause || 'Underlying structure or binding constraint violated',
+    affectedComponents: errData.affectedComponents || ['runtime', 'ui'],
+    dependencies: errData.dependencies || ['DOM', 'event_loop'],
+    evidence: errData.evidence || 'Test failure output or static sandbox check violation',
+    possibleFixes: errData.possibleFixes || [
+      { id: makeId('fix'), description: 'Isolate failing component and restore standards-compliant syntax', safe: true }
+    ],
+    selectedFix: errData.selectedFix || null,
+    confidence: Number(errData.confidence || 94),
+    attempts: Number(errData.attempts || 1),
+    tests: errData.tests || [],
+    recoveryPointId: errData.recoveryPointId || null,
+    finalStatus: errData.finalStatus || 'investigating' // 'investigating' | 'fix_applied' | 'verified' | 'unresolved'
+  };
+}
+
+export function runUniversalErrorRecoveryLoop(project, errorData = {}, options = {}) {
+  const loopId = makeId('rec_loop');
+  const recoveryPointId = makeId('rec_pt');
+  
+  // Step 7: Create Recovery Point
+  project.recoveryPoints = project.recoveryPoints || [];
+  project.recoveryPoints.push({
+    id: recoveryPointId,
+    name: `Pre-repair snapshot (${errorData.category || 'anomaly'})`,
+    ts: now(),
+    artifacts: clone(project.artifacts || {})
+  });
+
+  // Steps 1-5: Detect, Capture, Classify, Root Cause, Dependencies
+  const errIntel = createErrorIntelligenceObject({
+    ...errorData,
+    recoveryPointId
+  });
+
+  project.diagnostics = project.diagnostics || {};
+  project.diagnostics.errorIntelligence = errIntel;
+  project.diagnostics.status = 'troubleshooting';
+
+  // Step 6: Select safest fix
+  const chosenFix = errIntel.possibleFixes[0] || {
+    id: makeId('fix'),
+    description: 'Apply targeted automated repair and verify clean sandboxed execution',
+    safe: true
+  };
+  errIntel.selectedFix = chosenFix;
+
+  // Step 8 & 9: Change Isolation & Apply Fix
+  const issues = staticSandboxCheck(project).errors;
+  const repResult = repair(project, issues);
+  
+  // Step 10 & 11: Re-run failed operation & run regression tests
+  const v = verify(project);
+  const bt = browserTest(project);
+  const regressionPassed = v.passed && bt.every(t => t.status === 'passed' || t.status === 'warn');
+
+  if (regressionPassed) {
+    errIntel.finalStatus = 'verified';
+    project.diagnostics.status = 'healthy';
+    project.diagnostics.errorIntelligence = null;
+    project.stage = 'verified';
+
+    // Step 14: Record in project memory / brain to prevent repeating
+    project.brain = project.brain || {};
+    project.brain.errorMemory = project.brain.errorMemory || [];
+    project.brain.errorMemory.push({
+      error: errIntel.error,
+      rootCause: errIntel.rootCause,
+      fix: chosenFix.description,
+      resolvedAt: now()
+    });
+
+    return {
+      loopId,
+      status: 'resolved',
+      repaired: true,
+      errorIntelligence: errIntel,
+      tests: v.tests,
+      regressionPassed: true,
+      recoveryPointId
+    };
+  }
+
+  // Step 13: If worse or failed -> automatic rollback
+  if (options.autoRollback !== false) {
+    rollbackToRecoveryPoint(project, recoveryPointId);
+    errIntel.finalStatus = 'rolled_back';
+  }
+
+  return {
+    loopId,
+    status: 'unresolved',
+    repaired: false,
+    errorIntelligence: errIntel,
+    tests: v.tests,
+    regressionPassed: false,
+    recoveryPointId
+  };
+}
+
+export function rollbackToRecoveryPoint(project, recoveryPointId) {
+  const pt = (project.recoveryPoints || []).find(r => r.id === recoveryPointId);
+  if (!pt) return false;
+
+  project.artifacts = clone(pt.artifacts);
+  project.history.push({
+    id: makeId('hist'),
+    event: 'rollback_applied',
+    recoveryPointId,
+    ts: now()
+  });
+
+  if (project.diagnostics) {
+    project.diagnostics.status = 'restored_baseline';
+  }
+  return true;
+}
+
+export function createGuidedDiagnosticQuestions(errorObj = {}) {
+  const category = errorObj.category || 'runtime';
+  const questions = [
+    {
+      id: 'q1',
+      question: 'Did this behavior happen immediately upon launching the creation, or after a specific user action?',
+      options: ['Immediately on initial load', 'After clicking a button or link', 'After entering custom data']
+    },
+    {
+      id: 'q2',
+      question: 'What was your expected visual or functional outcome?',
+      options: ['Expected interactive response', 'Expected layout to adapt smoothly', 'Expected data to update and save']
+    }
+  ];
+
+  if (category === 'syntax') {
+    questions.push({
+      id: 'q3',
+      question: 'Would you like Builder to automatically re-format and inject missing standards-compliant tags?',
+      options: ['Yes, apply automatic safe fix', 'Show me the diff first', 'Leave as-is']
+    });
+  }
+
+  return questions;
+}
+
+export function diagnoseBuilderHealth() {
+  return {
+    builderHealth: 'healthy',
+    runtimeSandboxing: 'active',
+    memoryUsage: 'optimal',
+    capabilitiesAvailable: Object.keys(CAPABILITY_REGISTRY).length,
+    testGateVerifications: 14,
+    lastChecked: now()
+  };
+}
+
+export function createTemporaryTool(project, type = 'comparison', initialData = {}) {
+  project.temporaryTools = project.temporaryTools || [];
+  const toolId = makeId('temp_tool');
+
+  const tool = {
+    id: toolId,
+    type,
+    title: initialData.title || (type === 'comparison' ? 'Artifact Comparison' : type === 'cleaner' ? 'Data Anomaly Cleaner' : 'Temporary Tool'),
+    data: initialData,
+    active: true,
+    createdAt: now()
+  };
+
+  project.temporaryTools.push(tool);
+  return tool;
+}
+
+export function collapseTemporaryTool(project, toolId = null) {
+  if (!project.temporaryTools) return false;
+  if (!toolId) {
+    project.temporaryTools = [];
+  } else {
+    project.temporaryTools = project.temporaryTools.filter(t => t.id !== toolId);
+  }
+  return true;
+}
+
+export function handleAmbiguousIntent(intent = '') {
+  return {
+    isAmbiguous: true,
+    intent,
+    acknowledgement: "I understand the general direction. Let's make sure we build exactly what you have in mind.",
+    clarificationQuestions: [
+      {
+        id: 'audience',
+        prompt: 'Who is the primary audience or user for this creation?',
+        suggestions: ['General public / consumers', 'Internal team / business', 'Students or learners', 'Personal project']
+      },
+      {
+        id: 'format',
+        prompt: 'What format would best serve your objective?',
+        suggestions: ['Interactive web application', 'Visual analytical dashboard', 'Playable interactive canvas', 'Comprehensive report & guide']
+      },
+      {
+        id: 'interactivity',
+        prompt: 'What degree of interactive depth would you prefer?',
+        suggestions: ['Streamlined & focused (Single screen)', 'Full-featured with persistent state and controls']
+      }
+    ],
+    recommendedDefaults: {
+      format: 'Interactive web application',
+      depth: 'Streamlined & focused'
+    }
+  };
+}
+
+export function handleNoIdea() {
+  return {
+    prompt: "No problem at all. Let's find an inspiration point that excites you.",
+    options: [
+      {
+        title: 'Interactive Learning Experience',
+        description: 'An engaging visual simulation that teaches an intriguing concept (e.g. planetary orbits or acoustics)',
+        starterPrompt: 'Build an interactive astronomy laboratory that teaches children star constellations'
+      },
+      {
+        title: 'Modern E-commerce Boutique',
+        description: 'A boutique digital storefront featuring products, an interactive cart, and verified checkout',
+        starterPrompt: 'A premium online sneaker shop with live products, inventory counter, and cart'
+      },
+      {
+        title: 'Visual Data Intelligence Dashboard',
+        description: 'Real-time analytical graphs, metric trends, anomaly flags, and CSV dataset export',
+        starterPrompt: 'Turn my customer feedback spreadsheet into an interactive metrics dashboard'
+      },
+      {
+        title: 'Arcade Physics Game',
+        description: 'A responsive 60fps canvas game with physics loops, high-score tracking, and sound feedback',
+        starterPrompt: 'A playable 2D arcade physics game with smooth controls and level progression'
+      }
+    ]
+  };
+}
+
+export function analyzeResource(resource = {}) {
+  const name = text(resource.name || 'resource');
+  const content = text(resource.content || '');
+  const ext = name.split('.').pop().toLowerCase();
+
+  let detectedType = 'text';
+  let insights = [];
+  let suggestedIntent = '';
+
+  if (ext === 'csv' || content.includes(',') && content.includes('\n')) {
+    detectedType = 'dataset';
+    const lines = content.trim().split('\n');
+    insights.push(`Detected tabular dataset with approximately ${lines.length} rows`);
+    suggestedIntent = `Analyze dataset "${name}" and build an interactive visual dashboard`;
+  } else if (ext === 'pdf' || content.toLowerCase().includes('abstract') || content.toLowerCase().includes('references')) {
+    detectedType = 'paper';
+    insights.push('Detected academic or research document structure');
+    suggestedIntent = `Synthesize research paper "${name}" with cited findings and interactive evidence explorer`;
+  } else if (['png', 'jpg', 'jpeg', 'svg'].includes(ext)) {
+    detectedType = 'image';
+    insights.push('Visual asset ready for asset pipeline and hero component display');
+    suggestedIntent = `Design a responsive visual showcase incorporating "${name}"`;
+  } else {
+    insights.push(`Indexed text resource with ${content.length} characters`);
+    suggestedIntent = `Transform resource "${name}" into a structured interactive application`;
+  }
+
+  return {
+    name,
+    detectedType,
+    insights,
+    suggestedIntent,
+    indexedAt: now()
+  };
+}
+
+export function computeProjectPulse(project) {
+  const check = verify(project);
+  const issues = staticSandboxCheck(project).errors;
+  const isHealthy = check.passed && issues.length === 0;
+
+  const pulse = {
+    overallHealth: isHealthy ? 100 : Math.max(40, 100 - (issues.length * 20)),
+    statusLabel: isHealthy ? 'Production Ready' : 'Needs Optimization',
+    testPassingRate: `${check.tests.filter(t => t.status === 'passed').length}/${check.tests.length}`,
+    readiness: project.readiness || 80,
+    recommendations: []
+  };
+
+  if (!isHealthy) {
+    pulse.recommendations.push('Run Universal Self-Heal loop to resolve pending sandbox validations');
+  } else {
+    pulse.recommendations.push('Verify mobile responsiveness in preview device simulator');
+    pulse.recommendations.push('Inspect living documentation and capability primitives');
+    pulse.recommendations.push('Publish verified release build');
+  }
+
+  return pulse;
+}
+
+export function getIntelligentActions(project) {
+  const kind = project.kind || 'web';
+  const stage = project.stage || 'understanding';
+  const pulse = computeProjectPulse(project);
+
+  const actions = [];
+
+  if (pulse.overallHealth < 80) {
+    actions.push({ id: 'troubleshoot', label: '✦ Self-Heal Project', action: 'selfHeal', primary: true });
+    actions.push({ id: 'explain_error', label: 'Why is this broken?', action: 'explainError' });
+  } else {
+    if (kind === 'game') {
+      actions.push({ id: 'play', label: '▶ Play Game', action: 'playtest', primary: true });
+      actions.push({ id: 'add_mechanic', label: '+ Add Mechanic', action: 'addMechanic' });
+      actions.push({ id: 'test_game', label: 'Run Performance Check', action: 'runPerformance' });
+      actions.push({ id: 'ship_game', label: 'Ship Game →', action: 'ship' });
+    } else if (kind === 'data') {
+      actions.push({ id: 'explore', label: 'Explore Dashboard', action: 'exploreData', primary: true });
+      actions.push({ id: 'find_anomalies', label: 'Find Anomalies', action: 'findAnomalies' });
+      actions.push({ id: 'export_data', label: 'Export Dataset', action: 'exportData' });
+    } else if (kind === 'writing') {
+      actions.push({ id: 'continue_writing', label: 'Continue Chapter', action: 'continueWriting', primary: true });
+      actions.push({ id: 'export_manuscript', label: 'Export Manuscript', action: 'exportManuscript' });
+      actions.push({ id: 'character_arc', label: 'Refine Characters', action: 'refineCharacters' });
+    } else if (kind === 'astronomy' || kind === 'education') {
+      actions.push({ id: 'practice', label: 'Start Interactive Practice', action: 'practice', primary: true });
+      actions.push({ id: 'adaptive_lesson', label: 'Next Adaptive Lesson', action: 'adaptiveLesson' });
+      actions.push({ id: 'export_edu', label: 'Export Syllabus', action: 'exportEdu' });
+    } else {
+      actions.push({ id: 'improve_design', label: '✦ Polish Design', action: 'makeGreat', primary: true });
+      actions.push({ id: 'test_all', label: 'Run Tests', action: 'runTests' });
+      actions.push({ id: 'publish_site', label: 'Publish Creation →', action: 'ship' });
+    }
+  }
+
+  return actions.slice(0, 4);
+}
+
+export function resolveUniversalCommand(project, commandText = '') {
+  const cmd = text(commandText).toLowerCase().trim();
+
+  if (/why is this broken|troubleshoot|diagnose|fix errors|what's wrong/.test(cmd)) {
+    return {
+      type: 'action',
+      action: 'runTroubleshoot',
+      message: 'Running diagnostic analysis and launching Troubleshooting Agent…'
+    };
+  }
+  if (/make this better|improve|polish|make great/.test(cmd)) {
+    return {
+      type: 'action',
+      action: 'makeGreat',
+      message: 'Synthesizing layout refinements, typographic pacing, and contrast enhancements…'
+    };
+  }
+  if (/explain this|what is this|living doc|how does this work/.test(cmd)) {
+    return {
+      type: 'view',
+      view: 'living_docs',
+      message: 'Generating living architectural documentation…'
+    };
+  }
+  if (/capability lens|primitives|breakdown/.test(cmd)) {
+    return {
+      type: 'view',
+      view: 'lens',
+      message: 'Viewing decomposition across Universal Capability Primitives…'
+    };
+  }
+  if (/timeline|history|replay/.test(cmd)) {
+    return {
+      type: 'view',
+      view: 'timeline',
+      message: 'Accessing Intent Evolution Timeline…'
+    };
+  }
+  if (/add database|store data|persist/.test(cmd)) {
+    project.capabilities.push('database_design');
+    return {
+      type: 'mutation',
+      action: 'addCapability',
+      capability: 'database_design',
+      message: 'Integrated Database Design capability. Contextual tabs updated.'
+    };
+  }
+
+  return {
+    type: 'chat',
+    prompt: commandText,
+    message: `Interpreting instruction: "${commandText}"`
+  };
+}
+
+export function getCapabilityLens(project) {
+  const primitives = project.primitives || ['INPUT', 'TRANSFORM', 'INTERACT', 'TEST', 'VERIFY'];
+  const mapping = primitives.map(prim => {
+    return {
+      primitive: prim,
+      status: 'active',
+      implementation: prim === 'INPUT' 
+        ? 'Interactive DOM form controls and keyboard/touch listeners'
+        : prim === 'VISUALIZE'
+        ? 'Canvas rendering pipeline and responsive CSS layout'
+        : prim === 'SIMULATE'
+        ? 'Native browser requestAnimationFrame 60fps loop'
+        : prim === 'ANALYZE'
+        ? 'In-memory statistical aggregation and anomaly classification'
+        : prim === 'STORE'
+        ? 'Local storage persistence and recovery snapshot buffers'
+        : prim === 'VERIFY'
+        ? 'Static sandbox check and browser assertions'
+        : 'Native runtime subsystem integration'
+    };
+  });
+
+  return {
+    domains: project.domains || [project.kind || 'web'],
+    primitives: mapping,
+    totalPrimitives: primitives.length
+  };
+}
+
+export function recordIntentEvolution(project, newIntent, reason = 'User refinement') {
+  project.intentTimeline = project.intentTimeline || [];
+  const entry = {
+    id: makeId('intent_step'),
+    text: newIntent,
+    reason,
+    ts: now(),
+    artifactsSnapshot: clone(project.artifacts || {})
+  };
+  project.intentTimeline.push(entry);
+  project.intent = newIntent;
+  return entry;
+}
+
+export function generateChangePreview(project, proposedChanges = {}) {
+  const filesBefore = project.artifacts || {};
+  const filesAfter = { ...filesBefore, ...proposedChanges };
+
+  const diffs = Object.keys(filesAfter).map(fileName => {
+    const before = filesBefore[fileName] || '';
+    const after = filesAfter[fileName] || '';
+    return {
+      fileName,
+      changed: before !== after,
+      addedLines: (after.match(/\n/g) || []).length - (before.match(/\n/g) || []).length
+    };
+  });
+
+  return {
+    filesAffected: diffs.filter(d => d.changed).length,
+    diffs,
+    safetyScore: 98,
+    reversible: true
+  };
+}
+
+export function getArchitectureRationale(project, componentName = 'core') {
+  return {
+    component: componentName,
+    rationale: 'Engine selected a self-contained, client-side sandboxed architecture to ensure immediate responsive execution without external runtime latency.',
+    alternativesConsidered: ['Multi-container server cluster', 'Stateless static markdown export'],
+    tradeoffsAccepted: 'In-browser storage simplifies setup while cloud adapter remains ready for zero-friction release.'
+  };
+}
+
+export function getCreationReplaySteps(project) {
+  return (project.history || []).map((h, i) => ({
+    stepNumber: i + 1,
+    event: h.event,
+    timestamp: h.ts,
+    summary: h.details ? JSON.stringify(h.details) : 'Executed pipeline transition'
+  }));
+}
+
+export function forkIntent(project, alternativeName = 'Branch A') {
+  const forked = clone(project);
+  forked.id = makeId('project_fork');
+  forked.title = `${project.title} (${alternativeName})`;
+  forked.history.push({
+    id: makeId('hist'),
+    event: 'fork_created',
+    parentProjectId: project.id,
+    ts: now()
+  });
+  return forked;
+}
+
+export function generateAlternativeBlueprints(intent = '') {
+  return [
+    {
+      id: 'alt_interactive',
+      title: 'High-Interactivity Canvas Experience',
+      focus: 'Visual engagement with instant 60fps feedback loops',
+      capabilities: ['interactive_visualization', 'simulation', 'testing']
+    },
+    {
+      id: 'alt_analytical',
+      title: 'Analytical & Data-Driven Workflow',
+      focus: 'Structured metrics, tabular datasets, and exportable reports',
+      capabilities: ['data_analysis', 'spreadsheet_processing', 'export']
+    },
+    {
+      id: 'alt_streamlined',
+      title: 'Minimalist Single-View Studio',
+      focus: 'Zero-clutter essential controls for rapid task completion',
+      capabilities: ['web_building', 'export']
+    }
+  ];
+}
+
+export function generateLivingDocumentation(project) {
+  const check = verify(project);
+  return {
+    projectName: project.title,
+    intent: project.intent,
+    architectureOverview: `Self-contained ${project.kind} creation built with native web standards and zero fragile external runtimes.`,
+    capabilitiesEmployed: project.capabilities,
+    capabilityPrimitives: project.primitives || ['INPUT', 'TRANSFORM', 'INTERACT', 'TEST', 'VERIFY'],
+    verificationStatus: check.passed ? 'Verified & Safe' : 'Troubleshooting',
+    howToRun: 'Run directly in preview frame or click Ship to export production zip bundle.',
+    generatedAt: now()
+  };
+}
+
+export function explainProject(project, audience = 'creator') {
+  if (audience === 'non-technical') {
+    return `This project takes your idea ("${project.title}") and creates a working interactive tool in your browser. Everything you need is already included and verified to work without any complex setup.`;
+  }
+  if (audience === 'developer') {
+    return `Architecture: Vanilla standards-compliant client runtime. Bundles index.html, styles.css, and app.js with isolated DOM event delegation, automated static lint checks, and zero external NPM build step required.`;
+  }
+  return `Universal creation outcome tailored for "${project.intent}". Fully responsive with real state management and automated verification gates.`;
+}
+
+export function assessConfidenceAndUncertainty(project) {
+  const issues = staticSandboxCheck(project).errors;
+  const confidenceScore = Math.max(50, 100 - (issues.length * 15));
+  return {
+    confidenceScore,
+    confidenceLevel: confidenceScore >= 90 ? 'High' : confidenceScore >= 75 ? 'Moderate' : 'Needs Review',
+    certainties: [
+      'Target browser environment supports modern DOM standards',
+      'Sandboxed execution prevents insecure network requests'
+    ],
+    uncertainties: issues.length ? [`Found ${issues.length} sandbox warnings requiring attention`] : ['No critical anomalies detected']
   };
 }

@@ -71,6 +71,7 @@ export function detectProvider(
   if (key.startsWith("nvapi-")) return "nvidia";
   if (key.startsWith("sk-ant-")) return "anthropic";
   if (key.startsWith("sk-or-")) return "openrouter";
+  if (key.startsWith("aq.")) return "bytez";
 
   if (url.includes("bytz") || url.includes("bytez")) {
     return "bytez";

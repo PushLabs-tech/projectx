@@ -99,6 +99,17 @@ async function credentialsFor(userId: string): Promise<Credential[]> {
     });
   }
 
+  // Secure Server-Side Fallback & Troubleshooter Provider (never exposed to client)
+  const troubleshootKey = (Deno.env.get("TROUBLESHOOT_API_KEY") || Deno.env.get("BYTEZ_API_KEY") || "").trim();
+  if (troubleshootKey && !out.some(c => c.provider === "bytez")) {
+    out.push({
+      provider: "bytez",
+      label: "System Autonomous Gateway",
+      apiKey: troubleshootKey,
+      baseUrl: "https://api.bytez.com"
+    });
+  }
+
   return out;
 }
 
