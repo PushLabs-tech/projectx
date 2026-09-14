@@ -665,28 +665,28 @@ import * as Engine from './universal-engine.js';
       reply = `Transformed project into a mobile-first responsive application with touch navigation and responsive viewport.`;
     } else if (/\b(cart|shop|store|checkout|product|inventory|buy|ecommerce)\b/.test(raw) && !currentFiles["index.html"]?.includes("cart-drawer")) {
       const shopProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildStartupArtifact(shopProj);
+      const arts = Engine.buildCommerceArtifact(shopProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
       reply = `Added full ecommerce functionality: interactive product catalog, category filters, cart drawer, and checkout modal flow.`;
     } else if (/\b(game|flappy|canvas|playable|score|arcade)\b/.test(raw) && !currentFiles["game.js"]) {
       const gameProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildStartupArtifact(gameProj);
+      const arts = Engine.buildGameArtifact(gameProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
       reply = `Generated 60fps canvas game engine with physics loop, keyboard and touch controls, score tracking, and persistent best scores.`;
     } else if (/\b(dashboard|chart|csv|data|analytics|metric|table)\b/.test(raw) && !currentFiles["index.html"]?.includes("metricChart")) {
       const dataProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildStartupArtifact(dataProj);
+      const arts = Engine.buildDataDashboardArtifact(dataProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
       reply = `Created interactive analytics dashboard with real-time SVG trend chart, KPI summary cards, filterable data explorer, and CSV export.`;
     } else if (/\b(research|paper|citation|medical|study|journal)\b/.test(raw) && !currentFiles["index.html"]?.includes("Citations")) {
       const resProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildStudyArtifact(resProj);
+      const arts = Engine.buildResearchArtifact(resProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
@@ -1923,8 +1923,8 @@ import * as Engine from './universal-engine.js';
     }
 
     try {
-      if(window.Engine && typeof Engine.createProject === "function"){
-        const p = Engine.createProject(intent);
+      if(window.Engine && typeof Engine.synthesizeUniversalProject === "function"){
+        const p = Engine.synthesizeUniversalProject(intent);
         state.projects = [p, ...(state.projects || [])];
         state.projectId = p.id;
         state.route = "project";
@@ -3209,6 +3209,7 @@ import * as Engine from './universal-engine.js';
             <div class="principles">
               <span>Deterministic work before AI</span>
               <span>Task-based routing</span>
+              <span>Automatic routing</span>
               <span>Sandbox before destructive edits</span>
               <span>Test → fix → test</span>
               <span>Human approval for sensitive actions</span>
@@ -3788,177 +3789,7 @@ import * as Engine from './universal-engine.js';
   }
 
   function bindEvents(){
-    $$('[data-view]').forEach(e=>
-      e.addEventListener("click",()=>{
-        patch({
-          route:e.dataset.view,
-          projectId:null
-        });
-
-        ui.sidebarOpen=false;
-      })
-    );
-
-    $$('[data-open-project]').forEach(e=>
-      e.addEventListener("click",()=>{
-        state.projectId=e.dataset.openProject;
-        state.route="project";
-        state.panel="overview";
-        saveLocal();
-        render();
-        ui.sidebarOpen=false;
-      })
-    );
-
-    $$('[data-set-mode]').forEach(e=>
-      e.addEventListener("click",()=>{
-        state.mode=e.dataset.setMode;
-        saveLocal();
-        render();
-      })
-    );
-
-    $$('[data-suggest]').forEach(e=>
-      e.addEventListener("click",()=>{
-        const text = e.dataset.suggest;
-        ui.composer = text;
-        const input = $("#chatInput");
-        if(input) {
-          input.value = text;
-        }
-        sendMessage();
-      })
-    );
-
-    $$('[data-panel]').forEach(e=>
-      e.addEventListener("click",()=>{
-        state.panel=e.dataset.panel;
-        saveLocal();
-        render();
-        setTimeout(renderPreview,0);
-      })
-    );
-
-    $$('[data-action]').forEach(e=>
-      e.addEventListener("click",()=>{
-        handleAction(e.dataset.action);
-      })
-    );
-
-    $$('[data-example]').forEach(e=>
-      e.addEventListener("click",()=>{
-        ui.composer=e.dataset.example;
-        render();
-        $("#homeInput")?.focus();
-      })
-    );
-
-    $$('[data-settings-tab]').forEach(e=>
-      e.addEventListener("click",()=>{
-        ui.settingsTab=e.dataset.settingsTab;
-        render();
-      })
-    );
-
-    $$('[data-default-ai]').forEach(e=>
-      e.addEventListener("click",()=>{
-        state.defaults={
-          ...state.defaults,
-          selected:e.dataset.defaultAi
-        };
-
-        saveLocal();
-        render();
-      })
-    );
-
-    $$('[data-autonomy]').forEach(e=>
-      e.addEventListener("click",()=>{
-        state.autonomy=e.dataset.autonomy;
-        saveLocal();
-        render();
-      })
-    );
-
-    $$('[data-provider]').forEach(e=>
-      e.addEventListener("click",()=>{
-        if(!CONFIGURED){
-          patch({
-            route:"setup",
-            projectId:null
-          });
-          return;
-        }
-
-        ui.pendingProvider=e.dataset.provider;
-        openModal("provider");
-      })
-    );
-
-    $$('[data-template]').forEach(e=>
-      e.addEventListener("click",()=>{
-        const t = e.dataset.template || "project";
-        ui.composer=
-          `Build a ${t.toLowerCase()} using the best blueprint`;
-
-        render();
-        $("#homeInput")?.focus();
-        toast(`${t} blueprint loaded`);
-      })
-    );
-
-    $$('[data-type-choice]').forEach(e=>
-      e.addEventListener("click",()=>{
-        $$('[data-type-choice]')
-          .forEach(x=>x.classList.remove("selected"));
-
-        e.classList.add("selected");
-        ui.pendingType=e.dataset.typeChoice;
-      })
-    );
-
-    $$('[data-provider-remove]').forEach(e=>
-      e.addEventListener(
-        "click",
-        ()=>removeProvider(e.dataset.providerRemove)
-      )
-    );
-
-    $$('[data-agent-settings]').forEach(e=>
-      e.addEventListener("click",()=>{
-        ui.pendingAgent=e.dataset.agentSettings;
-        openAgentSettings();
-      })
-    );
-
-    $$('[data-resource-tab]').forEach(e=>
-      e.addEventListener("click",()=>{
-        ui.resourceTab=e.dataset.resourceTab;
-        render();
-      })
-    );
-
-    $$('[data-file]').forEach(e=>
-      e.addEventListener("click",()=>{
-        const p=project();
-
-        updateProject(
-          p.id,
-          x=>({
-            ...x,
-            activeFile:e.dataset.file
-          })
-        );
-      })
-    );
-
-    $$('[data-restore]').forEach(e=>
-      e.addEventListener(
-        "click",
-        ()=>restoreVersion(e.dataset.restore)
-      )
-    );
-
+    // Standard input bindings
     $("#homeInput")?.addEventListener(
       "input",
       e=>ui.composer=e.target.value
@@ -3984,8 +3815,63 @@ import * as Engine from './universal-engine.js';
       sendMessage
     );
 
-    if(state.panel==="preview")
-      setTimeout(renderPreview,0);
+    // Other specific bindings
+    $$('[data-suggest]').forEach(e=>
+      e.addEventListener("click",()=>{
+        const text = e.dataset.suggest;
+        ui.composer = text;
+        const input = $("#chatInput");
+        if(input) {
+          input.value = text;
+        }
+        sendMessage();
+      })
+    );
+
+    $$('[data-example]').forEach(e=>
+      e.addEventListener("click",()=>{
+        ui.composer=e.dataset.example;
+        render();
+        $("#homeInput")?.focus();
+      })
+    );
+
+    $$('[data-template]').forEach(e=>
+      e.addEventListener("click",()=>{
+        const t = e.dataset.template || "project";
+        ui.composer=
+          `Build a ${t.toLowerCase()} using the best blueprint`;
+
+        render();
+        $("#homeInput")?.focus();
+        toast(`${t} blueprint loaded`);
+      })
+    );
+
+    $$('[data-type-choice]').forEach(e=>
+      e.addEventListener("click",()=>{
+        $$('[data-type-choice]')
+          .forEach(x=>x.classList.remove("selected"));
+
+        e.classList.add("selected");
+        ui.pendingType=e.dataset.typeChoice;
+      })
+    );
+
+    $$('[data-file]').forEach(e=>
+      e.addEventListener("click",()=>{
+        const p=project();
+        if(!p) return;
+
+        updateProject(
+          p.id,
+          x=>({
+            ...x,
+            activeFile:e.dataset.file
+          })
+        );
+      })
+    );
 
     $$('[data-device]').forEach(e=>
       e.addEventListener("click",()=>{
@@ -4009,6 +3895,9 @@ import * as Engine from './universal-engine.js';
         }
       })
     );
+
+    if(state.panel==="preview")
+      setTimeout(renderPreview,0);
   }
 
   function handleAction(a){
@@ -4797,11 +4686,6 @@ import * as Engine from './universal-engine.js';
     return `<div class="ship-panel"><div class="ship-hero ${ready?"ready":""}"><div><span class="section-label">Release control</span><h3>${ready?"Ready for a release check":"Not ready yet"}</h3><p>Ship the correct artifact for this creation: publish, deploy, activate, export or share.</p></div><button class="primary" data-action="ship">${ready?"Ship creation →":"Run readiness →"}</button></div><div class="release-grid">${[["Build quality",checks[0],`${p?.progress||0}% complete`],["Tests",checks[1],"A passing suite is required"],["Security",checks[2],"No obvious high-risk findings"],["Project health",checks[3],`${p?.health||90}% health`]].map(([n,s,d])=>`<div><span class="check-status ${s?"passed":"warn"}">${s?"PASS":"WAIT"}</span><b>${n}</b><small>${d}</small></div>`).join("")}</div></div>`;
   }
 
-  function newModal(){
-    const types=CREATION_TYPES.map(([t,d])=>`<button class="type-choice" data-type-choice="${esc(t)}"><b>${esc(t)}</b><span>${esc(d)}</span></button>`).join("");
-    return `<div class="modal-backdrop" data-close><div class="modal wide-modal" data-stop><div class="modal-head"><div><b>New creation</b><small>Start with intent. We'll ask only what matters.</small></div><button class="icon-btn" data-close>×</button></div><label>What are you trying to make?</label><textarea id="newText" class="input area" rows="5" placeholder="Describe the outcome, audience and constraints…"></textarea><label>Detected or preferred type</label><div class="type-grid">${types}</div><div class="modal-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="createProjectBtn">Continue →</button></div></div></div>`;
-  }
-
   function providerListHTML(){const known=["google","nvidia","openai","anthropic","openrouter","bytez","generic"];const labels={google:"Google Gemini",nvidia:"NVIDIA NIM",openai:"OpenAI",anthropic:"Anthropic",openrouter:"OpenRouter",bytez:"Bytez",generic:"OpenAI-compatible"};return `<div class="provider-grid">${known.map(id=>{const p=state.providers.find(x=>x.provider===id);return `<div class="provider-card ${p?"connected":""}"><div class="provider-top"><span class="provider-logo">${labels[id][0]}</span><div><b>${labels[id]}</b><small>${p?`Connected · ${esc(p.label||"Personal")}`:"Optional"}</small></div><span class="status-dot ${p?"on":""}"></span></div><p>${id==="generic"?"Bring an OpenAI-compatible endpoint.":"Connect this provider with one API key; models stay abstracted behind the router."}</p><div class="provider-actions"><button class="secondary small" data-provider="${id}">${p?"Reconnect":"Connect"}</button>${p?`<button class="secondary small danger-btn" data-provider-remove="${id}">Remove</button>`:""}</div></div>`}).join("")}</div>`}
 
   function providerModal(){if(!CONFIGURED)return `<div class="modal-backdrop" data-close><div class="modal compact" data-stop><div class="modal-head"><div><span class="section-label">BACKEND REQUIRED</span><b>Connect Supabase first</b><small>Provider credentials are stored by the authenticated Edge Function. GitHub Pages cannot store them safely by itself.</small></div><button class="icon-btn" data-close>×</button></div><div class="setup-inline"><b>What is missing</b><span>Supabase URL + publishable key in config.js, deployed schema, AI Edge Function and Auth.</span></div><div class="modal-actions"><button class="secondary" data-close>Close</button><button class="primary" data-view="setup">Open setup →</button></div></div></div>`;const id=ui.pendingProvider||"generic";const labels={google:"Google Gemini",nvidia:"NVIDIA NIM",openai:"OpenAI",anthropic:"Anthropic",openrouter:"OpenRouter",bytez:"Bytez",generic:"OpenAI-compatible"};return `<div class="modal-backdrop" data-close><div class="modal" data-stop><div class="modal-head"><div><b>Connect ${labels[id]}</b><small>One provider + API key. The router handles models internally.</small></div><button class="icon-btn" data-close>×</button></div><input type="hidden" id="providerId" value="${id}"><label>Provider</label><select id="providerSelect" class="select">${Object.entries(labels).map(([k,v])=>`<option value="${k}" ${k===id?"selected":""}>${v}</option>`).join("")}</select><label>Label</label><input id="providerLabel" class="input" placeholder="My AI key"><label>API key</label><div class="secret-field"><input id="providerKey" class="input" type="password" autocomplete="off" placeholder="Paste API key"><button id="toggleSecret" class="secondary small">Show</button></div>${id==="generic"?`<label>Compatible base URL</label><input id="providerBaseUrl" class="input" placeholder="https://example.com/v1">`:""}<div class="security-note">[SECURE] The frontend does not persist the raw key. Stored and validated exclusively on your authenticated backend.</div><div class="modal-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="saveProvider">Test & connect</button></div></div></div>`}
@@ -5186,15 +5070,6 @@ import * as Engine from './universal-engine.js';
       saveProvider
     );
 
-    $$("[data-provider-remove]",host).forEach(el=>
-      el.addEventListener(
-        "click",
-        ()=>{
-          removeProvider(el.dataset.providerRemove);
-        }
-      )
-    );
-
     $$("[data-answer]",host).forEach(el=>
       el.addEventListener(
         "click",
@@ -5226,40 +5101,6 @@ import * as Engine from './universal-engine.js';
           }
         }
       )
-    );
-
-    $$("[data-action]",host).forEach(el=>
-      el.addEventListener(
-        "click",
-        ()=>{
-          handleAction(el.dataset.action);
-        }
-      )
-    );
-
-    $$("[data-autonomy]",host).forEach(el=>
-      el.addEventListener(
-        "click",
-        ()=>{
-          state.autonomy=el.dataset.autonomy;
-          saveLocal();
-
-          $$("[data-autonomy]",host)
-            .forEach(x=>x.classList.remove("active"));
-
-          el.classList.add("active");
-        }
-      )
-    );
-
-    $('[data-view="setup"]',host)?.addEventListener(
-      "click",
-      ()=>{
-        closeModal();
-        state.route="setup";
-        state.projectId=null;
-        render();
-      }
     );
   }
 
@@ -6822,6 +6663,144 @@ import * as Engine from './universal-engine.js';
     }
   );
 
+  // Central Event Delegation for better performance and reliability
+  document.addEventListener("click", e => {
+    // 1. data-view
+    const viewEl = e.target.closest("[data-view]");
+    if (viewEl) {
+      e.preventDefault();
+      patch({
+        route: viewEl.dataset.view,
+        projectId: null
+      });
+      ui.sidebarOpen = false;
+      return;
+    }
+
+    // 2. data-action
+    const actionEl = e.target.closest("[data-action]");
+    if (actionEl) {
+      e.preventDefault();
+      handleAction(actionEl.dataset.action);
+      return;
+    }
+
+    // 3. data-open-project
+    const openEl = e.target.closest("[data-open-project]");
+    if (openEl) {
+      e.preventDefault();
+      state.projectId = openEl.dataset.openProject;
+      state.route = "project";
+      state.panel = "overview";
+      saveLocal();
+      render();
+      ui.sidebarOpen = false;
+      return;
+    }
+
+    // 4. data-panel
+    const panelEl = e.target.closest("[data-panel]");
+    if (panelEl) {
+      e.preventDefault();
+      state.panel = panelEl.dataset.panel;
+      saveLocal();
+      render();
+      return;
+    }
+
+    // 5. data-settings-tab
+    const settingsTabEl = e.target.closest("[data-settings-tab]");
+    if (settingsTabEl) {
+      e.preventDefault();
+      ui.settingsTab = settingsTabEl.dataset.settingsTab;
+      render();
+      return;
+    }
+
+    // 6. data-autonomy
+    const autonomyEl = e.target.closest("[data-autonomy]");
+    if (autonomyEl) {
+      e.preventDefault();
+      state.autonomy = autonomyEl.dataset.autonomy;
+      saveLocal();
+      render();
+      return;
+    }
+
+    // 7. data-set-mode
+    const modeEl = e.target.closest("[data-set-mode]");
+    if (modeEl) {
+      e.preventDefault();
+      state.mode = modeEl.dataset.setMode;
+      saveLocal();
+      render();
+      return;
+    }
+
+    // 8. data-default-ai
+    const defaultAiEl = e.target.closest("[data-default-ai]");
+    if (defaultAiEl) {
+      e.preventDefault();
+      state.defaults = {
+        ...state.defaults,
+        selected: defaultAiEl.dataset.defaultAi
+      };
+      saveLocal();
+      render();
+      return;
+    }
+
+    // 9. data-provider
+    const providerEl = e.target.closest("[data-provider]");
+    if (providerEl) {
+      e.preventDefault();
+      if (!CONFIGURED) {
+        patch({
+          route: "setup",
+          projectId: null
+        });
+        return;
+      }
+      ui.pendingProvider = providerEl.dataset.provider;
+      openModal("provider");
+      return;
+    }
+
+    // 10. data-provider-remove
+    const providerRemoveEl = e.target.closest("[data-provider-remove]");
+    if (providerRemoveEl) {
+      e.preventDefault();
+      removeProvider(providerRemoveEl.dataset.providerRemove);
+      return;
+    }
+
+    // 11. data-agent-settings
+    const agentSettingsEl = e.target.closest("[data-agent-settings]");
+    if (agentSettingsEl) {
+      e.preventDefault();
+      ui.pendingAgent = agentSettingsEl.dataset.agentSettings;
+      openAgentSettings();
+      return;
+    }
+
+    // 12. data-resource-tab
+    const resourceTabEl = e.target.closest("[data-resource-tab]");
+    if (resourceTabEl) {
+      e.preventDefault();
+      ui.resourceTab = resourceTabEl.dataset.resourceTab;
+      render();
+      return;
+    }
+
+    // 13. data-restore
+    const restoreEl = e.target.closest("[data-restore]");
+    if (restoreEl) {
+      e.preventDefault();
+      restoreVersion(restoreEl.dataset.restore);
+      return;
+    }
+  });
+
   window.addEventListener(
     "keydown",
     e=>{
@@ -6848,25 +6827,6 @@ import * as Engine from './universal-engine.js';
         closeModal();
       }
     }
-  );
-
-  // Defensive delegated handler: dynamic settings controls remain functional
-  // even after a render replaces the DOM.
-  document.addEventListener(
-    "click",
-    e=>{
-      const el=e.target.closest?.("[data-autonomy]");
-
-      if(
-        el &&
-        !el.closest("#modal")
-      ){
-        state.autonomy=el.dataset.autonomy;
-        saveLocal();
-        render();
-      }
-    },
-    {capture:true}
   );
 
   initEngine();
