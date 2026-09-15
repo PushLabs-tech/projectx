@@ -287,7 +287,7 @@ export function classifyIntent(input = '') {
   const x = text(input).toLowerCase();
 
   // Test matrix explicit cases must preserve exact matching:
-  if (/flappy|game|playable|platformer|rpg|arcade|pong|tetris|pixel|phaser/.test(x)) return 'game';
+  if (/flappy|game|playable|platformer|rpg|arcade|pong|tetris|pixel|phaser|shooter|space\s*shooter|alien|shoot|snake|brick/.test(x)) return 'game';
   if (/sneaker|shop|store|ecommerce|e-commerce|cart|checkout|clothing|product catalog/.test(x)) return 'commerce';
   if (/mobile|ios|android|phone|touch screen|app view/.test(x)) return 'mobile';
   if (/agent|assistant|copilot|autonomous|bot|support agent|customer service/.test(x)) return 'agent';
@@ -1280,24 +1280,85 @@ export function createGameEngine(canvas, onScoreUpdate, onGameOver) {
     ctx.fillStyle = '#ded895';
     ctx.fillRect(0, state.height - 20, state.width, 20);
 
-    // Bird
-    ctx.fillStyle = '#f59e0b';
+    // Authentic Animated Flappy Bird Character
+    ctx.save();
+    ctx.translate(70, state.birdY);
+    ctx.rotate(Math.min(Math.PI / 3, Math.max(-Math.PI / 6, state.velocity * 0.06)));
+    const wingY = Math.sin(frameCount * 0.3) * 3;
+
+    // Tail feather
+    ctx.fillStyle = '#ca8a04';
     ctx.beginPath();
-    ctx.arc(70, state.birdY, 14, 0, Math.PI * 2);
+    ctx.moveTo(-11, -2);
+    ctx.lineTo(-18, -5);
+    ctx.lineTo(-16, 3);
+    ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#b45309';
-    ctx.lineWidth = 2;
+
+    // Body (oval)
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 14, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ca8a04';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Eye
-    ctx.fillStyle = '#fff';
+    // Belly highlight
+    ctx.fillStyle = '#fef08a';
     ctx.beginPath();
-    ctx.arc(75, state.birdY - 4, 4, 0, Math.PI * 2);
+    ctx.ellipse(-2, 3, 8, 5, -0.1, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#000';
+
+    // Wing
+    ctx.fillStyle = '#eab308';
     ctx.beginPath();
-    ctx.arc(76, state.birdY - 4, 2, 0, Math.PI * 2);
+    ctx.ellipse(-3, -1 + wingY, 7, 4, 0.2, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = '#a16207';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Orange Beak / Lips
+    ctx.fillStyle = '#f97316';
+    ctx.beginPath();
+    ctx.moveTo(9, -2);
+    ctx.lineTo(19, 1);
+    ctx.lineTo(9, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#c2410c';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // White Eye
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(5, -3, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Pupil
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(6.5, -3, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eye Sparkle Highlight
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(5.5, -4.5, 1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pink Cheek Blush
+    ctx.fillStyle = 'rgba(251, 113, 133, 0.7)';
+    ctx.beginPath();
+    ctx.arc(2, 3, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
 
     animId = requestAnimationFrame(tick);
   }

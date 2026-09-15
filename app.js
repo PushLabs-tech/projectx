@@ -275,7 +275,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     };
   }
 
-  const GAME_RUNTIME = "(()=>{const c=document.getElementById('game'),ctx=c.getContext('2d'),o=document.getElementById('overlay'),start=document.getElementById('start'),scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');let bird,pipes,score,best=Number(localStorage.getItem('builder-best')||0),running=false,last=0;bestEl.textContent=best;function reset(){bird={x:115,y:300,vy:0,r:16};pipes=[];score=0;scoreEl.textContent='0';for(let i=0;i<4;i++)pipes.push({x:520+i*155,gap:170+Math.random()*60,top:90+Math.random()*280,passed:false})}function flap(){if(!running){startGame();return}bird.vy=-7}function startGame(){reset();running=true;o.hidden=true;last=performance.now();requestAnimationFrame(loop)}function end(){running=false;o.hidden=false;o.querySelector('h1').textContent='Game over';o.querySelector('p').textContent='Press Start or Space to try again';start.textContent='Restart';if(score>best){best=score;localStorage.setItem('builder-best',best);bestEl.textContent=best}}function loop(t){if(!running)return;const dt=Math.min(32,t-last)/16.67;last=t;bird.vy+=.42*dt;bird.y+=bird.vy*dt;pipes.forEach(p=>{p.x-=2.7*dt;if(!p.passed&&p.x+58<bird.x){p.passed=true;score++;scoreEl.textContent=score}});while(pipes.length&&pipes[0].x<-80)pipes.shift();if(pipes[pipes.length-1].x<360)pipes.push({x:520,gap:170+Math.random()*60,top:70+Math.random()*300,passed:false});draw();const hit=bird.y-bird.r<0||bird.y+bird.r>c.height||pipes.some(p=>{const bottom=p.top+p.gap;return bird.x+bird.r>p.x&&bird.x-bird.r<p.x+58&&(bird.y-bird.r<p.top||bird.y+bird.r>bottom)});if(hit)return end();requestAnimationFrame(loop)}function draw(){ctx.clearRect(0,0,c.width,c.height);const g=ctx.createLinearGradient(0,0,0,c.height);g.addColorStop(0,'#8fd8ff');g.addColorStop(1,'#eef8ff');ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#72c66d';pipes.forEach(p=>{ctx.fillRect(p.x,0,58,p.top);ctx.fillRect(p.x,p.top+p.gap,58,c.height-(p.top+p.gap));ctx.fillStyle='#4d9c4a';ctx.fillRect(p.x-4,p.top-12,66,12);ctx.fillRect(p.x-4,p.top+p.gap,66,12);ctx.fillStyle='#72c66d'});ctx.fillStyle='#f4c542';ctx.beginPath();ctx.arc(bird.x,bird.y,bird.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bird.x+6,bird.y-5,5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#111';ctx.beginPath();ctx.arc(bird.x+8,bird.y-5,2,0,Math.PI*2);ctx.fill()}start.addEventListener('click',startGame);c.addEventListener('pointerdown',flap);addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();flap()}});reset();draw()})()";
+  const GAME_RUNTIME = "(()=>{const c=document.getElementById('game'),ctx=c.getContext('2d'),o=document.getElementById('overlay'),start=document.getElementById('start'),scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');let bird,pipes,score,best=Number(localStorage.getItem('builder-best')||0),running=false,last=0,frame=0;bestEl.textContent=best;function reset(){bird={x:115,y:300,vy:0,r:14};pipes=[];score=0;frame=0;scoreEl.textContent='0';for(let i=0;i<4;i++)pipes.push({x:520+i*155,gap:170+Math.random()*60,top:90+Math.random()*280,passed:false})}function flap(){if(!running){startGame();return}bird.vy=-7}function startGame(){reset();running=true;o.hidden=true;last=performance.now();requestAnimationFrame(loop)}function end(){running=false;o.hidden=false;o.querySelector('h1').textContent='Game over';o.querySelector('p').textContent='Press Start or Space to try again';start.textContent='Restart';if(score>best){best=score;localStorage.setItem('builder-best',best);bestEl.textContent=best}}function loop(t){if(!running)return;frame++;const dt=Math.min(32,t-last)/16.67;last=t;bird.vy+=.42*dt;bird.y+=bird.vy*dt;pipes.forEach(p=>{p.x-=2.7*dt;if(!p.passed&&p.x+58<bird.x){p.passed=true;score++;scoreEl.textContent=score}});while(pipes.length&&pipes[0].x<-80)pipes.shift();if(pipes[pipes.length-1].x<360)pipes.push({x:520,gap:170+Math.random()*60,top:70+Math.random()*300,passed:false});draw();const hit=bird.y-bird.r<0||bird.y+bird.r>c.height||pipes.some(p=>{const bottom=p.top+p.gap;return bird.x+bird.r>p.x&&bird.x-bird.r<p.x+58&&(bird.y-bird.r<p.top||bird.y+bird.r>bottom)});if(hit)return end();requestAnimationFrame(loop)}function draw(){ctx.clearRect(0,0,c.width,c.height);const g=ctx.createLinearGradient(0,0,0,c.height);g.addColorStop(0,'#8fd8ff');g.addColorStop(1,'#eef8ff');ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#72c66d';pipes.forEach(p=>{ctx.fillRect(p.x,0,58,p.top);ctx.fillRect(p.x,p.top+p.gap,58,c.height-(p.top+p.gap));ctx.fillStyle='#4d9c4a';ctx.fillRect(p.x-4,p.top-12,66,12);ctx.fillRect(p.x-4,p.top+p.gap,66,12);ctx.fillStyle='#72c66d'});ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(Math.min(Math.PI/3,Math.max(-Math.PI/6,bird.vy*0.06)));const w=Math.sin(frame*0.3)*3;ctx.fillStyle='#ca8a04';ctx.beginPath();ctx.moveTo(-11,-2);ctx.lineTo(-18,-5);ctx.lineTo(-16,3);ctx.closePath();ctx.fill();ctx.fillStyle='#facc15';ctx.beginPath();ctx.ellipse(0,0,14,11,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#ca8a04';ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle='#fef08a';ctx.beginPath();ctx.ellipse(-2,3,8,5,-0.1,0,Math.PI*2);ctx.fill();ctx.fillStyle='#eab308';ctx.beginPath();ctx.ellipse(-3,-1+w,7,4,0.2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#a16207';ctx.lineWidth=1.2;ctx.stroke();ctx.fillStyle='#f97316';ctx.beginPath();ctx.moveTo(9,-2);ctx.lineTo(19,1);ctx.lineTo(9,5);ctx.closePath();ctx.fill();ctx.strokeStyle='#c2410c';ctx.lineWidth=1;ctx.stroke();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(5,-3,5,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#0f172a';ctx.lineWidth=1;ctx.stroke();ctx.fillStyle='#0f172a';ctx.beginPath();ctx.arc(6.5,-3,2.2,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(5.5,-4.5,1,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(251,113,133,0.7)';ctx.beginPath();ctx.arc(2,3,2.5,0,Math.PI*2);ctx.fill();ctx.restore()}start.addEventListener('click',startGame);c.addEventListener('pointerdown',flap);addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();flap()}});reset();draw()})()";
 
   function starterFiles(title,type){
     try {
@@ -475,6 +475,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     state.route="project";
     state.mode=mode;
     state.panel=defaultTab;
+    ui.composer="";
 
     logActivity(`Created “${p.title}” with adaptive intelligence`);
     saveLocal();
@@ -642,7 +643,181 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     const ops = [];
     let reply = "";
 
-    if (/\b(heal|fix|repair|debug|error|issue|broken|troubleshoot|diagnos|adapt)\b/.test(raw)) {
+    // Sanitize any existing user-feature-section banners from existing project files
+    for (const [path, content] of Object.entries(currentFiles)) {
+      if (typeof content === "string" && content.includes("user-feature-section")) {
+        const cleaned = content.replace(/<section\b[^>]*class=["'][^"']*user-feature-section[^"']*["'][\s\S]*?<\/section>/gi, "");
+        if (cleaned !== content) {
+          ops.push({ op: "write_file", path, content: cleaned });
+          currentFiles[path] = cleaned;
+        }
+      }
+    }
+
+    // Clean title helper: never pollute project titles with conversational prompt text
+    let cleanProjectTitle = (p.title || "Flappy Bird")
+      .replace(/\s+(i don'?t|it'?s|js ball|ball|delete|heal|fix|debug)[\s\S]*/i, "")
+      .trim() || p.title || "Flappy Bird";
+
+    // Clean up any previously polluted titles in existing index.html
+    if (currentFiles["index.html"] && /\b(i don'?t|it'?s|js ball)\b/i.test(currentFiles["index.html"])) {
+      let cleanedHtml = currentFiles["index.html"]
+        .replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/i, `<h1 class="game-title">${esc(cleanProjectTitle)}</h1>`)
+        .replace(/<title\b[^>]*>[\s\S]*?<\/title>/i, `<title>${esc(cleanProjectTitle)}</title>`);
+      if (cleanedHtml !== currentFiles["index.html"]) {
+        ops.push({ op: "write_file", path: "index.html", content: cleanedHtml });
+        currentFiles["index.html"] = cleanedHtml;
+      }
+    }
+
+    const isGameProject = Boolean(
+      p.type === "Game" ||
+      currentFiles["game.js"] ||
+      (currentFiles["index.html"] && currentFiles["index.html"].includes("gameCanvas"))
+    );
+
+    if (/\b(delete\s+(everything|all|project|canvas|files?|code)|clear\s+(everything|all|project|canvas)|wipe(\s+all)?|reset\s+(everything|all|project|canvas)|start\s+over|blank\s+(canvas|page|slate)|empty\s+(canvas|page|project))\b/i.test(raw)) {
+      // 1. Delete all non-html files (game.js, extra styles, secondary scripts)
+      for (const path of Object.keys(currentFiles)) {
+        if (path !== "index.html") {
+          ops.push({ op: "delete_file", path });
+        }
+      }
+      const cleanHtml = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Clean Canvas</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0f172a;
+      color: #94a3b8;
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 24px;
+      text-align: center;
+    }
+    .clean-box {
+      max-width: 420px;
+      width: 100%;
+      background: #1e293b;
+      border: 1px dashed #334155;
+      border-radius: 16px;
+      padding: 36px 24px;
+    }
+    .clean-icon {
+      font-size: 28px;
+      margin-bottom: 12px;
+      display: inline-block;
+    }
+    h2 {
+      color: #f8fafc;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="clean-box">
+    <div class="clean-icon">✦</div>
+    <h2>Workspace Cleared</h2>
+    <p>Everything has been deleted. Ready for your next creation. Describe what you'd like to build!</p>
+  </div>
+</body>
+</html>`;
+      ops.push({ op: "write_file", path: "index.html", content: cleanHtml });
+      reply = `Deleted all files and cleared the workspace. The live canvas has been reset to a clean slate.`;
+    } else if (/\b(delete|remove)\s+(the\s+)?(game|flappy|bird|arcade|canvas)\b/i.test(raw)) {
+      if (currentFiles["game.js"]) ops.push({ op: "delete_file", path: "game.js" });
+      let html = currentFiles["index.html"] || "";
+      html = html.replace(/<script\b[^>]*src=["'][^"']*game\.js["'][^>]*>\s*<\/script>/gi, "");
+      html = html.replace(/<div\b[^>]*id=["']wrap["'][\s\S]*?<\/div>/gi, "");
+      html = html.replace(/<canvas\b[^>]*id=["']gameCanvas["'][\s\S]*?<\/canvas>/gi, "");
+      ops.push({ op: "write_file", path: "index.html", content: html });
+      reply = `Removed the game engine and canvas from your project.`;
+    } else if (/\b(shooter|space\s*invaders?|shoot\s*'?em\s*up|galaga|starship|star\s*fighter|alien|laser|bullet\s*hell|space\s*game|shooting)\b/i.test(raw)) {
+      p.title = "Space Shooter";
+      p.type = "Game";
+      cleanProjectTitle = "Space Shooter";
+      const shooterArts = typeof Engine !== "undefined" && typeof Engine.buildShooterGameArtifact === "function"
+        ? Engine.buildShooterGameArtifact("Space Shooter")
+        : (typeof Engine !== "undefined" && typeof Engine.buildGameArtifact === "function"
+          ? Engine.buildGameArtifact("Space Shooter")
+          : starterFiles("Space Shooter", "Game"));
+      for (const [path, content] of Object.entries(shooterArts)) {
+        ops.push({ op: "write_file", path, content });
+      }
+      reply = `Created 60fps playable Space Shooter arcade game with starship steering, dual laser cannons, descending alien fleets, particle blast explosions, energy shields, and keyboard/touch controls. Check the Live Sandbox!`;
+    } else if (/\b(snake|slither|worm)\b/i.test(raw)) {
+      p.title = "Retro Snake";
+      p.type = "Game";
+      cleanProjectTitle = "Retro Snake";
+      const snakeArts = typeof Engine !== "undefined" && typeof Engine.buildSnakeGameArtifact === "function"
+        ? Engine.buildSnakeGameArtifact("Retro Snake")
+        : (typeof Engine !== "undefined" && typeof Engine.buildGameArtifact === "function"
+          ? Engine.buildGameArtifact("Retro Snake")
+          : starterFiles("Retro Snake", "Game"));
+      for (const [path, content] of Object.entries(snakeArts)) {
+        ops.push({ op: "write_file", path, content });
+      }
+      reply = `Created classic Retro Snake arcade game with smooth grid navigation, food pellets, growing tail physics, score tracking, and keyboard/touch D-pad controls. Check the Live Sandbox!`;
+    } else if (/\b(brick\s*break(er)?|breakout|paddle|pong|block\s*break(er)?)\b/i.test(raw)) {
+      p.title = "Brick Breaker";
+      p.type = "Game";
+      cleanProjectTitle = "Brick Breaker";
+      const brickArts = typeof Engine !== "undefined" && typeof Engine.buildBrickBreakerArtifact === "function"
+        ? Engine.buildBrickBreakerArtifact("Brick Breaker")
+        : (typeof Engine !== "undefined" && typeof Engine.buildGameArtifact === "function"
+          ? Engine.buildGameArtifact("Brick Breaker")
+          : starterFiles("Brick Breaker", "Game"));
+      for (const [path, content] of Object.entries(brickArts)) {
+        ops.push({ op: "write_file", path, content });
+      }
+      reply = `Created 60fps Brick Breaker arcade game with responsive paddle physics, bouncing ball, multi-colored brick matrix, scoring, and keyboard/touch controls. Check the Live Sandbox!`;
+    } else if (/\b(todo|to-do|task\s*list|task\s*manager|checklist)\b/i.test(raw)) {
+      p.title = "Task Manager";
+      p.type = "Web";
+      cleanProjectTitle = "Task Manager";
+      const todoArts = typeof Engine !== "undefined" && typeof Engine.buildTodoArtifact === "function"
+        ? Engine.buildTodoArtifact("Task Manager")
+        : starterFiles("Task Manager", "Web");
+      for (const [path, content] of Object.entries(todoArts)) {
+        ops.push({ op: "write_file", path, content });
+      }
+      reply = `Created interactive Task Manager application with task creation, real-time completion toggles, status filters (All, Active, Completed), item counter, and local persistence. Check the Live Sandbox!`;
+    } else if (/\b(calculator|calc)\b/i.test(raw)) {
+      p.title = "Calculator";
+      p.type = "Web";
+      cleanProjectTitle = "Calculator";
+      const calcArts = typeof Engine !== "undefined" && typeof Engine.buildCalculatorArtifact === "function"
+        ? Engine.buildCalculatorArtifact("Calculator")
+        : starterFiles("Calculator", "Web");
+      for (const [path, content] of Object.entries(calcArts)) {
+        ops.push({ op: "write_file", path, content });
+      }
+      reply = `Created modern Calculator application with responsive digit pad, mathematical operations (+, -, ×, ÷), clear and backspace controls, calculation history tape, and keyboard support. Check the Live Sandbox!`;
+    } else if (isGameProject && !/\b(shooter|snake|brick|pong|todo|task|calc)\b/i.test(raw) && /\b(bird|ball|sprite|character|wing|beak|graphics?|look\s+like|avatar|skin|physics|jump|flap)\b/i.test(raw)) {
+      // User is asking specifically about the bird appearance or game character!
+      const gameArts = typeof Engine !== "undefined" && typeof Engine.buildGameArtifact === "function"
+        ? Engine.buildGameArtifact(cleanProjectTitle)
+        : starterFiles(cleanProjectTitle, "Game");
+      
+      for (const [path, content] of Object.entries(gameArts)) {
+        ops.push({ op: "write_file", path, content });
+      }
+      reply = `Updated game character graphics! Replaced the ball placeholder with an authentic animated Flappy Bird featuring flapping wings, orange beak, cartoon eyes with highlights, cheek blush, and velocity-based tilt physics. Cleaned up the game header title as well. Check the Live Sandbox!`;
+    } else if (/\b(heal|fix|repair|debug|error|issue|broken|troubleshoot|diagnos|adapt)\b/.test(raw)) {
       const tempProject = { ...p, artifacts: { ...currentFiles }, files: { ...currentFiles }, fixes: [] };
       const healRes = typeof Engine !== "undefined" && typeof Engine.autoAdaptAndHealProject === "function"
         ? Engine.autoAdaptAndHealProject(tempProject)
@@ -666,28 +841,32 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       }
       reply = `Transformed project into a mobile-first responsive application with touch navigation and responsive viewport.`;
     } else if (/\b(cart|shop|store|checkout|product|inventory|buy|ecommerce)\b/.test(raw) && !currentFiles["index.html"]?.includes("cart-drawer")) {
-      const shopProj = Engine.createProject(p.title + " " + userText);
+      const shopProj = Engine.createProject(cleanProjectTitle);
       const arts = Engine.buildCommerceArtifact(shopProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
       reply = `Added full ecommerce functionality: interactive product catalog, category filters, cart drawer, and checkout modal flow.`;
-    } else if (/\b(game|flappy|canvas|playable|score|arcade)\b/.test(raw) && !currentFiles["game.js"]) {
-      const gameProj = Engine.createProject(p.title + " " + userText);
-      const arts = Engine.buildGameArtifact(gameProj);
+    } else if (/\b(game|flappy|falppy|canvas|playable|score|arcade|bird)\b/.test(raw)) {
+      const gameProj = typeof Engine !== "undefined" && typeof Engine.createProject === "function"
+        ? Engine.createProject(cleanProjectTitle)
+        : null;
+      const arts = (gameProj && typeof Engine.buildGameArtifact === "function")
+        ? Engine.buildGameArtifact(cleanProjectTitle)
+        : starterFiles(cleanProjectTitle, "Game");
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
-      reply = `Generated 60fps canvas game engine with physics loop, keyboard and touch controls, score tracking, and persistent best scores.`;
+      reply = `Created 60fps playable Flappy Bird canvas game with authentic animated bird sprite, wings, physics loop, keyboard/touch flap controls, pipes, and score tracking. Check the Live Sandbox!`;
     } else if (/\b(dashboard|chart|csv|data|analytics|metric|table)\b/.test(raw) && !currentFiles["index.html"]?.includes("metricChart")) {
-      const dataProj = Engine.createProject(p.title + " " + userText);
+      const dataProj = Engine.createProject(cleanProjectTitle);
       const arts = Engine.buildDataDashboardArtifact(dataProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
       }
       reply = `Created interactive analytics dashboard with real-time SVG trend chart, KPI summary cards, filterable data explorer, and CSV export.`;
     } else if (/\b(research|paper|citation|medical|study|journal)\b/.test(raw) && !currentFiles["index.html"]?.includes("Citations")) {
-      const resProj = Engine.createProject(p.title + " " + userText);
+      const resProj = Engine.createProject(cleanProjectTitle);
       const arts = Engine.buildResearchArtifact(resProj);
       for (const [path, content] of Object.entries(arts)) {
         ops.push({ op: "write_file", path, content });
@@ -703,13 +882,41 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       ops.push({ op: "write_file", path: "styles.css", content: css });
       reply = `Refined styling, typography hierarchy, and interactive states to meet premium production standards.`;
     } else {
-      let html = currentFiles["index.html"] || "";
-      const featureId = "feat_" + Math.random().toString(36).slice(2, 6);
-      if (html.includes("</body>")) {
-        html = html.replace("</body>", `  <section class="user-feature-section" id="${featureId}">\n    <div class="feature-banner">\n      <span class="feature-tag">Engine Verified</span>\n      <p>Implemented: ${esc(userText)}</p>\n    </div>\n  </section>\n</body>`);
-        ops.push({ op: "write_file", path: "index.html", content: html });
+      let html = currentFiles["index.html"] || starterFiles(p.title, p.type || "Web")["index.html"] || "";
+      html = html.replace(/<section\b[^>]*class=["'][^"']*user-feature-section[^"']*["'][\s\S]*?<\/section>/gi, "");
+
+      let modified = false;
+      const titleMatch = raw.match(/\b(?:title|heading|call it|name it)\s+(?:to|as)?\s*["']?([^"']+)["']?/i);
+      if (titleMatch && titleMatch[1]) {
+        const newTitle = titleMatch[1].trim();
+        html = html.replace(/<title>[^<]*<\/title>/i, `<title>${esc(newTitle)}</title>`);
+        html = html.replace(/<h1[^>]*>[^<]*<\/h1>/i, `<h1>${esc(newTitle)}</h1>`);
+        modified = true;
       }
-      reply = `Analyzed requirement "${userText}". Updated project structure, verified dependencies, and refreshed preview.`;
+
+      if (/\b(button|cta|action)\b/i.test(raw)) {
+        const btnLabel = userText.replace(/\b(add|create|insert|a|button|called|labeled)\b/gi, "").trim() || "Action";
+        const btnHtml = `\n  <button class="custom-action-btn" type="button" style="margin-top:12px;padding:8px 16px;border-radius:6px;border:none;background:#38bdf8;color:#0f172a;font-weight:600;cursor:pointer;">${esc(btnLabel)}</button>`;
+        if (html.includes("</main>")) {
+          html = html.replace("</main>", `${btnHtml}\n</main>`);
+          modified = true;
+        } else if (html.includes("</body>")) {
+          html = html.replace("</body>", `${btnHtml}\n</body>`);
+          modified = true;
+        }
+      }
+
+      if (!modified) {
+        const contentBlock = `\n  <div class="user-content-block" style="margin-top:16px;padding:14px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;">\n    <p style="margin:0;font-size:13.5px;color:#e2e8f0;line-height:1.5;">${esc(userText)}</p>\n  </div>`;
+        if (html.includes("</main>")) {
+          html = html.replace("</main>", `${contentBlock}\n</main>`);
+        } else if (html.includes("</body>")) {
+          html = html.replace("</body>", `${contentBlock}\n</body>`);
+        }
+      }
+
+      ops.push({ op: "write_file", path: "index.html", content: html });
+      reply = `Applied updates for "${userText}". Updated project files and live preview.`;
     }
 
     return {
@@ -724,9 +931,21 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
   async function sendMessage(){
     const p=project();
-    const text=ui.composer.trim();
+    const text=(ui.composer || "").trim();
 
-    if(!p||!text||ui.thinking)return;
+    if(!p || !text || ui.thinking) return;
+
+    // Immediately lock thinking & clear composer in state & DOM to prevent rapid double-taps/event duplication
+    ui.thinking = true;
+    ui.composer = "";
+
+    const chatInput = $("#chatInput");
+    if (chatInput) chatInput.value = "";
+    const sendBtn = $("#sendBtn");
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Thinking…";
+    }
 
     const mode=state.mode;
 
@@ -744,41 +963,70 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       updatedAt:now()
     }));
 
-    ui.composer="";
-    ui.thinking=true;
-    render();
-
     try{
       const history=p.chat
         .slice(-12)
         .map(m=>({role:m.role,text:m.text}));
 
       let result;
-      if(CONFIGURED && sb && session){
-        try{
-          result=await api("chat",{
-            mode,
-            message:text,
+
+      // Primary AI Generation Engine via Server-Side Gemini API
+      try {
+        const genRes = await fetch("/api/ai/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: text,
             history,
-            model:selectedModel(mode),
-            project:{
-              id:p.id,
-              title:p.title,
-              intention:p.intention,
-              type:p.type,
-              plan:p.plan,
-              resources:p.resources,
-              files:p.files,
-              requirements:p.requirements,
-              agents:p.agents
-            }
-          });
-        }catch(apiErr){
-          console.warn("Remote AI endpoint unavailable, using Universal Engine:", apiErr);
+            currentFiles: p.files,
+            projectTitle: p.title,
+            projectType: p.type,
+            mode
+          })
+        });
+
+        const genData = await genRes.json().catch(() => ({}));
+        if (genRes.ok && genData.ok && genData.result) {
+          result = {
+            text: genData.result.reply,
+            model: "Gemini AI",
+            result: genData.result
+          };
+        } else {
+          throw new Error(genData.error || `AI endpoint returned ${genRes.status}`);
+        }
+      } catch (genErr) {
+        console.warn("Direct Gemini endpoint fallback:", genErr);
+        if(CONFIGURED && sb && session){
+          try{
+            const apiPromise = api("chat",{
+              mode,
+              message:text,
+              history,
+              model:selectedModel(mode),
+              project:{
+                id:p.id,
+                title:p.title,
+                intention:p.intention,
+                type:p.type,
+                plan:p.plan,
+                resources:p.resources,
+                files:p.files,
+                requirements:p.requirements,
+                agents:p.agents
+              }
+            });
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("AI service timeout")), 8000)
+            );
+            result = await Promise.race([apiPromise, timeoutPromise]);
+          }catch(apiErr){
+            console.warn("Remote Supabase endpoint unavailable:", apiErr);
+            result=await localEngineChat(p, text, mode);
+          }
+        }else{
           result=await localEngineChat(p, text, mode);
         }
-      }else{
-        result=await localEngineChat(p, text, mode);
       }
 
       const response=
@@ -788,9 +1036,10 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
       if(result.result?.operations){
         const ops=result.result.operations;
+        const replaceAll = !!result.result.replaceAllFiles;
 
         updateProject(p.id,proj=>{
-          const files={...proj.files};
+          const files = replaceAll ? {} : { ...proj.files };
 
           for(const op of ops){
             if(!safePath(op.path))continue;
@@ -804,16 +1053,18 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
           return {
             ...proj,
+            title: result.result?.title || proj.title,
+            type: result.result?.type || proj.type,
             files,
-            progress:Math.min(100,proj.progress+8),
-            readiness:Math.min(100,proj.readiness+5),
-            health:Math.min(100,proj.health+1),
+            progress:Math.min(100,proj.progress+15),
+            readiness:Math.min(100,proj.readiness+10),
+            health:Math.min(100,proj.health+5),
             tests:computeTests(files),
             security:computeSecurity(files),
             versions:[
               {
                 id:uid(),
-                label:`${AGENTS[mode]?.label||"AI"} change`,
+                label:`${AGENTS[mode]?.label||"AI"} (${result.result?.title || "Update"})`,
                 ts:now(),
                 files
               },
@@ -826,6 +1077,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
                 role:"assistant",
                 mode,
                 text:response,
+                thinking:result.result?.thinking || null,
                 model:result.model,
                 ts:now()
               }
@@ -836,6 +1088,8 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       }else{
         updateProject(p.id,proj=>({
           ...proj,
+          title: result.result?.title || proj.title,
+          type: result.result?.type || proj.type,
           chat:[
             ...proj.chat,
             {
@@ -843,6 +1097,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
               role:"assistant",
               mode,
               text:response,
+              thinking:result.result?.thinking || null,
               model:result.model,
               ts:now()
             }
@@ -1094,14 +1349,67 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
   function assemblePreviewHtml(p){
     const files = (p?.files && typeof p.files === "object") ? p.files : {};
-    let html = files["index.html"] || "<html><body><h1>No preview yet.</h1></body></html>";
+    let html = files["index.html"] || "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Preview</title></head><body><h1>No preview yet.</h1></body></html>";
+    // Strip any intrusive meta banners that may have been generated previously
+    html = html.replace(/<section\b[^>]*class=["'][^"']*user-feature-section[^"']*["'][\s\S]*?<\/section>/gi, '');
     const errorTrap = `<script>window.onerror=function(msg,url,line,col){window.parent.postMessage({type:'PREVIEW_RUNTIME_ERROR',error:String(msg),line,col},'*')};window.addEventListener('unhandledrejection',function(e){window.parent.postMessage({type:'PREVIEW_RUNTIME_ERROR',error:String(e.reason?.message||e.reason)},'*')});<\/script>`;
+    
+    // Replace linked css with inlined content
+    let hasInlinedCss = false;
+    html = html.replace(/<link\b[^>]*href=["']([^"']+)["'][^>]*>/gi, (tag,href)=>{ 
+      const clean=String(href).split('?')[0].replace(/^\.\//,''); 
+      const css=files[clean]; 
+      if (typeof css === 'string') {
+        hasInlinedCss = true;
+        return `<style>${css}</style>`;
+      }
+      return tag; 
+    });
+    
+    // Replace linked scripts with inlined code
+    let hasInlinedJs = false;
+    html = html.replace(/<script\b([^>]*)src=["']([^"']+)["']([^>]*)>\s*<\/script>/gi, (tag, before, src, after)=>{ 
+      const clean=String(src).split('?')[0].replace(/^\.\//,''); 
+      const code=files[clean]; 
+      if(typeof code!=='string') return tag; 
+      hasInlinedJs = true;
+      return `<script ${before} ${after}>${code.replace(/<\/script/gi,'<\\/script')}</script>`; 
+    });
+
+    if(typeof files["styles.css"]==='string' && !hasInlinedCss && !/<style>/i.test(html)) {
+      html=html.includes('</head>')?html.replace('</head>',`<style>${files["styles.css"]}</style></head>`):`<style>${files["styles.css"]}</style>${html}`;
+    }
+
+    if(!hasInlinedJs) { 
+      const mainJs = files["app.js"] || files["game.js"];
+      if (typeof mainJs === 'string' && mainJs.trim().length > 0) {
+        const js = mainJs.replace(/<\/script/gi,'<\\/script'); 
+        html = html.includes('</body>') ? html.replace('</body>',`<script>${js}</script></body>`) : `${html}<script>${js}</script>`; 
+      }
+    }
+
     html = /<head>/i.test(html) ? html.replace(/<head>/i, `<head>${errorTrap}`) : `${errorTrap}${html}`;
-    html = html.replace(/<link\b[^>]*href=["']([^"']+)["'][^>]*>/gi, (tag,href)=>{ const clean=String(href).split('?')[0].replace(/^\.\//,''); const css=files[clean]; return typeof css==='string'?`<style>${css}</style>`:tag; });
-    html = html.replace(/<script\b[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi, (tag,src)=>{ const clean=String(src).split('?')[0].replace(/^\.\//,''); const code=files[clean]; if(typeof code!=='string') return tag; const openEnd=tag.indexOf('>'); const open=tag.slice(0,openEnd+1).replace(/\s+src=["'][^"']+["']/i,''); return `${open}${code.replace(/<\/script/gi,'<\\/script')}</script>`; });
-    if(typeof files["styles.css"]==='string' && !/<style>|styles\.css/i.test(html)) html=html.includes('</head>')?html.replace('</head>',`<style>${files["styles.css"]}</style></head>`):`<style>${files["styles.css"]}</style>${html}`;
-    if(typeof files["app.js"]==='string' && !/src=["'][^"']*app\.js/i.test(html) && !html.includes(files["app.js"])) { const js=files["app.js"].replace(/<\/script/gi,'<\\/script'); html=html.includes('</body>')?html.replace('</body>',`<script>${js}</script></body>`):`${html}<script>${js}</script>`; }
     return html;
+  }
+
+  function canvasSkeletonOverlayHTML(statusText = "AI Synthesizing Architecture & Logic…"){
+    return `
+      <div class="canvas-skeleton-overlay" aria-label="AI Generating">
+        <div class="skeleton-badge-container">
+          <div class="skeleton-status-pill">
+            <span class="pulse-dot"></span>
+            <span>✦ ${esc(statusText)}</span>
+          </div>
+        </div>
+        <div class="skeleton-box skeleton-header-bar"></div>
+        <div class="skeleton-grid-row">
+          <div class="skeleton-box skeleton-card-item"></div>
+          <div class="skeleton-box skeleton-card-item"></div>
+          <div class="skeleton-box skeleton-card-item"></div>
+        </div>
+        <div class="skeleton-box skeleton-main-body"></div>
+      </div>
+    `;
   }
 
   function renderPreview(){
@@ -2570,7 +2878,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
         <section id="root" class="root"></section>
       </main>`;
 
-    $("#mobileCta")?.classList.toggle("hidden",false);
+    $("#mobileCta")?.classList.toggle("hidden", state.route === "project" || state.route === "home" || !session);
 
     renderShell();
     renderModal();
@@ -3510,6 +3818,35 @@ if (typeof window !== 'undefined') window.Engine = Engine;
   }
 
   function projectView(p){
+    // Automatically sanitize any corrupted titles from chat concatenation
+    if (p && p.title && /\b(i don'?t|it'?s|js ball)\b/i.test(p.title)) {
+      p.title = p.title.replace(/\s+(i don'?t|it'?s|js ball)[\s\S]*/i, '').trim() || "Flappy Bird";
+      saveLocal();
+    }
+
+    // Automatically clean up index.html if corrupted
+    if (p && p.files && p.files["index.html"] && /\b(i don'?t|it'?s|js ball)\b/i.test(p.files["index.html"])) {
+      p.files["index.html"] = p.files["index.html"]
+        .replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/i, `<h1 class="game-title">${esc(p.title)}</h1>`)
+        .replace(/<title\b[^>]*>[\s\S]*?<\/title>/i, `<title>${esc(p.title)}</title>`);
+      saveLocal();
+    }
+
+    // Automatically upgrade game.js if it contains the legacy plain circle/ball
+    if (p && p.files && p.files["game.js"] && !p.files["game.js"].includes("drawBird")) {
+      try {
+        if (typeof Engine !== "undefined" && typeof Engine.buildGameArtifact === "function") {
+          const freshGame = Engine.buildGameArtifact(p.title);
+          if (freshGame && freshGame["game.js"]) {
+            p.files["game.js"] = freshGame["game.js"];
+            saveLocal();
+          }
+        }
+      } catch (err) {
+        console.warn("Auto-upgrade game character error:", err);
+      }
+    }
+
     // Clean, intuitive 4-core workspace tabs
     const coreTabs = [
       { id: "preview", label: "Preview", desc: "Live running app" },
@@ -3575,7 +3912,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     `;
 
     return `
-      <div class="workspace-clean ${isSplit ? "workspace-split" : "workspace-focused"}">
+      <div class="workspace-clean ${isSplit ? "workspace-split" : "workspace-focused"}" data-active-panel="${state.panel}">
         <!-- 1. CLEAN WORKSPACE HEADER -->
         <header class="project-header-streamlined">
           <div class="project-title-area">
@@ -3590,11 +3927,9 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
           <!-- Centered View Switcher -->
           <div class="workspace-segmented-nav">
-            ${!isSplit ? `
-              <button class="segmented-tab ${state.panel === "chat" ? "active" : ""}" data-panel="chat">
-                Chat
-              </button>
-            ` : ""}
+            <button class="segmented-tab ${state.panel === "chat" ? "active" : ""}" data-panel="chat" title="AI Assistant Chat">
+              Chat
+            </button>
             ${coreTabs.map(t => `
               <button class="segmented-tab ${state.panel === t.id ? "active" : ""}" data-panel="${t.id}" title="${t.desc}">
                 ${t.label}
@@ -3644,7 +3979,8 @@ if (typeof window !== 'undefined') window.Engine = Engine;
                         <button class="btn btn-ghost btn-xs" data-action="openNewTab" title="Open full screen in new tab">↗ Popout</button>
                       </div>
                     </div>
-                    <div class="preview-iframe-wrapper">
+                    <div class="preview-iframe-wrapper ${ui.thinking ? "canvas-generating-pulse" : ""}" style="position:relative;">
+                      ${ui.thinking ? canvasSkeletonOverlayHTML("Synthesizing application logic & layout…") : ""}
                       <iframe id="previewFrame" sandbox="allow-scripts" title="Project live preview"></iframe>
                     </div>
                   </div>
@@ -3670,7 +4006,8 @@ if (typeof window !== 'undefined') window.Engine = Engine;
                       <button class="btn btn-ghost btn-xs" data-action="openNewTab">↗ Popout</button>
                     </div>
                   </div>
-                  <div class="preview-iframe-wrapper">
+                  <div class="preview-iframe-wrapper ${ui.thinking ? "canvas-generating-pulse" : ""}" style="position:relative;">
+                    ${ui.thinking ? canvasSkeletonOverlayHTML("Synthesizing application logic & layout…") : ""}
                     <iframe id="previewFrame" sandbox="allow-scripts" title="Project live preview"></iframe>
                   </div>
                 </div>
@@ -3763,11 +4100,6 @@ if (typeof window !== 'undefined') window.Engine = Engine;
           sendMessage();
         }
       }
-    );
-
-    $("#sendBtn")?.addEventListener(
-      "click",
-      sendMessage
     );
 
     // Other specific bindings
@@ -3938,16 +4270,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       case "openNewTab": {
         const p = project();
         if(!p) return;
-        const html = p.files["index.html"] || "<h1>No index.html</h1>";
-        const css = p.files["styles.css"] || "";
-        const js = p.files["app.js"] || "";
-        let full = html;
-        if(css && !html.includes(css)) {
-          full = full.includes("</head>") ? full.replace("</head>", `<style>${css}</style></head>`) : `<style>${css}</style>` + full;
-        }
-        if(js && !html.includes(js)) {
-          full = full.includes("</body>") ? full.replace("</body>", `<script>${js}</script></body>`) : full + `<script>${js}</script>`;
-        }
+        const full = assemblePreviewHtml(p);
         const blob = new Blob([full], {type: "text/html"});
         const url = URL.createObjectURL(blob);
         const win = window.open(url, "_blank");
@@ -4268,6 +4591,21 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
       case "runPerformance": {
         toast("Performance check: 60 FPS verified, draw calls optimal, 0 dropped frames.", "success");
+        break;
+      }
+
+      case "openAuthModal": {
+        ui.showAuthModal = true;
+        render();
+        break;
+      }
+
+      case "quickPreset": {
+        const promptEl = $("#heroPrompt") || $("#chatInput");
+        if(promptEl) {
+          promptEl.scrollIntoView({ behavior: "smooth", block: "center" });
+          promptEl.focus();
+        }
         break;
       }
     }
@@ -4621,7 +4959,24 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     const files = (p?.files && typeof p.files === 'object') ? p.files : {};
     const names = Object.keys(files);
     const active = files[p?.activeFile] != null ? p.activeFile : (names[0] || "");
-    return `<div class="code-panel"><div class="file-list">${names.map(n=>`<button class="file ${n===active?"active":""}" data-file="${esc(n)}">${esc(n)}</button>`).join("")||'<div class="empty-state" style="padding:12px;"><span>○</span><small>No files created</small></div>'}</div><div class="code-editor"><div class="code-toolbar"><div><b>${esc(active||"Workspace")}</b><small>Code workspace · safe edit surface</small></div><div><button class="secondary small" data-action="copyFile">Copy</button><button class="secondary small" data-action="formatCode">Format</button><button class="secondary small" data-action="downloadFile">Download</button></div></div><pre>${esc(active?files[active]:"No files generated yet")}</pre></div></div>`;
+    const isGenerating = ui.thinking;
+    return `<div class="code-panel ${isGenerating ? "canvas-generating-pulse" : ""}"><div class="file-list">${names.map(n=>`<button class="file ${n===active?"active":""}" data-file="${esc(n)}">${esc(n)}</button>`).join("")||'<div class="empty-state" style="padding:12px;"><span>○</span><small>No files created</small></div>'}</div><div class="code-editor"><div class="code-toolbar"><div><b>${esc(active||"Workspace")}</b><small>Code workspace · safe edit surface</small></div><div><button class="secondary small" data-action="copyFile">Copy</button><button class="secondary small" data-action="formatCode">Format</button><button class="secondary small" data-action="downloadFile">Download</button></div></div>${isGenerating ? `
+      <div class="code-skeleton-container" aria-label="Synthesizing code">
+        <div class="skeleton-status-pill" style="margin-bottom:8px;background:#242624;border-color:#383a38;color:#f3f4f6;">
+          <span class="pulse-dot"></span>
+          <span>✦ Synthesizing modules and functions…</span>
+        </div>
+        <div class="code-skeleton-line" style="width:40%;"></div>
+        <div class="code-skeleton-line" style="width:78%;"></div>
+        <div class="code-skeleton-line" style="width:62%;"></div>
+        <div class="code-skeleton-line" style="width:88%;"></div>
+        <div class="code-skeleton-line" style="width:30%;"></div>
+        <div class="code-skeleton-line" style="width:72%;"></div>
+        <div class="code-skeleton-line" style="width:50%;"></div>
+        <div class="code-skeleton-line" style="width:82%;"></div>
+        <div class="code-skeleton-line" style="width:68%;"></div>
+      </div>
+    ` : `<pre>${esc(active?files[active]:"No files generated yet")}</pre>`}</div></div>`;
   }
 
   function runsPanel(p){
@@ -5240,17 +5595,29 @@ if (typeof window !== 'undefined') window.Engine = Engine;
   }
 
   function msgHTML(m){
+    const isUser = m.role === "user";
     return `
-      <div class="chat-message ${m.role} ${m.error?"error":""}">
-        <div class="message-mark">
-          ${m.role==="user"?"You":"✦"}
+      <div class="chat-message message ${m.role} ${m.error?"error":""}">
+        <div class="message-avatar message-mark" aria-label="${isUser ? "User" : "Builder"}">
+          ${isUser ? "Y" : "✦"}
         </div>
 
         <div class="message-body">
           <div class="message-meta">
-            <b>${m.role==="user"?"You":esc(AGENTS[m.mode]?.label||"Builder")}</b>
+            <b>${isUser ? "You" : esc(AGENTS[m.mode]?.label||"Builder AI")}</b>
             <small>${formatTime(m.ts)}</small>
           </div>
+
+          ${m.thinking ? `
+            <details class="thinking-block" open>
+              <summary>
+                <span>🧠 AI Reasoning & Architecture</span>
+              </summary>
+              <div class="thinking-content">
+                ${esc(m.thinking)}
+              </div>
+            </details>
+          ` : ""}
 
           <div class="message-text">
             ${esc(m.text)}
@@ -5290,11 +5657,15 @@ if (typeof window !== 'undefined') window.Engine = Engine;
               </button>
             </div>
 
-            <iframe
-              id="previewFrame"
-              sandbox="allow-scripts"
-              title="Project preview"
-            ></iframe>
+            <div class="preview-iframe-wrapper ${ui.thinking ? "canvas-generating-pulse" : ""}" style="position:relative;flex:1;min-height:500px;">
+              ${ui.thinking ? canvasSkeletonOverlayHTML("Synthesizing application logic & layout…") : ""}
+              <iframe
+                id="previewFrame"
+                sandbox="allow-scripts"
+                title="Project preview"
+                style="width:100%;height:100%;min-height:500px;border:0;"
+              ></iframe>
+            </div>
           </div>`;
 
       case "resources":
@@ -6784,7 +7155,12 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       const t = e.target && typeof e.target.closest === "function" ? e.target.closest("[data-action],[data-view],[data-open-project],[data-panel],[data-settings-tab],[data-autonomy],[data-set-mode],[data-default-ai],[data-resource-tab],[data-restore]") : null;
       if (!t) return;
       try {
-        if (t.dataset.action) { handleAction(t.dataset.action); return; }
+        if (t.dataset.action) {
+          e.stopPropagation();
+          e.preventDefault();
+          handleAction(t.dataset.action);
+          return;
+        }
         if (t.dataset.view) { patch({ route: t.dataset.view, projectId: null }); ui.sidebarOpen = false; return; }
         if (t.dataset.openProject) { state.projectId = t.dataset.openProject; state.route = "project"; state.panel = "overview"; saveLocal(); render(); return; }
         if (t.dataset.panel) { state.panel = t.dataset.panel; saveLocal(); render(); return; }

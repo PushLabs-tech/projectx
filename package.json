@@ -22,5 +22,8 @@
   },
   "devDependencies": {
     "vite": "^7.0.0"
+  },
+  "dependencies": {
+    "@google/genai": "^2.22.0"
   }
 }
