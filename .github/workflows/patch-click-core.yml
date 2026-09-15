@@ -1,0 +1,52 @@
+name: Patch click core
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-click-core.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch app.js
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app.js')
+          s = p.read_text()
+
+          # Rebind controls after every render because render() replaces #appRoot HTML.
+          render_anchor = '    renderShell();\n    renderModal();\n'
+          if render_anchor in s and '    renderModal();\n    bindEvents();\n' not in s:
+              s = s.replace(render_anchor, render_anchor + '    bindEvents();\n', 1)
+
+          # Add a capture-phase fallback for all declarative controls.
+          marker = '  // CLICK_CORE_BRIDGE_V1\n'
+          if marker not in s:
+              anchor = '  initEngine();\n'
+              bridge = '''  // CLICK_CORE_BRIDGE_V1\n  if (!window.__builderClickCore) {\n    window.__builderClickCore = true;\n    document.addEventListener("click", (e) => {\n      const t = e.target && typeof e.target.closest === "function" ? e.target.closest("[data-action],[data-view],[data-open-project],[data-panel],[data-settings-tab],[data-autonomy],[data-set-mode],[data-default-ai],[data-resource-tab],[data-restore]") : null;\n      if (!t) return;\n      try {\n        if (t.dataset.action) { handleAction(t.dataset.action); return; }\n        if (t.dataset.view) { patch({ route: t.dataset.view, projectId: null }); ui.sidebarOpen = false; return; }\n        if (t.dataset.openProject) { state.projectId = t.dataset.openProject; state.route = "project"; state.panel = "overview"; saveLocal(); render(); return; }\n        if (t.dataset.panel) { state.panel = t.dataset.panel; saveLocal(); render(); return; }\n        if (t.dataset.settingsTab) { ui.settingsTab = t.dataset.settingsTab; render(); return; }\n        if (t.dataset.autonomy) { state.autonomy = t.dataset.autonomy; saveLocal(); render(); return; }\n        if (t.dataset.setMode) { state.mode = t.dataset.setMode; saveLocal(); render(); return; }\n        if (t.dataset.defaultAi) { state.defaults = { ...state.defaults, selected: t.dataset.defaultAi }; saveLocal(); render(); return; }\n        if (t.dataset.resourceTab) { ui.resourceTab = t.dataset.resourceTab; render(); return; }\n        if (t.dataset.restore) { restoreVersion(t.dataset.restore); return; }\n      } catch (err) { console.error("Click core error", err); }\n    }, true);\n  }\n\n'''
+              if anchor not in s:
+                  raise SystemExit('initEngine anchor not found')
+              s = s.replace(anchor, bridge + anchor, 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Syntax check
+        run: node --check app.js
+
+      - name: Commit app fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: restore runtime click bindings'
+          git push
