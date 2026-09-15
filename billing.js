@@ -5,12 +5,13 @@
   const sb=configured&&window.supabase?window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_PUBLISHABLE_KEY):null;
   const notice=document.querySelector('#billingNotice');
   const show=(m)=>{notice.textContent=m;notice.classList.remove('hidden')};
+  const home=()=>{location.href='./'};
   async function start(plan){
     window.BuilderSite?.track?.('billing_plan_selected',{plan});
-    if(plan==='free'){location.href='/';return;}
+    if(plan==='free'){home();return;}
     if(!sb){show('Payments are prepared but not live yet. Add Supabase + Razorpay server secrets when you have a merchant account.');return;}
     const {data:{session}}=await sb.auth.getSession();
-    if(!session){location.href='/#signin';return;}
+    if(!session){location.href='./#signin';return;}
     try{
       const r=await fetch(`${C.SUPABASE_URL}/functions/v1/payments`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':C.SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify({action:'createSubscription',plan})});
       const j=await r.json(); if(!r.ok||!j.ok) throw new Error(j.error||'Unable to start checkout');
