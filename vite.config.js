@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
+  base: '/projectx/',
   server: {
     host: '0.0.0.0',
     port: 3000,
