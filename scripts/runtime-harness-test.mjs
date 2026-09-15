@@ -12,12 +12,18 @@ assert.match(engine, /CAPABILITY_REGISTRY/);
 assert.match(app, /PREVIEW_READY|createGameEngine|preview/i);
 assert.doesNotMatch(app, /new Function\s*\(/);
 
-// The host application may persist its own state, but generated preview/game runtime
-// must not depend on iframe localStorage, which can be unavailable in sandboxed frames.
-const previewSections = app.match(/(?:createGameEngine|PREVIEW_READY|srcdoc|preview)[\s\S]{0,50000}/gi) || [];
-for (const section of previewSections) {
-  assert.doesNotMatch(section, /localStorage\s*\.\s*(getItem|setItem|removeItem)/);
-}
+// The host application can legitimately persist its own UI/session state.
+// The generated preview/runtime must not require iframe-localStorage.
+const enginePreview = engine.match(/(?:'game\.js'|GAME_RUNTIME)[\s\S]{0,70000}/gi) || [];
+const previewRuntimeText = enginePreview.join('\n');
+assert.doesNotMatch(previewRuntimeText, /localStorage\s*\.\s*(getItem|setItem|removeItem)/);
+assert.match(previewRuntimeText, /createGameEngine|requestAnimationFrame/);
+
+// App preview integration must inline the generated game runtime before the controller.
+assert.match(app, /gameJs/);
+assert.match(app, /src=["']game\.js["']/i);
+assert.match(app, /src=["']app\.js["']/i);
+assert.match(app, /PREVIEW_READY/);
 
 console.log('PASS engine source contract');
 console.log('PASS preview/runtime integration markers');
