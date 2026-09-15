@@ -1,6 +1,8 @@
 name: Repair ProjectX and Deploy
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -23,87 +25,47 @@ jobs:
         run: |
           from pathlib import Path
           import re
-
           path = Path('app.js')
           text = path.read_text(encoding='utf-8')
-
-          def fail(msg):
-              raise SystemExit(msg)
-
-          # Make the imported engine available to legacy paths that incorrectly
-          # expected a window.Engine global.
+          def fail(msg): raise SystemExit(msg)
           marker = "import * as Engine from './universal-engine.js';"
-          inject = marker + "\n\nif (typeof window !== 'undefined') window.Engine = Engine;"
           if "window.Engine = Engine" not in text:
-              if marker not in text:
-                  fail('engine import marker not found')
-              text = text.replace(marker, inject, 1)
-
-          # The effective API implementation is the later duplicate. Make it
-          # throw on backend/provider errors so sendMessage can use its fallback.
+              if marker not in text: fail('engine import marker not found')
+              text = text.replace(marker, marker + "\n\nif (typeof window !== 'undefined') window.Engine = Engine;", 1)
           api_start = text.rfind('  async function api(action, payload = {}) {')
           api_end = text.find('\n  async function refreshProviderState', api_start)
-          if api_start < 0 or api_end < 0:
-              fail('effective api function not found')
-          new_api = '''  async function api(action, payload = {}) {\n    if (!CONFIGURED || !sb) {\n      throw new Error("Supabase backend is not configured.");\n    }\n    const { data: { session: currentSession } = {} } = await sb.auth.getSession();\n    const token = currentSession?.access_token;\n    if (!token) throw new Error("Your session expired. Sign in again.");\n\n    const response = await fetch(`${CFG.SUPABASE_URL}/functions/v1/ai`, {\n      method: "POST",\n      headers: {\n        "Content-Type": "application/json",\n        "apikey": CFG.SUPABASE_PUBLISHABLE_KEY,\n        "Authorization": `Bearer ${token}`\n      },\n      body: JSON.stringify({ action, ...payload })\n    });\n\n    const data = await response.json().catch(() => ({}));\n    if (!response.ok || data.ok === false) {\n      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);\n    }\n    return data;\n  }\n'''
+          if api_start < 0 or api_end < 0: fail('effective api function not found')
+          new_api = '''  async function api(action, payload = {}) {\n    if (!CONFIGURED || !sb) throw new Error("Supabase backend is not configured.");\n    const { data: { session: currentSession } = {} } = await sb.auth.getSession();\n    const token = currentSession?.access_token;\n    if (!token) throw new Error("Your session expired. Sign in again.");\n    const response = await fetch(`${CFG.SUPABASE_URL}/functions/v1/ai`, {\n      method: "POST",\n      headers: { "Content-Type": "application/json", "apikey": CFG.SUPABASE_PUBLISHABLE_KEY, "Authorization": `Bearer ${token}` },\n      body: JSON.stringify({ action, ...payload })\n    });\n    const data = await response.json().catch(() => ({}));\n    if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);\n    return data;\n  }\n'''
           text = text[:api_start] + new_api + text[api_end:]
-
-          # The effective provider refresh implementation must consume the actual
-          # backend response fields and hydrate both providers and models.
           refresh_start = text.rfind('  async function refreshProviderState(silent = false) {')
           refresh_end = text.find('\n  async function initAuth(){', refresh_start)
-          if refresh_start < 0 or refresh_end < 0:
-              fail('effective provider refresh function not found')
-          new_refresh = '''  async function refreshProviderState(silent = false) {\n    if (!CONFIGURED || !sb || !session) return;\n    try {\n      const [creds, models] = await Promise.all([\n        api("listCredentials"),\n        api("listModels", { task: "chat" })\n      ]);\n      state.providers = creds.providers || [];\n      state.models = models.models || [];\n      saveLocal();\n      if (!silent) render();\n    } catch (e) {\n      if (!silent) toast(e.message || "Could not refresh AI connections.", "error");\n    }\n  }\n'''
+          if refresh_start < 0 or refresh_end < 0: fail('effective provider refresh function not found')
+          new_refresh = '''  async function refreshProviderState(silent = false) {\n    if (!CONFIGURED || !sb || !session) return;\n    try {\n      const [creds, models] = await Promise.all([api("listCredentials"), api("listModels", { task: "chat" })]);\n      state.providers = creds.providers || [];\n      state.models = models.models || [];\n      saveLocal();\n      if (!silent) render();\n    } catch (e) {\n      if (!silent) toast(e.message || "Could not refresh AI connections.", "error");\n    }\n  }\n'''
           text = text[:refresh_start] + new_refresh + text[refresh_end:]
-
-          # Remote AI was gated by state.session, but the live session is stored
-          # in the module-level `session` variable.
           text = text.replace('if(CONFIGURED && sb && state.session){', 'if(CONFIGURED && sb && session){')
-
-          # Cloud persistence previously sent nonexistent DB columns and never
-          # persisted object-shaped files. Send the actual project contract.
           persist_start = text.find('  async function persistProjectCloud(p){')
           persist_end = text.find('\n  function startRealtime(){', persist_start)
-          if persist_start < 0 or persist_end < 0:
-              fail('persistProjectCloud function not found')
-          new_persist = '''  async function persistProjectCloud(p){\n    if(!sb || !session) return;\n    await api("persistProject", {\n      project:{\n        id:p.id,\n        title:p.title,\n        intention:p.intention,\n        type:p.type,\n        plan:Array.isArray(p.plan)?p.plan:[],\n        files:p.files && typeof p.files === "object" ? p.files : {}\n      }\n    });\n  }\n'''
+          if persist_start < 0 or persist_end < 0: fail('persistProjectCloud function not found')
+          new_persist = '''  async function persistProjectCloud(p){\n    if(!sb || !session) return;\n    await api("persistProject", { project:{ id:p.id, title:p.title, intention:p.intention, type:p.type, plan:Array.isArray(p.plan)?p.plan:[], files:p.files && typeof p.files === "object" ? p.files : {} } });\n  }\n'''
           text = text[:persist_start] + new_persist + text[persist_end:]
-
-          # Realtime rows use project_type/plan/readiness/progress, not row.data.
           text = text.replace('              ...(row.data||{})\n', '              title: row.title || local.title,\n              intention: row.intention || local.intention,\n              type: row.project_type || local.type,\n              plan: Array.isArray(row.plan) ? row.plan : local.plan,\n              readiness: Number.isFinite(row.readiness) ? row.readiness : local.readiness,\n              progress: Number.isFinite(row.progress) ? row.progress : local.progress\n')
-
-          # Pending launch and capability-chip paths must use the imported Engine,
-          # not a nonexistent global object.
           text = text.replace('if(window.Engine && typeof Engine.synthesizeUniversalProject === "function"){', 'if(typeof Engine.synthesizeUniversalProject === "function"){')
           text = text.replace('if(!rail || !window.Engine) return;', 'if(!rail) return;')
-
-          # Build previews from every local CSS/JS asset referenced by the artifact.
           preview_start = text.find('  function renderPreview(){')
           preview_end = text.find('\n  function authHTML(){', preview_start)
-          if preview_start < 0 or preview_end < 0:
-              fail('renderPreview function not found')
-          new_preview = '''  function assemblePreviewHtml(p){\n    const files = (p?.files && typeof p.files === "object") ? p.files : {};\n    let html = files["index.html"] || "<html><body><h1>No preview yet.</h1></body></html>";\n\n    const errorTrap = `<script>\n      window.onerror = function(msg, url, line, col) {\n        window.parent.postMessage({ type: 'PREVIEW_RUNTIME_ERROR', error: String(msg), line, col }, '*');\n      };\n      window.addEventListener('unhandledrejection', function(e) {\n        window.parent.postMessage({ type: 'PREVIEW_RUNTIME_ERROR', error: String(e.reason?.message || e.reason) }, '*');\n      });\n    <\\/script>`;\n\n    html = /<head>/i.test(html) ? html.replace(/<head>/i, `<head>${errorTrap}`) : `${errorTrap}${html}`;\n\n    html = html.replace(/<link\\b[^>]*href=["']([^"']+)["'][^>]*>/gi, (tag, href) => {\n      const clean = String(href).split('?')[0].replace(/^\\.\\//, '');\n      const css = files[clean];\n      return typeof css === "string" ? `<style>${css}</style>` : tag;\n    });\n\n    html = html.replace(/<script\\b[^>]*src=["']([^"']+)["'][^>]*>\\s*<\\/script>/gi, (tag, src) => {\n      const clean = String(src).split('?')[0].replace(/^\\.\\//, '');\n      const code = files[clean];\n      if(typeof code !== "string") return tag;\n      const openEnd = tag.indexOf('>');\n      const open = tag.slice(0, openEnd + 1).replace(/\\s+src=["'][^"']+["']/i, '');\n      return `${open}${code.replace(/<\\/script/gi, '<\\\\/script')}</script>`;\n    });\n\n    if (typeof files["styles.css"] === "string" && !/<style>|styles\\.css/i.test(html)) {\n      html = html.includes('</head>') ? html.replace('</head>', `<style>${files["styles.css"]}</style></head>`) : `<style>${files["styles.css"]}</style>${html}`;\n    }\n    if (typeof files["app.js"] === "string" && !/src=["'][^"']*app\\.js/i.test(html) && !html.includes(files["app.js"])) {\n      const js = files["app.js"].replace(/<\\/script/gi, '<\\\\/script');\n      html = html.includes('</body>') ? html.replace('</body>', `<script>${js}</script></body>`) : `${html}<script>${js}</script>`;\n    }\n    return html;\n  }\n\n  function renderPreview(){\n    const p=project();\n    const frame=$("#previewFrame");\n    if(!p||!frame)return;\n    frame.srcdoc=assemblePreviewHtml(p);\n  }\n'''
+          if preview_start < 0 or preview_end < 0: fail('renderPreview function not found')
+          new_preview = '''  function assemblePreviewHtml(p){\n    const files = (p?.files && typeof p.files === "object") ? p.files : {};\n    let html = files["index.html"] || "<html><body><h1>No preview yet.</h1></body></html>";\n    const errorTrap = `<script>window.onerror=function(msg,url,line,col){window.parent.postMessage({type:'PREVIEW_RUNTIME_ERROR',error:String(msg),line,col},'*')};window.addEventListener('unhandledrejection',function(e){window.parent.postMessage({type:'PREVIEW_RUNTIME_ERROR',error:String(e.reason?.message||e.reason)},'*')});<\\/script>`;\n    html = /<head>/i.test(html) ? html.replace(/<head>/i, `<head>${errorTrap}`) : `${errorTrap}${html}`;\n    html = html.replace(/<link\\b[^>]*href=["']([^"']+)["'][^>]*>/gi, (tag,href)=>{ const clean=String(href).split('?')[0].replace(/^\\.\\//,''); const css=files[clean]; return typeof css==='string'?`<style>${css}</style>`:tag; });\n    html = html.replace(/<script\\b[^>]*src=["']([^"']+)["'][^>]*>\\s*<\\/script>/gi, (tag,src)=>{ const clean=String(src).split('?')[0].replace(/^\\.\\//,''); const code=files[clean]; if(typeof code!=='string') return tag; const openEnd=tag.indexOf('>'); const open=tag.slice(0,openEnd+1).replace(/\\s+src=["'][^"']+["']/i,''); return `${open}${code.replace(/<\\/script/gi,'<\\\\/script')}</script>`; });\n    if(typeof files["styles.css"]==='string' && !/<style>|styles\\.css/i.test(html)) html=html.includes('</head>')?html.replace('</head>',`<style>${files["styles.css"]}</style></head>`):`<style>${files["styles.css"]}</style>${html}`;\n    if(typeof files["app.js"]==='string' && !/src=["'][^"']*app\\.js/i.test(html) && !html.includes(files["app.js"])) { const js=files["app.js"].replace(/<\\/script/gi,'<\\\\/script'); html=html.includes('</body>')?html.replace('</body>',`<script>${js}</script></body>`):`${html}<script>${js}</script>`; }\n    return html;\n  }\n\n  function renderPreview(){\n    const p=project();\n    const frame=$("#previewFrame");\n    if(!p||!frame)return;\n    frame.srcdoc=assemblePreviewHtml(p);\n  }\n'''
           text = text[:preview_start] + new_preview + text[preview_end:]
-
-          # Prevent the Ship flow from inventing a hosted URL. Only export is a
-          # real operation in the current product; other targets explain the gap.
           ship_start = text.find('        const deployment={', text.find('function openShipModal'))
           ship_end = text.find('\n        updateProject(', ship_start)
-          if ship_start < 0 or ship_end < 0:
-              fail('ship deployment block not found')
-          new_ship = '''        if(target !== "export") {\n          modal=null;\n          render();\n          exportSourceZip();\n          toast(`External ${target} deployment is not configured. Source bundle exported instead; no fake live URL was created.`, "info");\n          return;\n        }\n\n        const deployment={\n          id:deployId,\n          target:"export",\n          status:"exported",\n          url:"local://source-bundle.zip",\n          rollbackToken,\n          ts:now()\n        };\n'''
+          if ship_start < 0 or ship_end < 0: fail('ship deployment block not found')
+          new_ship = '''        if(target !== "export") {\n          modal=null;\n          render();\n          exportSourceZip();\n          toast(`External ${target} deployment is not configured. Source bundle exported instead; no fake live URL was created.`, "info");\n          return;\n        }\n\n        const deployment={ id:deployId, target:"export", status:"exported", url:"local://source-bundle.zip", rollbackToken, ts:now() };\n'''
           text = text[:ship_start] + new_ship + text[ship_end:]
-
-          # Make the autonomous action perform a real deterministic repair/test pass
-          # instead of only incrementing progress numbers.
           auto_start = text.find('  function autonomousRun(){')
           auto_end = text.find('\n  function snapshot(){', auto_start)
-          if auto_start < 0 or auto_end < 0:
-              fail('autonomousRun function not found')
-          new_auto = '''  function autonomousRun(){\n    const p=project();\n    if(!p)return;\n    const temp={...p, artifacts:{...(p.files||{})}, files:{...(p.files||{})}, fixes:[]};\n    let result={repairLog:[],healthScore:p.health||0};\n    try {\n      if(typeof Engine.autoAdaptAndHealProject === "function") {\n        result=Engine.autoAdaptAndHealProject(temp) || result;\n      }\n    } catch(e) {\n      return toast(`Autonomous run failed: ${e.message||e}`, "error");\n    }\n    const files={...(temp.artifacts||temp.files||p.files||{})};\n    const tests=computeTests(files);\n    const security=computeSecurity(files);\n    const passed=tests.every(x=>x[1]==="passed") && security.every(x=>x[1]==="passed");\n    const health=Math.max(0,Math.min(100,Number(result.healthScore||p.health||0)));\n    updateProject(p.id,x=>({\n      ...x,\n      files,\n      artifacts:files,\n      tests,\n      security,\n      stage:passed?"Verified autonomous pass":"Autonomous pass needs review",\n      health,\n      progress:Math.max(x.progress||0, passed?90:70),\n      readiness:Math.max(x.readiness||0, passed?92:75),\n      runs:[{id:uid(),kind:"Autonomous build",status:passed?"completed":"warning",ts:now(),message:(result.repairLog||[]).join(" · ")},...(x.runs||[])].slice(0,20)\n    }));\n    toast(passed?"Autonomous repair + test pass completed":"Autonomous pass completed with review items",passed?"success":"info");\n  }\n'''
+          if auto_start < 0 or auto_end < 0: fail('autonomousRun function not found')
+          new_auto = '''  function autonomousRun(){\n    const p=project();\n    if(!p)return;\n    const temp={...p, artifacts:{...(p.files||{})}, files:{...(p.files||{})}, fixes:[]};\n    let result={repairLog:[],healthScore:p.health||0};\n    try { if(typeof Engine.autoAdaptAndHealProject === "function") result=Engine.autoAdaptAndHealProject(temp) || result; } catch(e) { return toast(`Autonomous run failed: ${e.message||e}`, "error"); }\n    const files={...(temp.artifacts||temp.files||p.files||{})};\n    const tests=computeTests(files), security=computeSecurity(files);\n    const passed=tests.every(x=>x[1]==="passed") && security.every(x=>x[1]==="passed");\n    const health=Math.max(0,Math.min(100,Number(result.healthScore||p.health||0)));\n    updateProject(p.id,x=>({...x,files,artifacts:files,tests,security,stage:passed?"Verified autonomous pass":"Autonomous pass needs review",health,progress:Math.max(x.progress||0,passed?90:70),readiness:Math.max(x.readiness||0,passed?92:75),runs:[{id:uid(),kind:"Autonomous build",status:passed?"completed":"warning",ts:now(),message:(result.repairLog||[]).join(" · ")},...(x.runs||[])].slice(0,20)}));\n    toast(passed?"Autonomous repair + test pass completed":"Autonomous pass completed with review items",passed?"success":"info");\n  }\n'''
           text = text[:auto_start] + new_auto + text[auto_end:]
-
           path.write_text(text, encoding='utf-8')
           print('app.js repair applied')
 
