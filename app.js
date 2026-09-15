@@ -1,5 +1,7 @@
 import * as Engine from './universal-engine.js';
 
+if (typeof window !== 'undefined') window.Engine = Engine;
+
 (() => {
   "use strict";
 
@@ -752,7 +754,7 @@ import * as Engine from './universal-engine.js';
         .map(m=>({role:m.role,text:m.text}));
 
       let result;
-      if(CONFIGURED && sb && state.session){
+      if(CONFIGURED && sb && session){
         try{
           result=await api("chat",{
             mode,
@@ -992,28 +994,15 @@ import * as Engine from './universal-engine.js';
   function autonomousRun(){
     const p=project();
     if(!p)return;
-
-    updateProject(p.id,x=>({
-      ...x,
-      stage:"Autonomous run",
-      progress:Math.min(100,x.progress+14),
-      readiness:Math.min(100,x.readiness+9),
-      runs:[
-        {
-          id:uid(),
-          kind:"Autonomous build",
-          status:"completed",
-          ts:now()
-        },
-        ...x.runs
-      ]
-    }));
-
-    setTimeout(runTests,50);
-    setTimeout(runSecurity,120);
-
-    logActivity(`Ran autonomous build loop for ${p.title}`);
-    toast("Autonomous build loop started");
+    const temp={...p, artifacts:{...(p.files||{})}, files:{...(p.files||{})}, fixes:[]};
+    let result={repairLog:[],healthScore:p.health||0};
+    try { if(typeof Engine.autoAdaptAndHealProject === "function") result=Engine.autoAdaptAndHealProject(temp) || result; } catch(e) { return toast(`Autonomous run failed: ${e.message||e}`, "error"); }
+    const files={...(temp.artifacts||temp.files||p.files||{})};
+    const tests=computeTests(files), security=computeSecurity(files);
+    const passed=tests.every(x=>x[1]==="passed") && security.every(x=>x[1]==="passed");
+    const health=Math.max(0,Math.min(100,Number(result.healthScore||p.health||0)));
+    updateProject(p.id,x=>({...x,files,artifacts:files,tests,security,stage:passed?"Verified autonomous pass":"Autonomous pass needs review",health,progress:Math.max(x.progress||0,passed?90:70),readiness:Math.max(x.readiness||0,passed?92:75),runs:[{id:uid(),kind:"Autonomous build",status:passed?"completed":"warning",ts:now(),message:(result.repairLog||[]).join(" · ")},...(x.runs||[])].slice(0,20)}));
+    toast(passed?"Autonomous repair + test pass completed":"Autonomous pass completed with review items",passed?"success":"info");
   }
 
   function snapshot(){
@@ -1103,40 +1092,23 @@ import * as Engine from './universal-engine.js';
     toast("Source package downloaded");
   }
 
+  function assemblePreviewHtml(p){
+    const files = (p?.files && typeof p.files === "object") ? p.files : {};
+    let html = files["index.html"] || "<html><body><h1>No preview yet.</h1></body></html>";
+    const errorTrap = `<script>window.onerror=function(msg,url,line,col){window.parent.postMessage({type:'PREVIEW_RUNTIME_ERROR',error:String(msg),line,col},'*')};window.addEventListener('unhandledrejection',function(e){window.parent.postMessage({type:'PREVIEW_RUNTIME_ERROR',error:String(e.reason?.message||e.reason)},'*')});<\/script>`;
+    html = /<head>/i.test(html) ? html.replace(/<head>/i, `<head>${errorTrap}`) : `${errorTrap}${html}`;
+    html = html.replace(/<link\b[^>]*href=["']([^"']+)["'][^>]*>/gi, (tag,href)=>{ const clean=String(href).split('?')[0].replace(/^\.\//,''); const css=files[clean]; return typeof css==='string'?`<style>${css}</style>`:tag; });
+    html = html.replace(/<script\b[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi, (tag,src)=>{ const clean=String(src).split('?')[0].replace(/^\.\//,''); const code=files[clean]; if(typeof code!=='string') return tag; const openEnd=tag.indexOf('>'); const open=tag.slice(0,openEnd+1).replace(/\s+src=["'][^"']+["']/i,''); return `${open}${code.replace(/<\/script/gi,'<\\/script')}</script>`; });
+    if(typeof files["styles.css"]==='string' && !/<style>|styles\.css/i.test(html)) html=html.includes('</head>')?html.replace('</head>',`<style>${files["styles.css"]}</style></head>`):`<style>${files["styles.css"]}</style>${html}`;
+    if(typeof files["app.js"]==='string' && !/src=["'][^"']*app\.js/i.test(html) && !html.includes(files["app.js"])) { const js=files["app.js"].replace(/<\/script/gi,'<\\/script'); html=html.includes('</body>')?html.replace('</body>',`<script>${js}</script></body>`):`${html}<script>${js}</script>`; }
+    return html;
+  }
+
   function renderPreview(){
     const p=project();
     const frame=$("#previewFrame");
-
     if(!p||!frame)return;
-
-    let html=
-      p.files["index.html"]||
-      "<html><body><h1>No preview yet.</h1></body></html>";
-
-    const css=p.files["styles.css"]||"";
-    const js=p.files["app.js"]||"";
-
-    const errorTrap = `<script>
-      window.onerror = function(msg, url, line, col) {
-        window.parent.postMessage({ type: 'PREVIEW_RUNTIME_ERROR', error: String(msg), line, col }, '*');
-      };
-      window.addEventListener('unhandledrejection', function(e) {
-        window.parent.postMessage({ type: 'PREVIEW_RUNTIME_ERROR', error: String(e.reason?.message || e.reason) }, '*');
-      });
-    </script>`;
-
-    html=html
-      .replace(/<head>/i, `<head>${errorTrap}`)
-      .replace(
-        /<link[^>]+href=["']styles\.css["'][^>]*>/i,
-        `<style>${css}</style>`
-      )
-      .replace(
-        /<script[^>]+src=["']app\.js["'][^>]*><\/script>/i,
-        `<script>${js.replace(/<\/script/gi,"<\\/script")}</script>`
-      );
-
-    frame.srcdoc=html;
+    frame.srcdoc=assemblePreviewHtml(p);
   }
 
   function authHTML(){
@@ -1901,7 +1873,7 @@ import * as Engine from './universal-engine.js';
 
   function updatePrimitiveChips(text){
     const rail = document.querySelector(".composer-primitive-rail");
-    if(!rail || !window.Engine) return;
+    if(!rail) return;
     try {
       const caps = Engine.discoverCapabilities(text);
       const prims = Object.keys(caps.primitives || {});
@@ -1923,7 +1895,7 @@ import * as Engine from './universal-engine.js';
     }
 
     try {
-      if(window.Engine && typeof Engine.synthesizeUniversalProject === "function"){
+      if(typeof Engine.synthesizeUniversalProject === "function"){
         const p = Engine.synthesizeUniversalProject(intent);
         state.projects = [p, ...(state.projects || [])];
         state.projectId = p.id;
@@ -2267,47 +2239,30 @@ import * as Engine from './universal-engine.js';
   }
 
   async function api(action, payload = {}) {
-    if (!CONFIGURED || !sb) {
-      return { ok: false, error: "Supabase backend is not configured." };
-    }
-    try {
-      let token = null;
-      try {
-        const { data: { session: currentSession } = {} } = (await sb.auth.getSession()) || {};
-        token = currentSession?.access_token;
-      } catch (_) {}
-
-      const functionUrl = `${CFG.SUPABASE_URL}/functions/v1/ai`;
-      const response = await fetch(functionUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": CFG.SUPABASE_PUBLISHABLE_KEY,
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ action, ...payload })
-      });
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        return { ok: false, error: errJson.error || `HTTP ${response.status}: ${response.statusText}` };
-      }
-      return await response.json();
-    } catch (err) {
-      return { ok: false, error: err.message || "Network request failed" };
-    }
+    if (!CONFIGURED || !sb) throw new Error("Supabase backend is not configured.");
+    const { data: { session: currentSession } = {} } = await sb.auth.getSession();
+    const token = currentSession?.access_token;
+    if (!token) throw new Error("Your session expired. Sign in again.");
+    const response = await fetch(`${CFG.SUPABASE_URL}/functions/v1/ai`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": CFG.SUPABASE_PUBLISHABLE_KEY, "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+    return data;
   }
 
   async function refreshProviderState(silent = false) {
     if (!CONFIGURED || !sb || !session) return;
     try {
-      const res = await api("listCredentials", {});
-      if (res && res.credentials) {
-        state.providers = res.credentials;
-        saveLocal();
-        render();
-      }
+      const [creds, models] = await Promise.all([api("listCredentials"), api("listModels", { task: "chat" })]);
+      state.providers = creds.providers || [];
+      state.models = models.models || [];
+      saveLocal();
+      if (!silent) render();
     } catch (e) {
-      if (!silent) console.warn("Failed to refresh provider state:", e);
+      if (!silent) toast(e.message || "Could not refresh AI connections.", "error");
     }
   }
 
@@ -4602,14 +4557,15 @@ import * as Engine from './universal-engine.js';
           ? "local://export-bundle.zip"
           : `https://${cleanSlug}.builder-live.app`;
 
-        const deployment={
-          id:deployId,
-          target,
-          status:"verified",
-          url:releaseUrl,
-          rollbackToken,
-          ts:now()
-        };
+        if(target !== "export") {
+          modal=null;
+          render();
+          exportSourceZip();
+          toast(`External ${target} deployment is not configured. Source bundle exported instead; no fake live URL was created.`, "info");
+          return;
+        }
+
+        const deployment={ id:deployId, target:"export", status:"exported", url:"local://source-bundle.zip", rollbackToken, ts:now() };
 
         updateProject(
           p.id,
@@ -6454,22 +6410,8 @@ import * as Engine from './universal-engine.js';
   }
 
   async function persistProjectCloud(p){
-    if(!sb||!session)return;
-
-    try{
-      await api(
-        "persistProject",
-        {
-          project:{
-            id:p.id,
-            title:p.title,
-            intention:p.intention,
-            type:p.type,
-            data:p
-          }
-        }
-      );
-    }catch{}
+    if(!sb || !session) return;
+    await api("persistProject", { project:{ id:p.id, title:p.title, intention:p.intention, type:p.type, plan:Array.isArray(p.plan)?p.plan:[], files:p.files && typeof p.files === "object" ? p.files : {} } });
   }
 
   function startRealtime(){
@@ -6507,7 +6449,12 @@ import * as Engine from './universal-engine.js';
 
             state.projects[index]={
               ...local,
-              ...(row.data||{})
+              title: row.title || local.title,
+              intention: row.intention || local.intention,
+              type: row.project_type || local.type,
+              plan: Array.isArray(row.plan) ? row.plan : local.plan,
+              readiness: Number.isFinite(row.readiness) ? row.readiness : local.readiness,
+              progress: Number.isFinite(row.progress) ? row.progress : local.progress
             };
 
             saveLocal();
