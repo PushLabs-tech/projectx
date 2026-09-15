@@ -12,7 +12,7 @@ assert.match(cors, /Access-Control-Allow-Origin/);
 assert.match(ai, /Authorization/);
 assert.match(ai, /persistProject/);
 assert.match(ai, /429/);
-assert.match(ai, /ai_provider_models/);
+assert.match(ai, /providerListModels/);
 assert.match(ai, /project_id/);
 
 assert.match(payments, /payment_events/);
