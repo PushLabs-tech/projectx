@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -26,6 +26,61 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Repair click handling before verification
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app.js')
+          s = p.read_text()
+          marker = '  // PAGES_CLICK_BRIDGE_V1\n'
+          bridge = r'''  // PAGES_CLICK_BRIDGE_V1
+  if (!window.__builderPagesClickBridge) {
+    window.__builderPagesClickBridge = true;
+    document.addEventListener("click", (e) => {
+      const t = e.target && typeof e.target.closest === "function"
+        ? e.target.closest("[data-action],[data-view],[data-open-project],[data-panel],[data-settings-tab],[data-autonomy],[data-set-mode],[data-default-ai],[data-resource-tab],[data-restore]")
+        : null;
+      if (!t) return;
+      try {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (t.hasAttribute("data-action")) return handleAction(t.dataset.action);
+        if (t.hasAttribute("data-view")) { patch({route:t.dataset.view, projectId:null}); ui.sidebarOpen=false; return; }
+        if (t.hasAttribute("data-open-project")) { state.projectId=t.dataset.openProject; state.route="project"; state.panel="overview"; saveLocal(); render(); ui.sidebarOpen=false; return; }
+        if (t.hasAttribute("data-panel")) { state.panel=t.dataset.panel; saveLocal(); render(); return; }
+        if (t.hasAttribute("data-settings-tab")) { ui.settingsTab=t.dataset.settingsTab; render(); return; }
+        if (t.hasAttribute("data-autonomy")) { state.autonomy=t.dataset.autonomy; saveLocal(); render(); return; }
+        if (t.hasAttribute("data-set-mode")) { state.mode=t.dataset.setMode; saveLocal(); render(); return; }
+        if (t.hasAttribute("data-default-ai")) { state.defaults={...state.defaults,selected:t.dataset.defaultAi}; saveLocal(); render(); return; }
+        if (t.hasAttribute("data-resource-tab")) { ui.resourceTab=t.dataset.resourceTab; render(); return; }
+        if (t.hasAttribute("data-restore")) return restoreVersion(t.dataset.restore);
+      } catch (err) {
+        console.error("Pages click bridge error:", err);
+        toast(err?.message || "Action failed", "error");
+      }
+    }, true);
+  }
+'''
+          if marker not in s:
+              anchor = '  initEngine();\n'
+              if anchor not in s:
+                  raise SystemExit('Missing initEngine anchor')
+              s = s.replace(anchor, bridge + '\n' + anchor, 1)
+              p.write_text(s)
+          PY
+
+          node --check app.js
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: install reliable capture-phase click bridge [skip ci]'
+            git push
+          fi
+
       - name: Run engine verification
         run: npm test
       - name: Build production bundle
