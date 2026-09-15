@@ -2574,6 +2574,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
     renderShell();
     renderModal();
+    bindEvents();
   }
 
   function renderShell(){
@@ -6775,6 +6776,27 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       }
     }
   );
+
+  // CLICK_CORE_BRIDGE_V1
+  if (!window.__builderClickCore) {
+    window.__builderClickCore = true;
+    document.addEventListener("click", (e) => {
+      const t = e.target && typeof e.target.closest === "function" ? e.target.closest("[data-action],[data-view],[data-open-project],[data-panel],[data-settings-tab],[data-autonomy],[data-set-mode],[data-default-ai],[data-resource-tab],[data-restore]") : null;
+      if (!t) return;
+      try {
+        if (t.dataset.action) { handleAction(t.dataset.action); return; }
+        if (t.dataset.view) { patch({ route: t.dataset.view, projectId: null }); ui.sidebarOpen = false; return; }
+        if (t.dataset.openProject) { state.projectId = t.dataset.openProject; state.route = "project"; state.panel = "overview"; saveLocal(); render(); return; }
+        if (t.dataset.panel) { state.panel = t.dataset.panel; saveLocal(); render(); return; }
+        if (t.dataset.settingsTab) { ui.settingsTab = t.dataset.settingsTab; render(); return; }
+        if (t.dataset.autonomy) { state.autonomy = t.dataset.autonomy; saveLocal(); render(); return; }
+        if (t.dataset.setMode) { state.mode = t.dataset.setMode; saveLocal(); render(); return; }
+        if (t.dataset.defaultAi) { state.defaults = { ...state.defaults, selected: t.dataset.defaultAi }; saveLocal(); render(); return; }
+        if (t.dataset.resourceTab) { ui.resourceTab = t.dataset.resourceTab; render(); return; }
+        if (t.dataset.restore) { restoreVersion(t.dataset.restore); return; }
+      } catch (err) { console.error("Click core error", err); }
+    }, true);
+  }
 
   initEngine();
   initAuth();
