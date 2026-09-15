@@ -20,18 +20,48 @@ jobs:
           p = Path('app.js')
           s = p.read_text()
 
-          # Remove stale per-render binding calls. The app uses one global delegated handler.
           s = s.replace('    bindEvents();\n', '')
           s = s.replace('  bindEvents();\n', '')
 
-          # Make delegated click handling resilient if a third-party/edge target is not an Element.
-          old = '  document.addEventListener("click", e => {\n'
-          new = '  document.addEventListener("click", e => {\n    if (!e.target || typeof e.target.closest !== "function") return;\n'
-          if old in s and new not in s:
-              s = s.replace(old, new, 1)
-
+          marker = '  // FINAL_CLICK_BRIDGE_V2\n'
+          bridge = r'''  // FINAL_CLICK_BRIDGE_V2
+  if (!window.__builderFinalClickBridgeV2) {
+    window.__builderFinalClickBridgeV2 = true;
+    document.addEventListener("click", (e) => {
+      const t = e.target && typeof e.target.closest === "function"
+        ? e.target.closest("[data-action],[data-view],[data-open-project],[data-panel],[data-settings-tab],[data-autonomy],[data-set-mode],[data-default-ai],[data-resource-tab],[data-restore]")
+        : null;
+      if (!t) return;
+      try {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (t.hasAttribute("data-action")) return handleAction(t.dataset.action);
+        if (t.hasAttribute("data-view")) { patch({route:t.dataset.view, projectId:null}); ui.sidebarOpen=false; return; }
+        if (t.hasAttribute("data-open-project")) { state.projectId=t.dataset.openProject; state.route="project"; state.panel="overview"; saveLocal(); render(); ui.sidebarOpen=false; return; }
+        if (t.hasAttribute("data-panel")) { state.panel=t.dataset.panel; saveLocal(); render(); return; }
+        if (t.hasAttribute("data-settings-tab")) { ui.settingsTab=t.dataset.settingsTab; render(); return; }
+        if (t.hasAttribute("data-autonomy")) { state.autonomy=t.dataset.autonomy; saveLocal(); render(); return; }
+        if (t.hasAttribute("data-set-mode")) { state.mode=t.dataset.setMode; saveLocal(); render(); return; }
+        if (t.hasAttribute("data-default-ai")) { state.defaults={...state.defaults,selected:t.dataset.defaultAi}; saveLocal(); render(); return; }
+        if (t.hasAttribute("data-resource-tab")) { ui.resourceTab=t.dataset.resourceTab; render(); return; }
+        if (t.hasAttribute("data-restore")) return restoreVersion(t.dataset.restore);
+      } catch (err) {
+        console.error("Final click bridge error:", err);
+        toast(err?.message || "Action failed", "error");
+      }
+    }, true);
+  }
+'''
+          if marker not in s:
+              anchor = '  initEngine();\n'
+              if anchor not in s:
+                  raise SystemExit('Could not find initEngine anchor')
+              s = s.replace(anchor, bridge + '\n' + anchor, 1)
           p.write_text(s)
           PY
+
+      - name: Syntax check
+        run: node --check app.js
 
       - name: Commit repaired app
         run: |
@@ -42,5 +72,5 @@ jobs:
             echo 'No click-handler changes were needed.'
             exit 0
           fi
-          git commit -m 'fix: repair global click handling'
+          git commit -m 'fix: install capture-phase click bridge'
           git push
