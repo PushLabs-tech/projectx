@@ -6,6 +6,14 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   base: '/projectx/',
+  resolve: {
+    alias: [
+      {
+        find: './universal-engine.js',
+        replacement: resolve(__dirname, 'universal-engine-fixed.js')
+      }
+    ]
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,
