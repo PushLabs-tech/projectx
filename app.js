@@ -2574,7 +2574,6 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
     renderShell();
     renderModal();
-    bindEvents();
   }
 
   function renderShell(){
@@ -6612,6 +6611,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
   // Central Event Delegation for better performance and reliability
   document.addEventListener("click", e => {
+    if (!e.target || typeof e.target.closest !== "function") return;
     // 1. data-view
     const viewEl = e.target.closest("[data-view]");
     if (viewEl) {
