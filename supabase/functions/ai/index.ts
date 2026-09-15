@@ -68,15 +68,15 @@ async function persistProject(user:any,p:any){
       if(!w)throw new Error("Not authorized to use this workspace");
     }
   }
-  const row={...(projectId?{id:projectId}:{}),owner_id:user.id,workspace_id:workspaceId,title:limitText(p?.title||"Untitled",200),intention:limitText(p?.intention,10000),type:limitText(p?.type||"custom",100),plan:Array.isArray(p?.plan)?p.plan.slice(0,100):[],updated_at:new Date().toISOString()};
+  const row={...(projectId?{id:projectId}:{}),owner_id:user.id,workspace_id:workspaceId,title:limitText(p?.title||"Untitled",200),intention:limitText(p?.intention,10000),project_type:limitText(p?.type||p?.project_type||"custom",100),plan:Array.isArray(p?.plan)?p.plan.slice(0,100):[],status:"planning",updated_at:new Date().toISOString()};
   const {data:saved,error}=await admin.from("projects").upsert(row).select("id,workspace_id").single();
   if(error)throw error;
-  if(Array.isArray(p?.files)){
-    const safe=p.files.filter((f:any)=>f&&typeof f.path==="string"&&!f.path.startsWith("/")&&!f.path.includes("..")&&String(f.content??"").length<=500000).slice(0,500);
+  if(p?.files && typeof p.files==="object" && !Array.isArray(p.files)){
+    const safe=Object.entries(p.files).filter(([path,content])=>typeof path==="string"&&!path.startsWith("/")&&!path.includes("..")&&!path.includes("\\")&&String(content??"").length<=500000).slice(0,500);
     await admin.from("project_files").delete().eq("project_id",saved.id);
-    if(safe.length){const {error:fe}=await admin.from("project_files").insert(safe.map((f:any)=>({project_id:saved.id,path:f.path,content:String(f.content??"")})));if(fe)throw fe;}
+    if(safe.length){const {error:fe}=await admin.from("project_files").insert(safe.map(([path,content])=>({project_id:saved.id,path,content:String(content??"")})));if(fe)throw fe;}
   }
-  await admin.from("audit_logs").insert({user_id:user.id,action:"project.persist",metadata:{project_id:saved.id}});
+  await admin.from("audit_logs").insert({user_id:user.id,action:"project.persist",metadata:{project_id:saved.id,file_count:p?.files&&typeof p.files==="object"&&!Array.isArray(p.files)?Object.keys(p.files).length:0}});
   return json({ok:true,projectId:saved.id,workspaceId:saved.workspace_id});
 }
 
