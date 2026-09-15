@@ -4,6 +4,13 @@ export * from './universal-engine.js?legacy';
 export const ENGINE_VERSION = '15.0.0';
 export const RUNTIME_CONTRACT_VERSION = '1.0.0';
 
+// Preserve every named artifact API consumed by app.js while routing the
+// canonical runtime adapter through the legacy engine implementation.
+export const buildCommerceArtifact = Legacy.buildCommerceArtifact;
+export const buildDataDashboardArtifact = Legacy.buildDataDashboardArtifact;
+export const buildResearchArtifact = Legacy.buildResearchArtifact;
+export const synthesizeUniversalProject = Legacy.synthesizeUniversalProject;
+
 function esc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 export function buildGameArtifact(title='ProjectX Game'){
