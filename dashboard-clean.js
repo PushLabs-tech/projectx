@@ -1,144 +1,26 @@
 (() => {
   'use strict';
-
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const NAV = ['Home','Projects','Analytics','Settings'];
-  const OLD = new Set(['Activity','Research','Agents','Integrations','Resources','Templates']);
-
-  const CSS = `
-  #appRoot{padding-left:0!important;margin:0!important;min-height:100vh!important;background:#fff!important}
-  .px-clean-sidebar{position:fixed;inset:0 auto 0 0;width:248px;z-index:100000;background:#fbfcfd;border-right:1px solid #e7e9ee;padding:28px 14px 16px;display:flex;flex-direction:column;color:#151a24;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-  .px-clean-brand{padding:0 14px 34px;font-size:24px;line-height:1;font-weight:750;letter-spacing:-.055em;color:#111722}
-  .px-clean-nav{display:grid;gap:4px}
-  .px-clean-nav button,.px-clean-assistant,.px-clean-account,.px-clean-recent button{font:inherit;cursor:pointer}
-  .px-clean-nav button{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:12px;text-align:left;padding:11px 12px;border-radius:10px;color:#667080;font-size:14px;font-weight:500}
-  .px-clean-nav button:hover,.px-clean-nav button.active{background:#eef1f5;color:#151a24}
-  .px-clean-nav button.active{font-weight:650}
-  .px-clean-icon{width:18px;display:inline-grid;place-items:center;font-size:15px;color:#252b35;flex:0 0 18px}
-  .px-clean-divider{height:1px;background:#e7e9ee;margin:22px 7px 17px}
-  .px-clean-label{padding:0 11px 9px;font-size:9px;font-weight:750;letter-spacing:.14em;text-transform:uppercase;color:#a0a7b2}
-  .px-clean-assistant{width:100%;border:1px solid #e0e4e9;background:#fff;border-radius:10px;display:flex;align-items:center;gap:12px;padding:11px 12px;color:#303744;font-size:14px;font-weight:550}
-  .px-clean-assistant:hover{background:#f5f6f8}
-  .px-clean-recent{display:grid;gap:2px;max-height:170px;overflow:hidden}
-  .px-clean-recent button{width:100%;border:0;background:transparent;text-align:left;padding:7px 11px;border-radius:7px;color:#667080;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .px-clean-recent button:hover{background:#f0f2f5;color:#151a24}
-  .px-clean-account{margin-top:auto;width:100%;border:1px solid #e0e4e9;background:#fff;border-radius:12px;padding:10px;display:flex;align-items:center;gap:10px;text-align:left;color:#151a24}
-  .px-clean-account:hover{background:#f7f8fa}
-  .px-clean-avatar{width:34px;height:34px;border-radius:50%;background:#e9edf2;display:grid;place-items:center;color:#697384;font-size:13px;font-weight:700;flex:0 0 34px}
-  .px-clean-account-main{min-width:0;flex:1}.px-clean-account-name{display:block;font-size:13px;font-weight:650}.px-clean-account-plan{display:block;margin-top:2px;color:#8b93a0;font-size:11px}.px-clean-chevron{font-size:19px;color:#8b93a0}
-  .px-clean-main{position:fixed;left:248px;right:0;top:0;bottom:0;overflow:auto;background:#fff;color:#141923;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-  .px-clean-topbar{height:72px;border-bottom:1px solid #eef0f3;display:flex;align-items:center;justify-content:flex-end;padding:0 36px}
-  .px-clean-assistant-top{border:1px solid #e0e4e9;background:#fff;border-radius:10px;padding:10px 15px;font:600 13px inherit;cursor:pointer;color:#1b2230}.px-clean-assistant-top:hover{background:#f5f6f8}
-  .px-clean-home{width:min(1050px,calc(100% - 64px));margin:0 auto;padding:62px 0 50px}
-  .px-clean-hero{text-align:center}.px-clean-hero h1{margin:0;font-size:clamp(34px,4vw,52px);line-height:1.08;letter-spacing:-.045em;font-weight:720;color:#111722}.px-clean-hero p{margin:14px auto 34px;max-width:620px;color:#737d8e;font-size:15px;line-height:1.6}
-  .px-clean-composer{background:#fff;border:1px solid #dce1e7;border-radius:15px;box-shadow:0 10px 32px rgba(20,27,38,.06);overflow:hidden;text-align:left}
-  .px-clean-composer textarea{display:block;width:100%;min-height:116px;padding:20px 22px;border:0;outline:0;resize:none;background:#fff;color:#151b26;font:500 15px/1.55 inherit}.px-clean-composer textarea::placeholder{color:#929aaa}
-  .px-clean-composer-bottom{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid #f0f2f5}.px-clean-attach{border:0;background:transparent;color:#7a8493;font:500 12px inherit;padding:7px}.px-clean-send{width:42px;height:42px;border:0;border-radius:10px;background:#141a24;color:#fff;font-size:21px;cursor:pointer}.px-clean-send:hover{background:#242c38}
-  .px-clean-examples{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;margin:20px 0 54px;color:#7a8493;font-size:12px}.px-clean-example{border:1px solid #e2e6eb;background:#fff;border-radius:999px;padding:8px 12px;color:#4f5968;font:500 12px inherit;cursor:pointer}.px-clean-example:hover{background:#f6f7f9}
-  .px-clean-features{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #e9ecf0;border-bottom:1px solid #e9ecf0;margin-bottom:38px}.px-clean-feature{padding:28px 25px;text-align:center}.px-clean-feature+.px-clean-feature{border-left:1px solid #e9ecf0}.px-clean-feature-icon{font-size:24px;margin-bottom:12px}.px-clean-feature strong{display:block;font-size:14px;margin-bottom:6px}.px-clean-feature span{display:block;color:#7b8594;font-size:12px;line-height:1.5}
-  .px-clean-recent-home{border-bottom:1px solid #e9ecf0;padding-bottom:28px}.px-clean-recent-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.px-clean-recent-head h2{margin:0;font-size:18px;letter-spacing:-.025em}.px-clean-view{border:0;background:transparent;color:#1670e8;font:600 12px inherit;cursor:pointer}.px-clean-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.px-clean-card{border:1px solid #e2e6eb;border-radius:12px;padding:15px;background:#fff;display:flex;align-items:center;gap:11px;text-align:left;cursor:pointer}.px-clean-card:hover{background:#f8f9fb}.px-clean-card-icon{width:36px;height:36px;border-radius:50%;background:#eef4ff;color:#246ee8;display:grid;place-items:center;flex:0 0 36px}.px-clean-card-title{font-size:12px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.px-clean-card-meta{font-size:11px;color:#8a93a1;margin-top:3px}.px-clean-card-arrow{margin-left:auto;color:#707a89;font-size:18px}.px-clean-footer{text-align:center;color:#9aa2ae;font-size:12px;line-height:1.8;padding:56px 0 10px}
-  .px-clean-panel{width:min(1000px,calc(100% - 64px));margin:0 auto;padding:50px 0}.px-clean-panel h1{margin:0 0 8px;font-size:34px;letter-spacing:-.04em}.px-clean-panel p{color:#7b8594;font-size:14px}.px-clean-empty{margin-top:25px;border:1px solid #e3e7ec;border-radius:12px;padding:28px;background:#fff;color:#737d8c;font-size:13px}
-  .px-clean-assistant-modal{position:fixed;z-index:100010;right:24px;top:78px;width:min(390px,calc(100vw - 32px));background:#fff;border:1px solid #dfe4ea;border-radius:14px;box-shadow:0 18px 50px rgba(15,22,32,.15);padding:18px}.px-clean-assistant-modal h3{margin:0 0 5px;font-size:16px}.px-clean-assistant-modal p{margin:0 0 14px;color:#7c8592;font-size:12px}.px-clean-assistant-modal textarea{width:100%;min-height:90px;border:1px solid #e1e5ea;border-radius:9px;padding:10px;resize:none;outline:0;font:13px/1.5 inherit}.px-clean-assistant-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.px-clean-assistant-actions button{border:1px solid #dfe4e9;background:#fff;border-radius:8px;padding:8px 11px;font:600 12px inherit;cursor:pointer}.px-clean-assistant-actions .primary{background:#151b25;color:#fff;border-color:#151b25}
-  .px-clean-source-hidden{display:none!important}
-  @media(max-width:800px){.px-clean-sidebar{position:fixed;width:100%;height:68px;bottom:auto;padding:8px 12px;flex-direction:row;align-items:center}.px-clean-brand{padding:0 10px;font-size:19px}.px-clean-nav{display:flex;flex:1;justify-content:center}.px-clean-nav button{width:auto;padding:9px 10px;justify-content:center}.px-clean-nav button span:last-child{display:none}.px-clean-divider,.px-clean-label,.px-clean-assistant,.px-clean-recent,.px-clean-account-main,.px-clean-chevron{display:none}.px-clean-account{margin:0;width:auto;border:0;padding:0;background:transparent}.px-clean-main{left:0;top:68px}.px-clean-topbar{height:56px;padding:0 14px}.px-clean-home{width:calc(100% - 28px);padding:38px 0}.px-clean-hero h1{font-size:34px}.px-clean-features,.px-clean-cards{grid-template-columns:1fr}.px-clean-feature+.px-clean-feature{border-left:0;border-top:1px solid #e9ecf0}.px-clean-feature{padding:20px}.px-clean-panel{width:calc(100% - 28px)}}
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const projects=()=>{const out=[];try{for(const k of ['builder_universal_v14','builder_state_v14']){const r=localStorage.getItem(k);if(!r)continue;const d=JSON.parse(r);for(const p of (Array.isArray(d.projects)?d.projects:[])){const t=String(p.title||p.name||p.intention||p.intent||'').split('\n')[0].trim();if(t&&!out.includes(t))out.push(t)}}}catch{}return out.slice(0,6)};
+  const css=`
+  #pxc{position:fixed;inset:0;z-index:2147483000;display:grid;grid-template-columns:248px minmax(0,1fr);background:#fff;color:#151922;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}#pxc *{box-sizing:border-box}.pxc-side{height:100%;background:#fbfcfd;border-right:1px solid #e7e9ed;padding:27px 12px 14px;display:flex;flex-direction:column}.pxc-logo{padding:0 12px 31px;font-size:23px;font-weight:760;letter-spacing:-.055em}.pxc-nav{display:grid;gap:3px}.pxc-nav button,.pxc-assistant,.pxc-recent button,.pxc-account{font:inherit;cursor:pointer}.pxc-nav button{border:0;background:transparent;width:100%;display:flex;gap:11px;align-items:center;text-align:left;padding:10px 12px;border-radius:9px;color:#687180;font-size:13px}.pxc-nav button.active,.pxc-nav button:hover{background:#edf0f4;color:#171c25}.pxc-nav button.active{font-weight:650}.pxc-icon{width:17px;text-align:center;color:#303641}.pxc-rule{height:1px;background:#e7e9ed;margin:22px 7px 16px}.pxc-label{padding:0 10px 8px;color:#a0a7b1;font-size:9px;font-weight:750;letter-spacing:.14em;text-transform:uppercase}.pxc-assistant{border:1px solid #e1e4e8;background:#fff;border-radius:9px;padding:10px 11px;text-align:left;color:#343b46;font-size:13px}.pxc-recent{display:grid;gap:2px}.pxc-recent button{border:0;background:transparent;text-align:left;color:#687180;padding:7px 10px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:7px}.pxc-account{margin-top:auto;border:1px solid #e0e4e9;background:#fff;border-radius:11px;padding:9px;display:flex;gap:9px;align-items:center;text-align:left}.pxc-avatar{width:32px;height:32px;border-radius:50%;background:#edf0f3;display:grid;place-items:center;font-size:12px;font-weight:700;color:#727b88}.pxc-account-text{min-width:0;flex:1}.pxc-name{font-size:12px;font-weight:650}.pxc-plan{font-size:10px;color:#9098a4;margin-top:2px}.pxc-main{min-width:0;height:100%;overflow:auto}.pxc-top{height:62px;border-bottom:1px solid #edf0f3;display:flex;align-items:center;justify-content:flex-end;padding:0 34px}.pxc-top button{border:1px solid #dfe3e8;background:#fff;border-radius:9px;padding:9px 13px;color:#2a313c;font:600 12px inherit;cursor:pointer}.pxc-content{width:min(960px,calc(100% - 64px));margin:0 auto;padding:70px 0 54px}.pxc-hero{text-align:center}.pxc-hero h1{margin:0;font-size:clamp(34px,4.4vw,54px);line-height:1.05;letter-spacing:-.05em;font-weight:730}.pxc-hero p{max-width:610px;margin:15px auto 31px;color:#747d8b;font-size:14px;line-height:1.65}.pxc-composer{border:1px solid #d9dee5;border-radius:14px;background:#fff;overflow:hidden;text-align:left;box-shadow:0 8px 28px rgba(20,27,38,.05)}.pxc-composer textarea{width:100%;height:128px;display:block;border:0;outline:0;resize:none;padding:19px 21px;font:14px/1.55 inherit;color:#171d27}.pxc-composer-foot{height:56px;border-top:1px solid #eef0f3;display:flex;align-items:center;justify-content:space-between;padding:7px 10px}.pxc-add{border:0;background:transparent;color:#7d8692;font:500 11px inherit;cursor:pointer}.pxc-send{width:39px;height:39px;border:0;border-radius:9px;background:#151a22;color:#fff;font-size:20px;cursor:pointer}.pxc-examples{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin:18px 0 55px}.pxc-examples span{font-size:11px;color:#9098a4;padding:8px 2px}.pxc-example{border:1px solid #e0e4e9;background:#fff;border-radius:999px;padding:8px 11px;color:#596270;font:500 11px inherit;cursor:pointer}.pxc-features{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #e8ebef;border-bottom:1px solid #e8ebef}.pxc-feature{text-align:center;padding:27px 22px}.pxc-feature+.pxc-feature{border-left:1px solid #e8ebef}.pxc-feature .ico{font-size:19px;margin-bottom:10px}.pxc-feature b{display:block;font-size:13px;margin-bottom:5px}.pxc-feature span{color:#818a97;font-size:11px;line-height:1.55}.pxc-recent-home{padding-top:37px}.pxc-recent-home-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.pxc-recent-home h2{font-size:17px;margin:0}.pxc-view{border:0;background:none;color:#3b4655;font:600 11px inherit;cursor:pointer}.pxc-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.pxc-card{border:1px solid #e1e5e9;border-radius:10px;padding:13px;display:flex;align-items:center;gap:10px;background:#fff;text-align:left;cursor:pointer}.pxc-card-icon{width:34px;height:34px;border-radius:8px;background:#f0f2f5;display:grid;place-items:center;color:#596270}.pxc-card-title{font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pxc-card-meta{font-size:10px;color:#929aa5;margin-top:3px}.pxc-panel{width:min(960px,calc(100% - 64px));margin:auto;padding:55px 0}.pxc-panel h1{margin:0;font-size:34px;letter-spacing:-.04em}.pxc-empty{margin-top:20px;border:1px solid #e1e5e9;border-radius:10px;padding:25px;color:#7d8692;font-size:12px}.pxc-modal{position:fixed;inset:0;z-index:2147483001;background:rgba(255,255,255,.94);display:grid;place-items:center;padding:20px}.pxc-dialog{width:min(650px,100%);border:1px solid #dfe3e8;border-radius:14px;background:#fff;box-shadow:0 20px 70px rgba(15,22,32,.14);padding:25px}.pxc-dialog h2{margin:0;font-size:22px}.pxc-dialog p{color:#78818e;font-size:12px}.pxc-dialog textarea{width:100%;min-height:110px;border:1px solid #dfe3e8;border-radius:9px;padding:13px;font:13px/1.5 inherit}.pxc-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:13px}.pxc-dialog-actions button{border:1px solid #dfe3e8;background:#fff;border-radius:8px;padding:9px 12px;font:600 11px inherit;cursor:pointer}.pxc-dialog-actions .go{background:#151a22;color:#fff}
+  @media(max-width:800px){#pxc{grid-template-columns:1fr;grid-template-rows:60px 1fr}.pxc-side{height:60px;flex-direction:row;align-items:center;padding:7px 10px;border-right:0;border-bottom:1px solid #e7e9ed}.pxc-logo{padding:0 9px;font-size:19px}.pxc-nav{display:flex;flex:1;justify-content:center}.pxc-nav button{width:auto;padding:9px}.pxc-nav button span:last-child{display:none}.pxc-rule,.pxc-label,.pxc-assistant,.pxc-recent,.pxc-account-text{display:none}.pxc-account{margin:0;border:0;padding:0}.pxc-main{height:auto}.pxc-top{height:54px;padding:0 13px}.pxc-content,.pxc-panel{width:calc(100% - 28px);padding:38px 0}.pxc-hero h1{font-size:35px}.pxc-features,.pxc-cards{grid-template-columns:1fr}.pxc-feature+.pxc-feature{border-left:0;border-top:1px solid #e8ebef}}
   `;
-
-  const addStyle = () => { if(document.getElementById('px-clean-final-style')) return; const s=document.createElement('style'); s.id='px-clean-final-style'; s.textContent=CSS; document.head.appendChild(s); };
-
-  function leaf(label){
-    return [...document.querySelectorAll('#appRoot *')].find(el => el.children.length===0 && (el.textContent||'').trim()===label) || null;
+  const addCss=()=>{if(document.getElementById('pxc-style'))return;const s=document.createElement('style');s.id='pxc-style';s.textContent=css;document.head.appendChild(s)};
+  function creation(text=''){
+    const b=[...document.querySelectorAll('[data-action="newProject"]')].find(x=>x.offsetParent!==null)||document.querySelector('[data-action="newProject"]');
+    if(b){b.click();setTimeout(()=>{const i=document.querySelector('#heroPrompt');if(i&&text){i.value=text;i.dispatchEvent(new Event('input',{bubbles:true}))}document.getElementById('pxc')?.remove()},150);return}
+    const m=document.createElement('div');m.className='pxc-modal';m.innerHTML='<div class="pxc-dialog"><h2>What are you creating?</h2><p>Start with your idea. ProjectX will ask follow-up questions before building the workspace.</p><textarea placeholder="Describe your idea, goal, business, game, app, research, or anything else..."></textarea><div class="pxc-dialog-actions"><button data-cancel>Cancel</button><button class="go" data-start>Continue →</button></div></div>';document.body.appendChild(m);const t=m.querySelector('textarea');t.value=text;t.focus();m.addEventListener('click',e=>{if(e.target.closest('[data-cancel]'))m.remove();if(e.target.closest('[data-start]')){const v=t.value.trim();if(v){m.remove();creation(v)}}})
   }
-  function clickLegacy(label){
-    const el=leaf(label); if(!el) return false;
-    const target=el.closest('button,a,[role="button"],li') || el;
-    target.click(); return true;
+  function render(page='Home'){
+    const r=document.getElementById('pxc');if(!r)return;const ps=projects();
+    const body=page==='Home'?`<section class="pxc-content"><div class="pxc-hero"><h1>What do you want to create?</h1><p>Describe your idea. ProjectX will ask the right questions, understand it, and help you turn it into reality.</p><div class="pxc-composer"><textarea id="pxc-prompt" placeholder="Tell me what you want to create..."></textarea><div class="pxc-composer-foot"><button class="pxc-add">＋ Add file (optional)</button><button class="pxc-send" data-create>→</button></div></div><div class="pxc-examples"><span>Try an example:</span>${['Website for my sneaker store','Local café business plan','A 2D platformer game','AI study assistant'].map(x=>`<button class="pxc-example">${x}</button>`).join('')}</div></div><div class="pxc-features"><div class="pxc-feature"><div class="ico">□</div><b>Understand</b><span>ProjectX asks only the questions needed for your idea.</span></div><div class="pxc-feature"><div class="ico">↗</div><b>Build a workspace</b><span>Your project gets sections that match what you are making.</span></div><div class="pxc-feature"><div class="ico">✓</div><b>Move forward</b><span>Plans, tasks and outputs stay connected.</span></div></div><div class="pxc-recent-home"><div class="pxc-recent-home-head"><h2>Recent creations</h2><button class="pxc-view" data-nav="Projects">View all</button></div><div class="pxc-cards">${ps.slice(0,3).map(x=>`<button class="pxc-card" data-project="${esc(x)}"><span class="pxc-card-icon">◇</span><span style="min-width:0"><span class="pxc-card-title">${esc(x)}</span><span class="pxc-card-meta">Project</span></span></button>`).join('')||'<div class="pxc-empty" style="grid-column:1/-1">No creations yet. Start with the prompt above.</div>'}</div></div></section>`:`<section class="pxc-panel"><h1>${esc(page)}</h1><p>${page==='Projects'?'Your projects and creations.':page==='Analytics'?'Usage and project activity.':'Account and application settings.'}</p><div class="pxc-empty">${page==='Projects'?(ps.length?ps.map(esc).join('<br>'):'No projects yet.'):'This section is ready for ProjectX data and actions.'}</div></section>`;
+    r.querySelector('.pxc-main').innerHTML=`<header class="pxc-top"><button data-assistant>✦ &nbsp; Assistant X</button></header>${body}`
   }
-  function hideLegacyChrome(){
-    const all=[...document.querySelectorAll('#appRoot *')];
-    for(const el of all){
-      if(el.children.length) continue;
-      const t=(el.textContent||'').trim().toLowerCase();
-      if(t==='builder'){
-        let n=el;
-        for(let i=0;i<6&&n&&n!==document.body;i++,n=n.parentElement){
-          const r=n.getBoundingClientRect();
-          if(r.width>100 && r.width<360 && r.height>400){n.classList.add('px-clean-source-hidden');break;}
-        }
-      }
-    }
-    // Hide any remaining legacy left rail by geometry/text signature.
-    for(const el of [...document.querySelectorAll('#appRoot > *,#appRoot > * > *')]){
-      const r=el.getBoundingClientRect(); const txt=(el.textContent||'').toLowerCase();
-      if(r.width>120&&r.width<360&&r.height>500&&txt.includes('universal creation engine')&&txt.includes('new creation')) el.classList.add('px-clean-source-hidden');
-    }
+  function mount(){
+    if(document.getElementById('pxc'))return;addCss();const r=document.createElement('div');r.id='pxc';r.innerHTML=`<aside class="pxc-side"><div class="pxc-logo">ProjectX</div><nav class="pxc-nav"><button class="active" data-nav="Home"><span class="pxc-icon">⌂</span><span>Home</span></button><button data-nav="Projects"><span class="pxc-icon">□</span><span>Projects</span></button><button data-nav="Analytics"><span class="pxc-icon">▥</span><span>Analytics</span></button><button data-nav="Settings"><span class="pxc-icon">⚙</span><span>Settings</span></button></nav><div class="pxc-rule"></div><div class="pxc-label">Assistant</div><button class="pxc-assistant" data-assistant>✦ &nbsp; Assistant X</button><div class="pxc-rule"></div><div class="pxc-label">Recent</div><div class="pxc-recent">${projects().map(x=>`<button data-project="${esc(x)}">${esc(x)}</button>`).join('')||'<span style="padding:7px 10px;color:#a0a7b1;font-size:11px">No creations yet</span>'}</div><button class="pxc-account"><span class="pxc-avatar">P</span><span class="pxc-account-text"><span class="pxc-name">Pushkar</span><span class="pxc-plan">Free Plan</span></span><span>›</span></button></aside><main class="pxc-main"></main>`;document.body.appendChild(r);render();
+    r.addEventListener('click',e=>{const n=e.target.closest('[data-nav]');if(n){r.querySelectorAll('.pxc-nav button').forEach(x=>x.classList.toggle('active',x===n));render(n.dataset.nav);return}const ex=e.target.closest('.pxc-example');if(ex){const i=r.querySelector('#pxc-prompt');i.value=ex.textContent;i.focus();return}if(e.target.closest('[data-create]')){creation(r.querySelector('#pxc-prompt')?.value.trim()||'');return}if(e.target.closest('[data-project]'))creation(e.target.closest('[data-project]').dataset.project);if(e.target.closest('[data-assistant]'))alert('Assistant X is ready.');});
+    const hide=()=>['appRoot','authRoot','mobileCta','modal','toast'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.setProperty('display','none','important');e.style.setProperty('visibility','hidden','important')}});hide();new MutationObserver(hide).observe(document.body,{childList:true,subtree:true});
   }
-  function recent(){
-    const out=[];
-    try{
-      for(const key of ['builder_universal_v14','builder_state_v14']){
-        const raw=localStorage.getItem(key); if(!raw) continue;
-        const s=JSON.parse(raw); const list=Array.isArray(s.projects)?s.projects:[];
-        for(const p of list){
-          const title=String(p.title||p.name||p.intention||p.intent||'').split('\n')[0].trim();
-          if(title&&!out.includes(title)) out.push(title);
-        }
-      }
-    }catch{}
-    return out.slice(0,6);
-  }
-  function showAssistant(){
-    document.querySelector('.px-clean-assistant-modal')?.remove();
-    const m=document.createElement('div');m.className='px-clean-assistant-modal';
-    m.innerHTML='<h3>Assistant X</h3><p>Ask about a project, an idea, or what to do next.</p><textarea placeholder="What do you need help with?"></textarea><div class="px-clean-assistant-actions"><button data-close>Close</button><button class="primary" data-send>Ask Assistant</button></div>';
-    document.body.appendChild(m);
-    m.addEventListener('click',e=>{if(e.target.closest('[data-close]'))m.remove();if(e.target.closest('[data-send]')){const v=m.querySelector('textarea').value.trim();if(v){m.querySelector('p').textContent='Assistant X is ready to work with this request from your project context.';m.querySelector('textarea').value='';}}});
-  }
-  function creationStart(text){
-    const btn=document.querySelector('[data-action="newProject"]');
-    if(btn){btn.click();setTimeout(()=>{const input=document.querySelector('#heroPrompt');if(input){input.value=text;input.dispatchEvent(new Event('input',{bubbles:true));}},80);return;}
-    window.dispatchEvent(new CustomEvent('projectx:start',{detail:{text}}));
-  }
-  function home(){
-    let main=document.querySelector('.px-clean-main');
-    if(main) main.remove();
-    main=document.createElement('main');main.className='px-clean-main';
-    const rs=recent();
-    main.innerHTML=`<div class="px-clean-topbar"><button class="px-clean-assistant-top" data-assistant>✦ &nbsp; Assistant X</button></div><section class="px-clean-home"><div class="px-clean-hero"><h1>What do you want to create?</h1><p>Describe your idea. ProjectX will ask the right questions, understand it, and help you turn it into reality.</p><div class="px-clean-composer"><textarea id="px-clean-prompt" placeholder="Tell me what you want to create..."></textarea><div class="px-clean-composer-bottom"><button class="px-clean-attach" type="button">⌕ &nbsp; Add file (optional)</button><button class="px-clean-send" type="button" data-create>→</button></div></div><div class="px-clean-examples"><span>Try an example:</span><button class="px-clean-example">Website for my sneaker store</button><button class="px-clean-example">Local café business plan</button><button class="px-clean-example">A 2D platformer game</button><button class="px-clean-example">AI study assistant</button><button class="px-clean-example">Other idea</button></div></div><div class="px-clean-features"><div class="px-clean-feature"><div class="px-clean-feature-icon">□</div><strong>Understand your idea</strong><span>Asks only what’s needed</span></div><div class="px-clean-feature"><div class="px-clean-feature-icon">≋</div><strong>Creates a tailored workspace</strong><span>Sections adapt to your project</span></div><div class="px-clean-feature"><div class="px-clean-feature-icon">ϟ</div><strong>Helps you go from idea to real</strong><span>Plan, build, organize, execute</span></div></div><section class="px-clean-recent-home"><div class="px-clean-recent-head"><h2>Recent creations</h2><button class="px-clean-view" data-view-projects>View all →</button></div><div class="px-clean-cards">${(rs.length?rs:['No recent creations yet']).slice(0,3).map((x,i)=>x==='No recent creations yet'?'<div class="px-clean-empty">No recent creations yet. Start with the prompt above.</div>':`<button class="px-clean-card" data-recent="${esc(x)}"><span class="px-clean-card-icon">${i===0?'◉':i===1?'□':'⌁'}</span><span style="min-width:0"><span class="px-clean-card-title">${esc(x)}</span><span class="px-clean-card-meta">Recent creation</span></span><span class="px-clean-card-arrow">›</span></button>`).join('')}</div></section><div class="px-clean-footer">Ideas to reality, with you.<br>ProjectX</div></section>`;
-    document.body.appendChild(main);
-    main.addEventListener('click',e=>{
-      if(e.target.closest('[data-assistant]')) return showAssistant();
-      const ex=e.target.closest('.px-clean-example'); if(ex){document.querySelector('#px-clean-prompt').value=ex.textContent;document.querySelector('#px-clean-prompt').focus();return;}
-      if(e.target.closest('[data-create]')){const v=document.querySelector('#px-clean-prompt').value.trim();if(v)creationStart(v);return;}
-      const card=e.target.closest('[data-recent]');if(card){clickLegacy(card.dataset.recent);return;}
-      if(e.target.closest('[data-view-projects]'))clickLegacy('Projects');
-    });
-  }
-  function panel(title,desc){
-    const main=document.querySelector('.px-clean-main'); if(!main)return;
-    main.innerHTML=`<div class="px-clean-topbar"><button class="px-clean-assistant-top" data-assistant>✦ &nbsp; Assistant X</button></div><section class="px-clean-panel"><h1>${esc(title)}</h1><p>${esc(desc)}</p><div class="px-clean-empty">This section is connected to your ProjectX workspace. Use the navigation to switch areas.</div></section>`;
-    main.querySelector('[data-assistant]')?.addEventListener('click',showAssistant);
-  }
-  function buildSidebar(){
-    if(document.querySelector('.px-clean-sidebar'))return;
-    const side=document.createElement('aside');side.className='px-clean-sidebar';
-    const rs=recent();
-    side.innerHTML=`<div class="px-clean-brand">ProjectX</div><nav class="px-clean-nav"><button data-nav="Home" class="active"><span class="px-clean-icon">⌂</span><span>Home</span></button><button data-nav="Projects"><span class="px-clean-icon">□</span><span>Projects</span></button><button data-nav="Analytics"><span class="px-clean-icon">▥</span><span>Analytics</span></button><button data-nav="Settings"><span class="px-clean-icon">⚙</span><span>Settings</span></button></nav><div class="px-clean-divider"></div><div class="px-clean-label">Assistant</div><button class="px-clean-assistant" data-assistant>✦ <span>Assistant X</span></button><div class="px-clean-divider"></div><div class="px-clean-label">Recent</div><div class="px-clean-recent">${rs.length?rs.map(x=>`<button data-recent="${esc(x)}">${esc(x)}</button>`).join(''):'<button disabled>No recent creations</button>'}</div><button class="px-clean-account" data-account><span class="px-clean-avatar">P</span><span class="px-clean-account-main"><span class="px-clean-account-name">Pushkar</span><span class="px-clean-account-plan">Free Plan</span></span><span class="px-clean-chevron">›</span></button>`;
-    document.body.appendChild(side);
-    side.addEventListener('click',e=>{
-      if(e.target.closest('[data-assistant]'))return showAssistant();
-      const nav=e.target.closest('[data-nav]');
-      if(nav){side.querySelectorAll('[data-nav]').forEach(x=>x.classList.toggle('active',x===nav));const label=nav.dataset.nav;if(label==='Home')home();else {clickLegacy(label);panel(label,label==='Projects'?'Your creations and saved work.':label==='Analytics'?'Usage and project activity.':'Account, preferences, and plan settings.');}return;}
-      const r=e.target.closest('[data-recent]');if(r){clickLegacy(r.dataset.recent);return;}
-      if(e.target.closest('[data-account]')){side.querySelector('[data-nav="Settings"]').click();}
-    });
-  }
-  function start(){
-    addStyle();
-    hideLegacyChrome();
-    buildSidebar();
-    home();
-    const obs=new MutationObserver(()=>{hideLegacyChrome();});
-    const root=document.querySelector('#appRoot');if(root)obs.observe(root,{subtree:true,childList:true});
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(start,50));else setTimeout(start,50);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })();
