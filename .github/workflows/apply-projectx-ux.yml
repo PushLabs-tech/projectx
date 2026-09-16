@@ -14,83 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch ProjectX UX
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('app.js'); s=p.read_text()
-          marker='  // PROJECTX_ADAPTIVE_UX_V2\n'
-          if marker not in s:
-            anchor='  function bindAuth(){\n'
-            fn=r'''  // PROJECTX_ADAPTIVE_UX_V2
-  function projectXAdaptiveUX(){
-    const root=document.querySelector('#appRoot');
-    if(!root)return;
-    root.querySelectorAll('h1,h2,h3,[role="heading"]').forEach(el=>{
-      if(/^welcome back\b/i.test((el.textContent||'').trim()))el.classList.add('px-hide-generic-welcome');
-    });
-    const p=project();
-    if(!p||!state.projectId)return;
-    const title=String(p.title||p.name||detectType(p.intention||p.description||'Project')).trim();
-    let header=root.querySelector('.px-project-header');
-    if(!header){header=document.createElement('div');header.className='px-project-header';root.prepend(header)}
-    header.innerHTML=`<div class="px-project-title">${esc(title)}</div>`;
-    const intent=String(p.intention||p.intent||p.description||title).toLowerCase();
-    const type=detectType(intent);
-    const schemas={
-      Website:['Chat','Plan','Design','Preview','Code','Files','Test','Publish'],
-      App:['Chat','Plan','Design','Preview','Code','Data','Test','Publish'],
-      Mobile:['Chat','Plan','Design','Preview','Code','Data','Test','Publish'],
-      Game:['Chat','Plan','Scenes','Assets','Code','Playtest','Test','Publish'],
-      Agent:['Chat','Plan','Tools','Memory','Test','Deploy'],
-      Automation:['Chat','Plan','Workflow','Integrations','Test','Deploy'],
-      API:['Chat','Plan','Endpoints','Data','Test','Docs','Deploy'],
-      Data:['Chat','Plan','Data','Analysis','Dashboard','Export'],
-      Document:['Chat','Plan','Content','Review','Export'],
-      Presentation:['Chat','Plan','Slides','Assets','Review','Export'],
-      Research:['Chat','Research','Sources','Analysis','Findings','Report'],
-      'Business system':['Chat','Plan','Customers','Operations','Analytics','Launch'],
-      'Creative project':['Chat','Plan','Assets','Draft','Review','Export'],
-      Custom:['Chat','Plan','Workspace','Output']
-    };
-    const sections=schemas[type]||schemas.App;
-    let nav=root.querySelector('.px-adaptive-sections');
-    if(!nav){nav=document.createElement('nav');nav.className='px-adaptive-sections';header.after(nav)}
-    nav.innerHTML=sections.map((name,i)=>`<button type="button" class="px-section ${i?'':'active'}" data-px-section="${esc(name.toLowerCase())}">${esc(name)}</button>`).join('');
-    nav.querySelectorAll('[data-px-section]').forEach(btn=>btn.addEventListener('click',()=>{
-      nav.querySelectorAll('.px-section').forEach(x=>x.classList.toggle('active',x===btn));
-      const wanted=btn.dataset.pxSection;
-      const match=[...root.querySelectorAll('[data-panel]')].find(el=>{
-        const panel=String(el.dataset.panel||'').toLowerCase(), text=String(el.textContent||'').toLowerCase();
-        return panel===wanted||panel.includes(wanted)||text.trim()===wanted;
-      });
-      if(match)match.click();
-      else if(wanted==='chat')root.querySelector('textarea,input[placeholder*="message" i],input[placeholder*="tell" i]')?.focus();
-    }));
-  }
-
-'''
-            if anchor not in s: raise SystemExit('bindAuth anchor not found')
-            s=s.replace(anchor,fn+anchor,1)
-          if '    projectXAdaptiveUX();\n' not in s:
-            anchor='    bindEvents();\n'
-            if anchor not in s: raise SystemExit('bindEvents anchor not found')
-            s=s.replace(anchor,anchor+'    projectXAdaptiveUX();\n',1)
-          p.write_text(s)
-          PY
-      - name: Simplify CSS
-        run: |
-          cat >> styles.css <<'CSS'
-          .px-hide-generic-welcome{display:none!important}
-          .px-project-header{width:100%;display:flex;justify-content:center;align-items:center;text-align:center;padding:28px 20px 8px}
-          .px-project-title{font-family:var(--font-sans);font-size:clamp(25px,3vw,38px);font-weight:700;letter-spacing:-.035em;line-height:1.15}
-          .px-adaptive-sections{width:min(1100px,calc(100% - 32px));margin:8px auto 18px;display:flex;justify-content:center;gap:3px;overflow-x:auto;padding:4px;border-bottom:1px solid var(--line);scrollbar-width:none}
-          .px-adaptive-sections::-webkit-scrollbar{display:none}
-          .px-section{border:0;background:transparent;color:var(--muted);padding:9px 13px;font-size:12px;font-weight:600;white-space:nowrap;border-bottom:2px solid transparent;border-radius:0}
-          .px-section:hover{background:var(--surface-subtle);color:var(--ink)}
-          .px-section.active{color:var(--ink);border-bottom-color:var(--ink)}
-          @media(max-width:720px){.px-project-header{padding:20px 16px 6px}.px-project-title{font-size:25px}.px-adaptive-sections{width:calc(100% - 20px);justify-content:flex-start}.px-section{padding:8px 10px;font-size:11px}}
-          CSS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply UX patch
+        run: node scripts/apply-projectx-ux.mjs
       - name: Verify
         run: |
           node --check app.js
