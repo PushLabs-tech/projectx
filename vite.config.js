@@ -45,7 +45,9 @@ function geminiApiPlugin() {
 }
 
 export default defineConfig({
-  base: '/',
+  // GitHub Pages serves this repository under /projectx/, not the domain root.
+  // Using / here makes Vite-generated JS/CSS URLs resolve to /assets/... and 404.
+  base: '/projectx/',
   plugins: [geminiApiPlugin()],
   resolve: {
     alias: [
@@ -78,4 +80,3 @@ export default defineConfig({
     },
   },
 });
-
