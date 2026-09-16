@@ -387,6 +387,231 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     return ["project context","resources","tasks","testing",...(map[type]||["files","browser","data"])];
   }
 
+  function categorizeProjectGroup(text) {
+    const lower = (text || "").toLowerCase();
+    const groupBKeywords = /\b(cafe|coffee|restaurant|bar|shop|store|business|bakery|bistro|diner|hotel|hardware|research|learning|event|real-world|physical|service|agency|startup)\b/;
+    if (groupBKeywords.test(lower)) {
+      return "Group B";
+    }
+    return "Group A";
+  }
+
+  function generateWorkspaceSections(p) {
+    const text = (p.intention || p.title || "").toLowerCase();
+    const chatText = (p.chat || []).map(m => m.text).join(" ").toLowerCase();
+    const combined = text + " " + chatText;
+
+    const isWebsite = /\b(website|site|landing|portfolio|blog)\b/.test(combined);
+    const isApp = /\b(app|saas|dashboard|tracker|tool|platform|portal)\b/.test(combined);
+    const isGame = /\b(game|platformer|arcade|puzzle|snake|flappy)\b/.test(combined);
+    const isCafeOrRestaurant = /\b(cafe|coffee|restaurant|bar|bakery|bistro|diner|hotel|food|drink|anime cafe)\b/.test(combined);
+    const isHardwareShopOrStore = /\b(hardware shop|store|shop|retail|boutique)\b/.test(combined);
+    const isResearch = /\b(research|solar|efficiency|study|analysis|science|papers|investigate)\b/.test(combined);
+    const isHardwareDevice = /\b(hardware device|smart irrigation|sensor|iot|arduino|raspberry|robot|device)\b/.test(combined);
+    const isFootballTeam = /\b(football team|sports team|soccer|club|team)\b/.test(combined);
+
+    const hasDigital = isWebsite || isApp || isGame;
+
+    if (isCafeOrRestaurant && hasDigital) {
+      p.group = "Group A & B";
+      p.type = "Business & Website";
+      return [
+        { id: "chat", label: "Chat", desc: "Consultation & building" },
+        { id: "concept", label: "Concept", desc: "Cafe vision & theme" },
+        { id: "menu", label: "Menu", desc: "Food & beverage offerings" },
+        { id: "budget", label: "Budget", desc: "Financial plan" },
+        { id: "preview", label: "Website Preview", desc: "Live website sandbox" },
+        { id: "code", label: "Website Code", desc: "Source files" },
+        { id: "checklist", label: "Checklist", desc: "Action items" }
+      ];
+    } else if (isCafeOrRestaurant) {
+      p.group = "Group B";
+      p.type = "Real-World Business";
+      return [
+        { id: "chat", label: "Chat", desc: "Strategy & guidance" },
+        { id: "concept", label: "Concept", desc: "Cafe vision & theme" },
+        { id: "research", label: "Market Research", desc: "Target audience & competitors" },
+        { id: "location", label: "Location", desc: "Site selection & layout" },
+        { id: "menu", label: "Menu", desc: "Food & drink menu design" },
+        { id: "budget", label: "Budget", desc: "Startup costs & financials" },
+        { id: "operations", label: "Operations", desc: "Staffing, suppliers & permits" },
+        { id: "checklist", label: "Checklist", desc: "Launch milestone tasks" }
+      ];
+    } else if (isHardwareShopOrStore) {
+      p.group = "Group B";
+      p.type = "Real-World Business";
+      return [
+        { id: "chat", label: "Chat", desc: "Business strategy" },
+        { id: "plan", label: "Business Plan", desc: "Model & strategy" },
+        { id: "research", label: "Market Research", desc: "Competitors & demand" },
+        { id: "location", label: "Location", desc: "Storefront & layout" },
+        { id: "products", label: "Products", desc: "Inventory & merchandising" },
+        { id: "suppliers", label: "Suppliers", desc: "Vendors & wholesale" },
+        { id: "budget", label: "Costs & Budget", desc: "Financial forecast" },
+        { id: "legal", label: "Legal & Compliance", desc: "Permits & licenses" },
+        { id: "marketing", label: "Marketing", desc: "Launch promotions" },
+        { id: "checklist", label: "Checklist", desc: "Launch task list" }
+      ];
+    } else if (isFootballTeam) {
+      p.group = "Group B";
+      p.type = "Real-World Project";
+      return [
+        { id: "chat", label: "Chat", desc: "Team consultation" },
+        { id: "concept", label: "Goal & Vision", desc: "Team identity" },
+        { id: "structure", label: "Team Structure", desc: "Staff & management" },
+        { id: "players", label: "Players", desc: "Roster & recruitment" },
+        { id: "training", label: "Training", desc: "Drills & schedule" },
+        { id: "equipment", label: "Equipment", desc: "Gear & kit" },
+        { id: "budget", label: "Budget", desc: "Expenses & dues" },
+        { id: "venue", label: "Venue", desc: "Pitch & facilities" },
+        { id: "checklist", label: "Checklist", desc: "Action checklist" }
+      ];
+    } else if (isResearch) {
+      p.group = "Group B";
+      p.type = "Research Study";
+      return [
+        { id: "chat", label: "Chat", desc: "Research assistant" },
+        { id: "research", label: "Research", desc: "Topic background" },
+        { id: "questions", label: "Questions", desc: "Key hypotheses" },
+        { id: "sources", label: "Sources", desc: "References & datasets" },
+        { id: "findings", label: "Findings", desc: "Observations & data" },
+        { id: "analysis", label: "Analysis", desc: "Evaluation metrics" },
+        { id: "notes", label: "Notes", desc: "Journal & notes" },
+        { id: "plan", label: "Plan", desc: "Methodology" }
+      ];
+    } else if (isHardwareDevice) {
+      p.group = "Group B";
+      p.type = "Hardware Engineering";
+      return [
+        { id: "chat", label: "Chat", desc: "Engineering assistant" },
+        { id: "requirements", label: "Requirements", desc: "Specs & constraints" },
+        { id: "research", label: "Research", desc: "Technical documentation" },
+        { id: "components", label: "Components", desc: "Bill of materials" },
+        { id: "design", label: "Design", desc: "Schematics" },
+        { id: "cost", label: "Cost", desc: "BOM pricing & budget" },
+        { id: "prototype", label: "Prototype", desc: "Build steps" },
+        { id: "testing", label: "Testing", desc: "QA verification" },
+        { id: "plan", label: "Plan", desc: "Manufacturing roadmap" }
+      ];
+    } else if (isGame) {
+      p.group = "Group A";
+      p.type = "Game Development";
+      return [
+        { id: "chat", label: "Chat", desc: "Game design assistant" },
+        { id: "plan", label: "Plan", desc: "Mechanics & loops" },
+        { id: "files", label: "Files", desc: "Code files" },
+        { id: "preview", label: "Preview", desc: "Playable game preview" },
+        { id: "test", label: "Test", desc: "Playtest logs" },
+        { id: "assets", label: "Assets", desc: "Media & graphics" },
+        { id: "export", label: "Export", desc: "Download package" }
+      ];
+    } else if (isWebsite || isApp) {
+      p.group = "Group A";
+      p.type = isWebsite ? "Website / Portfolio" : "Web Application";
+      return [
+        { id: "chat", label: "Chat", desc: "AI builder assistant" },
+        { id: "plan", label: "Plan", desc: "Architecture & features" },
+        { id: "files", label: "Files", desc: "Project files" },
+        { id: "code", label: "Code", desc: "Source editor" },
+        { id: "preview", label: "Preview", desc: "Live application sandbox" },
+        { id: "design", label: "Design", desc: "Visual theme" },
+        { id: "publish", label: "Publish", desc: "Deploy & share" }
+      ];
+    } else {
+      p.group = "Group A";
+      p.type = "Digital Project";
+      return [
+        { id: "chat", label: "Chat", desc: "AI Assistant" },
+        { id: "preview", label: "Preview", desc: "Live preview" },
+        { id: "files", label: "Files", desc: "Project files" },
+        { id: "design", label: "Design", desc: "Design specs" },
+        { id: "publish", label: "Publish", desc: "Publish & deploy" }
+      ];
+    }
+  }
+
+  function getAdaptiveWorkspaceSections(p) {
+    if (p.workspaceSections && Array.isArray(p.workspaceSections) && p.workspaceSections.length > 0) {
+      return p.workspaceSections;
+    }
+    const secs = generateWorkspaceSections(p);
+    p.workspaceSections = secs;
+    return secs;
+  }
+
+  function classifyIntent(text) {
+    const lower = (text || "").toLowerCase();
+    if (/\b(cafe|coffee|restaurant|bar|shop|store|business|bakery|bistro|diner|hotel)\b/.test(lower)) {
+      return "business";
+    }
+    if (/\b(game|arcade|play|flappy|shooter|puzzle|snake)\b/.test(lower)) {
+      return "game";
+    }
+    if (/\b(saas|dashboard|app|tool|software|platform|portal)\b/.test(lower)) {
+      return "saas";
+    }
+    if (/\b(website|site|landing|portfolio|blog|brand|clothing)\b/.test(lower)) {
+      return "website";
+    }
+    return "general";
+  }
+
+  function getInitialUnderstandingQuestion(text) {
+    const group = categorizeProjectGroup(text);
+    const domain = classifyIntent(text);
+    if (group === "Group B") {
+      return {
+        text: `[Group B: Business & Real-World Venture] Let's figure out what you're planning. What kind of business, venture, or physical establishment is this?`,
+        options: ["Cafe / Coffee shop", "Restaurant / Bistro", "Retail shop", "Service agency", "Other venture"]
+      };
+    } else {
+      if (domain === "game") {
+        return {
+          text: `[Group A: Digital & Software] Let's design your game. What style or genre of game are you imagining?`,
+          options: ["Action / Arcade", "Puzzle", "Platformer", "Strategy", "Casual"]
+        };
+      } else if (domain === "saas") {
+        return {
+          text: `[Group A: Digital & Software] Let's plan your software tool. What core problem will this app solve for users?`,
+          options: ["Task / Project management", "Customer analytics", "Automation tool", "Collaboration portal", "Other"]
+        };
+      } else {
+        return {
+          text: `[Group A: Digital & Software] Let's figure out what you're building. What category of digital software or website is this?`,
+          options: ["E-commerce store", "Brand website", "Landing page", "Portfolio", "Web app"]
+        };
+      }
+    }
+  }
+
+  function getFollowUpUnderstandingQuestion(initialText, turnCount) {
+    const group = categorizeProjectGroup(initialText);
+    const domain = classifyIntent(initialText);
+    if (group === "Group B") {
+      return {
+        text: `Got it. What is your primary operating model and customer goal?`,
+        options: ["Dine-in & local menu", "Online ordering & delivery", "Table reservations & bookings", "Brand story & hours", "Services & client bookings"]
+      };
+    } else {
+      if (domain === "game") {
+        return {
+          text: `Awesome. What is the core scoring or win condition for players?`,
+          options: ["High score survival", "Level progression", "Time trial / speedrun", "Sandbox"]
+        };
+      } else if (domain === "saas") {
+        return {
+          text: `Who is the primary user role for this software?`,
+          options: ["Team members / Employees", "External clients / Customers", "Admins / Managers", "Anyone"]
+        };
+      } else {
+        return {
+          text: `What are the most important interactive features or pages needed for users?`,
+          options: ["Products & checkout", "Services & contact form", "About & gallery", "Testimonials & FAQs", "All of the above"]
+        };
+      }
+    }
+  }
+
   function makeProject(text,mode="interview"){
     let ep = null;
     try {
@@ -408,11 +633,14 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     const viewConfig = ep ? Engine.getWorkspaceViewConfig(ep) : null;
     const defaultTab = viewConfig?.defaultTab || "overview";
 
+    const initialQ = getInitialUnderstandingQuestion(text);
+
     const p={
       id:uid(),
       title:text.length<60?text:"New creation",
       intention:text,
       intent:text,
+      group: categorizeProjectGroup(text),
       kind:ep?.kind || (type ? String(type).toLowerCase() : "application"),
       domains:ep?.domains || [(type ? String(type).toLowerCase() : "application")],
       primitives:ep?.primitives || ['INPUT', 'TRANSFORM', 'INTERACT', 'TEST', 'VERIFY'],
@@ -460,7 +688,17 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       files:initialFiles,
       artifacts:initialFiles,
       activeFile:"index.html",
-      chat:[],
+      understandingComplete: false,
+      requirementSatisfied: false,
+      chat:[
+        {
+          id:uid(),
+          role:"assistant",
+          text: initialQ.text,
+          options: initialQ.options,
+          ts:ts
+        }
+      ],
       versions:[],
       tests:[],
       security:[],
@@ -474,7 +712,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     state.projectId=p.id;
     state.route="project";
     state.mode=mode;
-    state.panel=defaultTab;
+    state.panel="chat";
     ui.composer="";
 
     logActivity(`Created “${p.title}” with adaptive intelligence`);
@@ -642,6 +880,27 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     const currentFiles = { ...(p.files || {}) };
     const ops = [];
     let reply = "";
+
+    if (!p.understandingComplete) {
+      const turnCount = p.chat.length;
+      if (turnCount <= 2) {
+        const nextQ = getFollowUpUnderstandingQuestion(p.intention || p.title, turnCount);
+        return {
+          text: nextQ.text,
+          options: nextQ.options,
+          operations: []
+        };
+      } else {
+        p.understandingComplete = true;
+        p.requirementSatisfied = true;
+        p.stage = p.group === "Group B" ? "Venture Strategy & Planning" : "Workspace Execution";
+        saveLocal();
+        return {
+          text: `Project classified as [${p.group || "Group A"}]. All requirements understood and contextualized. Opening your workspace now...`,
+          operations: []
+        };
+      }
+    }
 
     // Sanitize any existing user-feature-section banners from existing project files
     for (const [path, content] of Object.entries(currentFiles)) {
@@ -1422,223 +1681,263 @@ if (typeof window !== 'undefined') window.Engine = Engine;
   function authHTML(){
     const sign=ui.authMode==="signup";
     const showModal=!!ui.showAuthModal;
+    const heroPromptVal = ui.composer !== undefined ? ui.composer : "";
 
     return `
-      <div class="public-experience">
-        <!-- Editorial Architectural Navigation -->
-        <header class="editorial-nav">
-          <div class="nav-brand">
-            <span class="brand-symbol">✦</span>
-            <span>Universal Creation Engine</span>
-          </div>
-          <nav class="nav-links">
-            <a href="#experience" class="nav-link">Experience</a>
-            <a href="#pipeline" class="nav-link">Pipeline</a>
-            <a href="#morph" class="nav-link">Adaptive Workspace</a>
-            <a href="#selfheal" class="nav-link">Self-Healing</a>
-            <a href="#gallery" class="nav-link">Creations</a>
+      <div class="projectx-landing">
+        <!-- Project X Top Navigation Bar -->
+        <header class="projectx-header">
+          <a href="#" class="projectx-brand-wrap" aria-label="Project X Home">
+            <div class="projectx-logo-mark">✕</div>
+            <div class="projectx-brand-text">
+              <span class="projectx-brand-title">Project X</span>
+              <span class="projectx-brand-sub">AI Creation & Problem-Solving Platform</span>
+            </div>
+          </a>
+
+          <nav class="projectx-nav-links">
+            <a href="#experience" class="projectx-nav-link">Projects</a>
+            <a href="#pillars" class="projectx-nav-link">Features</a>
+            <a href="#pipeline" class="projectx-nav-link">How it works</a>
+            <a href="#demo" class="projectx-nav-link">Adaptive Demo</a>
+            <a href="#faq" class="projectx-nav-link">FAQ</a>
           </nav>
-          <div class="nav-actions">
-            <button class="btn btn-secondary btn-sm" data-action="quickPreset">Try Presets</button>
-            <button class="btn btn-primary btn-sm" data-action="openAuthModal">Sign In / Launch</button>
+
+          <div class="projectx-header-ctas">
+            <button class="btn btn-ghost btn-sm" data-action="openAuthModal">Log in</button>
+            <button class="btn btn-primary btn-sm" data-action="quickPreset">Start →</button>
           </div>
         </header>
 
-        <!-- Hero Stage -->
-        <main class="hero-stage" id="experience">
-          <div class="pill-badge live hero-tag">
-            <span>UNIVERSAL CREATION ENGINE</span>
+        <!-- Main Hero Section -->
+        <main class="projectx-hero" id="experience">
+          <div class="projectx-hero-eyebrow">
+            <span>✦</span> PROJECT X · AUTONOMOUS ADAPTIVE ENGINE
           </div>
 
-          <h1 class="hero-headline">
-            MAKE SOMETHING <em>REAL.</em>
+          <h1 class="projectx-hero-title">
+            What's on your mind?
           </h1>
 
-          <p class="hero-subhead">
-            Describe what you want. The system figures out what needs to exist.
+          <p class="projectx-hero-subtitle">
+            Turn an idea, goal, or problem into something real.
           </p>
 
-          <!-- Interactive Intent Composer -->
-          <div class="hero-composer-wrap">
-            <div class="composer-header">
-              <span class="composer-header-label">INTENT TO SUBSTANCE COMPOSER</span>
-              <span class="pill-badge">AUTONOMOUS DECOMPOSITION</span>
-            </div>
-
+          <!-- Large Intent Composer Card -->
+          <div class="projectx-composer-card">
             <textarea
               id="heroPrompt"
-              class="composer-prompt-input"
-              placeholder="Describe what you want to create (e.g. an interactive astrophysics simulation with orbital gravity physics and star charts)..."
-            >${esc(ui.composer || "Create an interactive orbital astrophysics laboratory with live gravitational physics, celestial star map, and adaptive planetary lessons.")}</textarea>
+              class="projectx-prompt-area"
+              placeholder="Tell Project X what's on your mind... (e.g. Build a luxury sneaker marketplace with checkout, launch a local cafe with a $50k budget, or make a retro space arcade game)"
+              rows="3"
+            >${esc(heroPromptVal)}</textarea>
 
-            <!-- Realtime Primitive Discovery Rail -->
-            <div class="composer-primitive-rail">
-              <span class="rail-label">Discovered Primitives:</span>
-              <span class="primitive-chip active" data-primitive="INPUT">✦ INPUT</span>
-              <span class="primitive-chip active" data-primitive="SIMULATE">✦ SIMULATE</span>
-              <span class="primitive-chip active" data-primitive="TRANSFORM">✦ TRANSFORM</span>
-              <span class="primitive-chip active" data-primitive="VERIFY">✦ VERIFY</span>
-              <span class="primitive-chip active" data-primitive="PERSIST">✦ PERSIST</span>
-              <span class="primitive-chip active" data-primitive="ADAPT">✦ ADAPT</span>
+            <div id="heroAttachmentsArea" class="projectx-attachment-chips" style="${ui.attachedFiles && ui.attachedFiles.length ? '' : 'display:none;'}">
+              ${(ui.attachedFiles || []).map((f, i) => `
+                <div class="projectx-attach-pill">
+                  <span>📎 ${esc(f.name || 'Resource')}</span>
+                  <button type="button" data-remove-attachment="${i}">×</button>
+                </div>
+              `).join('')}
             </div>
 
-            <div class="composer-controls">
-              <div class="composer-presets">
-                <button class="preset-btn selected" data-intent="Create an interactive orbital astrophysics laboratory with live gravitational physics, celestial star map, and adaptive planetary lessons.">✦ Astrophysics Lab</button>
-                <button class="preset-btn" data-intent="Build a 60fps 2D kinetic vector space arcade game with particle thrusters, collision physics, and high-score persistence.">✦ Vector Arcade Game</button>
-                <button class="preset-btn" data-intent="Design an interactive venture economics engine with discounted cash flow matrix, sensitivity curves, and multi-scenario models.">✦ Venture Economics</button>
-                <button class="preset-btn" data-intent="Assemble a collaborative literary worldbuilding codex with character dependency graphs and timeline arcs.">✦ Worldbuilding Codex</button>
+            <input type="file" id="heroFileInput" style="display:none;" multiple>
+
+            <div class="projectx-composer-toolbar">
+              <div class="projectx-composer-tools-left">
+                <button type="button" class="projectx-attach-btn" id="heroAttachBtn" title="Attach documents, CSVs, mockups, or specs">
+                  <span>📎</span> Attach file
+                </button>
+                <span class="projectx-shortcut-hint">Enter ↵ to send · Shift+Enter newline</span>
               </div>
 
-              <button id="heroMaterializeBtn" class="btn btn-primary btn-lg">
-                <span>✦ Materialize Creation</span>
+              <button id="heroMaterializeBtn" class="projectx-send-btn">
+                <span>Send</span>
                 <span>→</span>
               </button>
             </div>
           </div>
 
-          <!-- Embedded Substance Showcase Frame -->
-          <div class="hero-simulation-frame">
-            <div class="sim-canvas-viewport">
-              <div class="sim-overlay-hud">
-                <span class="hud-pill">● 60 FPS LIVE GRAVITATIONAL SIMULATION</span>
-                <span class="hud-pill">INTERACTIVE DRAG & DROP MASS</span>
-              </div>
-              <canvas id="heroCanvas" width="720" height="480"></canvas>
-            </div>
-
-            <div class="sim-sidebar">
-              <div>
-                <div class="pill-badge live" style="margin-bottom: 12px;">ACTIVE SUBSTANCE</div>
-                <h4>Orbital Physics Engine</h4>
-                <p>Calculates n-body gravitational trajectories, collision bounds, and velocity vectors in real time.</p>
-
-                <div class="sim-metrics-grid">
-                  <div class="sim-metric-card">
-                    <span>Frame Rate</span>
-                    <strong id="heroFps">60.0</strong>
-                  </div>
-                  <div class="sim-metric-card">
-                    <span>Bodies</span>
-                    <strong>12</strong>
-                  </div>
-                  <div class="sim-metric-card">
-                    <span>Primitives</span>
-                    <strong>14 Active</strong>
-                  </div>
-                  <div class="sim-metric-card">
-                    <span>Health</span>
-                    <strong style="color: var(--emerald);">100%</strong>
-                  </div>
-                </div>
-              </div>
-
-              <button class="btn btn-secondary btn-sm" data-action="quickPreset" style="width: 100%;">
-                Open Full Interactive Canvas →
-              </button>
-            </div>
+          <!-- Prompt Pills Row -->
+          <div class="projectx-chips-container">
+            <button class="projectx-chip-btn" data-intent="Build a modern web application with user accounts, search, and responsive layout">
+              ✦ Build a website
+            </button>
+            <button class="projectx-chip-btn" data-intent="Create a native-style mobile app with interactive screens and local state">
+              ✦ Create an app
+            </button>
+            <button class="projectx-chip-btn" data-intent="Make a playable 2D game with physics, particle effects, and high score tracking">
+              ✦ Make a game
+            </button>
+            <button class="projectx-chip-btn" data-intent="Start a specialty coffee shop business with unit economics, permits, and operations plan">
+              ✦ Start a business
+            </button>
+            <button class="projectx-chip-btn" data-intent="Plan a hardware prototype product from component specs to manufacturing timeline">
+              ✦ Plan a project
+            </button>
+            <button class="projectx-chip-btn" data-intent="Research market opportunity, competitor moats, and financial models for a vertical SaaS">
+              ✦ Research an idea
+            </button>
           </div>
         </main>
 
-        <!-- Narrative Scrollytelling Section -->
-        <section class="editorial-section" id="pipeline">
-          <div class="section-eyebrow">HOW INTENT BECOMES SUBSTANCE</div>
-          <h2 class="section-heading">The Autonomous Creation Pipeline</h2>
-          <p class="section-description">
-            From raw conversational intention to verified production software. The engine parses, generates, verifies, and self-heals in one continuous cycle.
-          </p>
+        <!-- Two Pillars Section: BUILD IT vs FIGURE IT OUT -->
+        <section class="projectx-section" id="pillars">
+          <div class="projectx-section-header">
+            <div class="projectx-section-eyebrow">DUAL CREATION CAPABILITIES</div>
+            <h2 class="projectx-section-title">Whatever you're trying to do, Project X adapts.</h2>
+            <p class="projectx-section-sub">
+              Whether it is digital software that can be coded, compiled, and deployed, or a real-world venture requiring structured guidance, research, and execution roadmaps.
+            </p>
+          </div>
 
-          <div class="pipeline-flow-grid">
-            <article class="pipeline-step-card">
-              <div>
-                <span class="step-number">STAGE 01</span>
-                <h3>Natural Expression</h3>
-                <p>Describe what you want without artificial boilerplate or technical constraints. Intent is accepted in any format.</p>
+          <div class="projectx-pillars-grid">
+            <!-- Pillar 1: BUILD IT -->
+            <article class="projectx-pillar-card">
+              <div class="projectx-pillar-badge group-a">
+                <span>✦</span> GROUP A · DIGITAL CREATION & CODE
               </div>
-              <span class="step-tag">RAW AMBITION</span>
+              <h3>BUILD IT</h3>
+              <p>
+                Turn an idea into a working digital product. Project X writes clean executable code, manages state, renders live interactive previews, runs zero-regression tests, and exports production-ready artifacts.
+              </p>
+              <div class="projectx-pillar-tags">
+                <span class="projectx-tag-pill">Websites</span>
+                <span class="projectx-tag-pill">Mobile Apps</span>
+                <span class="projectx-tag-pill">Games</span>
+                <span class="projectx-tag-pill">Tools & Dashboards</span>
+                <span class="projectx-tag-pill">APIs</span>
+                <span class="projectx-tag-pill">Automations</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" style="margin-top: 18px; width: 100%;" data-intent="Build an interactive SaaS dashboard with metrics, search filter, and CSV export">
+                Try Build Mode →
+              </button>
             </article>
 
-            <article class="pipeline-step-card">
-              <div>
-                <span class="step-number">STAGE 02</span>
-                <h3>Intent Decomposition</h3>
-                <p>The universal engine analyzes multi-domain requirements, entity structures, and runtime expectations.</p>
+            <!-- Pillar 2: FIGURE IT OUT -->
+            <article class="projectx-pillar-card">
+              <div class="projectx-pillar-badge group-b">
+                <span>⌁</span> GROUP B · REAL-WORLD & STRATEGY
               </div>
-              <span class="step-tag">DECOMPOSITION</span>
-            </article>
-
-            <article class="pipeline-step-card">
-              <div>
-                <span class="step-number">STAGE 03</span>
-                <h3>Capability Discovery</h3>
-                <p>Maps requirements dynamically onto the 14 Universal Primitives without forced SaaS clichés.</p>
+              <h3>FIGURE IT OUT</h3>
+              <p>
+                Break complex goals into practical steps, research, resources, and actions. Project X crafts comprehensive phased roadmaps, interactive budget matrices, vendor directories, permit checklists, and execution guides.
+              </p>
+              <div class="projectx-pillar-tags">
+                <span class="projectx-tag-pill">Local Business & Cafes</span>
+                <span class="projectx-tag-pill">Hardware Products</span>
+                <span class="projectx-tag-pill">Deep Research</span>
+                <span class="projectx-tag-pill">Skill Acquisition</span>
+                <span class="projectx-tag-pill">Execution Roadmaps</span>
               </div>
-              <span class="step-tag">PRIMITIVE SYNTHESIS</span>
-            </article>
-
-            <article class="pipeline-step-card">
-              <div>
-                <span class="step-number">STAGE 04</span>
-                <h3>Substance Assembly</h3>
-                <p>Generates clean, executable code, state models, interactive canvases, and responsive viewports.</p>
-              </div>
-              <span class="step-tag">GENERATION</span>
-            </article>
-
-            <article class="pipeline-step-card">
-              <div>
-                <span class="step-number">STAGE 05</span>
-                <h3>Autonomous Verification</h3>
-                <p>Executes synthetic user journeys, verifies security boundaries, and checks runtime stability.</p>
-              </div>
-              <span class="step-tag">TEST MATRIX</span>
-            </article>
-
-            <article class="pipeline-step-card">
-              <div>
-                <span class="step-number">STAGE 06</span>
-                <h3>Self-Healing Repair</h3>
-                <p>Catches defects immediately, isolates root cause, takes pre-repair snapshots, and verifies mutation passes.</p>
-              </div>
-              <span class="step-tag">CONTINUOUS RECOVERY</span>
+              <button class="btn btn-secondary btn-sm" style="margin-top: 18px; width: 100%;" data-intent="Open a boutique coffee roastery and cafe with $50k budget, equipment sourcing, and permit plan">
+                Try Guidance Mode →
+              </button>
             </article>
           </div>
         </section>
 
-        <!-- Adaptive Workspace Morphing Showcase -->
-        <section class="editorial-section" id="morph">
-          <div class="section-eyebrow">CONTEXTUAL INTELLIGENCE</div>
-          <h2 class="section-heading">Workspaces That Shape Themselves</h2>
-          <p class="section-description">
-            A physics simulation needs orbital telemetry; a venture model needs cash-flow matrices; a game needs collision controls. The interface morphs to match the craft.
-          </p>
+        <!-- 7-Stage Creation Pipeline -->
+        <section class="projectx-section" id="pipeline" style="border-top: 1px solid var(--line);">
+          <div class="projectx-section-header">
+            <div class="projectx-section-eyebrow">THE ARCHITECTURE</div>
+            <h2 class="projectx-section-title">How Project X Works</h2>
+            <p class="projectx-section-sub">
+              From initial intention to verified substance. The system understands your goal, asks what is missing, plans the architecture, builds or guides, and continuously adapts.
+            </p>
+          </div>
 
-          <div class="morph-showcase-wrap">
-            <div class="morph-tab-bar">
-              <button class="morph-tab ${ui.morphTab==='astronomy'?'active':''}" data-morph-tab="astronomy">✦ Astrophysics Laboratory</button>
-              <button class="morph-tab ${ui.morphTab==='game'?'active':''}" data-morph-tab="game">✦ 2D Vector Game Engine</button>
-              <button class="morph-tab ${ui.morphTab==='venture'?'active':''}" data-morph-tab="venture">✦ Venture Financial Model</button>
-              <button class="morph-tab ${ui.morphTab==='world'?'active':''}" data-morph-tab="world">✦ Worldbuilding Codex</button>
+          <div class="projectx-pipeline-grid">
+            <div class="projectx-step-card">
+              <span class="projectx-step-num">01</span>
+              <span class="projectx-step-name">INTENTION</span>
+              <p class="projectx-step-desc">Express your idea, goal, or problem freely without boilerplate syntax.</p>
             </div>
 
-            <div class="morph-viewport">
+            <div class="projectx-step-card">
+              <span class="projectx-step-num">02</span>
+              <span class="projectx-step-name">UNDERSTAND</span>
+              <p class="projectx-step-desc">Classifies digital build vs. real-world guidance and deconstructs core entities.</p>
+            </div>
+
+            <div class="projectx-step-card">
+              <span class="projectx-step-num">03</span>
+              <span class="projectx-step-name">ASK</span>
+              <p class="projectx-step-desc">Surfaces targeted clarifying questions when essential context or constraints are missing.</p>
+            </div>
+
+            <div class="projectx-step-card">
+              <span class="projectx-step-num">04</span>
+              <span class="projectx-step-name">PLAN</span>
+              <p class="projectx-step-desc">Constructs a transparent architecture blueprint or phased execution roadmap.</p>
+            </div>
+
+            <div class="projectx-step-card">
+              <span class="projectx-step-num">05</span>
+              <span class="projectx-step-name">BUILD / GUIDE</span>
+              <p class="projectx-step-desc">Writes executable code or generates operational financial models and checklists.</p>
+            </div>
+
+            <div class="projectx-step-card">
+              <span class="projectx-step-num">06</span>
+              <span class="projectx-step-name">VERIFY</span>
+              <p class="projectx-step-desc">Executes synthetic user journeys, verifies security bounds, or validates budgets.</p>
+            </div>
+
+            <div class="projectx-step-card">
+              <span class="projectx-step-num">07</span>
+              <span class="projectx-step-name">ADAPT</span>
+              <p class="projectx-step-desc">Self-heals runtime defects, refines based on prompts, and evolves continuously.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Adaptive Workspace Demonstration -->
+        <section class="projectx-section" id="demo" style="border-top: 1px solid var(--line);">
+          <div class="projectx-section-header">
+            <div class="projectx-section-eyebrow">CONTEXTUAL INTERFACES</div>
+            <h2 class="projectx-section-title">Workspaces that shape themselves to the craft</h2>
+            <p class="projectx-section-sub">
+              An online store needs product catalogs and checkout carts. A cafe business needs budget projections and permit checklists. Project X changes its interface based on what you are creating.
+            </p>
+          </div>
+
+          <div class="projectx-demo-wrap">
+            <div class="projectx-demo-nav">
+              <button class="projectx-demo-tab ${ui.morphTab==='website' || !ui.morphTab || ui.morphTab==='astronomy'?'active':''}" data-morph-tab="website">
+                ✦ Website (Group A)
+              </button>
+              <button class="projectx-demo-tab ${ui.morphTab==='cafe'?'active':''}" data-morph-tab="cafe">
+                ✦ Cafe / Business (Group B)
+              </button>
+              <button class="projectx-demo-tab ${ui.morphTab==='game'?'active':''}" data-morph-tab="game">
+                ✦ Playable Game (Group A)
+              </button>
+              <button class="projectx-demo-tab ${ui.morphTab==='hardware'?'active':''}" data-morph-tab="hardware">
+                ✦ Hardware Product (Group B)
+              </button>
+            </div>
+
+            <div class="projectx-demo-body">
               ${renderMorphTabContent()}
             </div>
           </div>
         </section>
 
-        <!-- Autonomous Self-Healing & Diagnostic Gate Demonstration -->
-        <section class="editorial-section" id="selfheal">
-          <div class="section-eyebrow">RESILIENCE ARCHITECTURE</div>
-          <h2 class="section-heading">Autonomous Self-Healing Loop</h2>
-          <p class="section-description">
-            Experience how the troubleshooting agent catches live exceptions, analyzes root causes, creates pre-repair snapshots, and verifies fixes automatically.
-          </p>
+        <!-- Autonomous Self-Healing & Defect Diagnostic Demonstration -->
+        <section class="projectx-section" id="selfheal" style="border-top: 1px solid var(--line);">
+          <div class="projectx-section-header">
+            <div class="projectx-section-eyebrow">ZERO-REGRESSION RESILIENCE</div>
+            <h2 class="projectx-section-title">Autonomous Self-Healing Loop</h2>
+            <p class="projectx-section-sub">
+              Watch how the Project X troubleshooting agent catches anomalies, isolates root causes, creates pre-repair snapshots, and verifies fixes automatically.
+            </p>
+          </div>
 
           <div class="self-heal-box">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
               <div>
-                <strong style="font-size: 18px; display: block;">Interactive Defect Recovery Demonstration</strong>
+                <strong style="font-size: 18px; display: block; color: var(--ink);">Interactive Defect Recovery Simulation</strong>
                 <span style="font-size: 13px; color: var(--muted);">Click to inject a simulated defect and observe the autonomous resolution loop.</span>
               </div>
               <div style="display: flex; gap: 8px;">
@@ -1677,83 +1976,108 @@ if (typeof window !== 'undefined') window.Engine = Engine;
           </div>
         </section>
 
-        <!-- Creation Spectrum Gallery -->
-        <section class="editorial-section" id="gallery">
-          <div class="section-eyebrow">CREATION SPECTRUM</div>
-          <h2 class="section-heading">Things Worth Making</h2>
-          <p class="section-description">
-            Explore diverse creations materialized by the universal creation engine. Click any creation to launch it directly in your workspace.
-          </p>
+        <!-- Frequently Asked Questions -->
+        <section class="projectx-section" id="faq" style="border-top: 1px solid var(--line);">
+          <div class="projectx-section-header">
+            <div class="projectx-section-eyebrow">COMMON QUESTIONS</div>
+            <h2 class="projectx-section-title">Frequently Asked Questions</h2>
+            <p class="projectx-section-sub">
+              Everything you need to know about Project X, autonomous creation, and adaptive workspaces.
+            </p>
+          </div>
 
-          <div class="gallery-editorial-grid">
-            <article class="gallery-item-card">
-              <div>
-                <div class="gallery-item-top">
-                  <span class="pill-badge">ASTRONOMY & PHYSICS</span>
-                  <span style="font-family: var(--font-mono); font-size: 11px; color: var(--muted);">60 FPS</span>
-                </div>
-                <h3>Orbital Astrophysics Lab</h3>
-                <p>N-body gravity simulation with adaptive lesson modules, live orbital trail rendering, and planetary mass manipulation.</p>
+          <div class="projectx-faq-list">
+            <div class="projectx-faq-item">
+              <button class="projectx-faq-question" data-toggle-faq="0">
+                <span>What is the difference between Group A and Group B?</span>
+                <span>▾</span>
+              </button>
+              <div class="projectx-faq-answer" id="faqAns0">
+                Group A covers digital creations that can be built, coded, compiled, and deployed directly inside Project X (e.g. websites, mobile apps, games, dashboards, and APIs). Group B covers real-world projects that cannot be compiled into software (e.g. opening a cafe, planning a physical hardware product, or learning a skill). For Group B, Project X creates operational plans, financial models, checklists, and step-by-step guidance.
               </div>
-              <button class="btn btn-secondary btn-sm" data-launch-preset="astronomy">Launch in Engine →</button>
-            </article>
+            </div>
 
-            <article class="gallery-item-card">
-              <div>
-                <div class="gallery-item-top">
-                  <span class="pill-badge">GAME RUNTIME</span>
-                  <span style="font-family: var(--font-mono); font-size: 11px; color: var(--muted);">2D CANVAS</span>
-                </div>
-                <h3>Vector Space Arcade</h3>
-                <p>High-speed vector arcade with particle thrusters, collision matrices, procedural asteroid fields, and high-score memory.</p>
+            <div class="projectx-faq-item">
+              <button class="projectx-faq-question" data-toggle-faq="1">
+                <span>Can I export the code and host it anywhere?</span>
+                <span>▾</span>
+              </button>
+              <div class="projectx-faq-answer" id="faqAns1" style="display:none;">
+                Yes. Every digital creation in Project X uses standard, clean HTML, CSS, and modern TypeScript/JavaScript without vendor lock-in. You can download a full ZIP bundle of your project at any time and host it on Vercel, Netlify, Cloud Run, GitHub Pages, or your own servers.
               </div>
-              <button class="btn btn-secondary btn-sm" data-launch-preset="game">Launch in Engine →</button>
-            </article>
+            </div>
 
-            <article class="gallery-item-card">
-              <div>
-                <div class="gallery-item-top">
-                  <span class="pill-badge">FINANCE & VENTURE</span>
-                  <span style="font-family: var(--font-mono); font-size: 11px; color: var(--muted);">MATRIX ENGINE</span>
-                </div>
-                <h3>Venture Economics Engine</h3>
-                <p>Interactive 5-year discounted cash flow forecasting with dynamic unit economics, sensitivity sliders, and Monte Carlo curves.</p>
+            <div class="projectx-faq-item">
+              <button class="projectx-faq-question" data-toggle-faq="2">
+                <span>How does Project X handle missing details or ambiguous prompts?</span>
+                <span>▾</span>
+              </button>
+              <div class="projectx-faq-answer" id="faqAns2" style="display:none;">
+                Project X never forces you into generic templates. During the intake stage, if essential requirements are missing, the AI Assistant surfaces focused clarifying questions. You can answer them or let the system apply sensible industry defaults.
               </div>
-              <button class="btn btn-secondary btn-sm" data-launch-preset="venture">Launch in Engine →</button>
-            </article>
+            </div>
+
+            <div class="projectx-faq-item">
+              <button class="projectx-faq-question" data-toggle-faq="3">
+                <span>Can I bring my own AI API keys and models?</span>
+                <span>▾</span>
+              </button>
+              <div class="projectx-faq-answer" id="faqAns3" style="display:none;">
+                Yes. Under Settings → AI Behavior & Models, you can connect your own API keys for Google Gemini, NVIDIA NIM, OpenAI, Anthropic, OpenRouter, or OpenAI-compatible endpoints. All credentials are encrypted and proxied server-side.
+              </div>
+            </div>
           </div>
         </section>
 
-        <!-- Footer -->
-        <footer style="border-top: 1px solid var(--line); padding: 48px 36px; text-align: center; font-size: 13px; color: var(--muted);">
-          <div style="display: flex; justify-content: center; gap: 24px; margin-bottom: 16px;">
-            <a href="privacy.html" class="nav-link">Privacy Policy</a>
-            <a href="terms.html" class="nav-link">Terms of Service</a>
-            <a href="billing.html" class="nav-link">Billing & Plans</a>
+        <!-- Final Call to Action -->
+        <section class="projectx-section" style="text-align: center; padding: 72px 24px; border-top: 1px solid var(--line);">
+          <div class="projectx-hero-eyebrow" style="margin-bottom: 14px;">READY TO CREATE?</div>
+          <h2 class="projectx-hero-title" style="font-size: clamp(32px, 4.5vw, 46px); margin-bottom: 14px;">
+            Start with an idea.
+          </h2>
+          <p class="projectx-hero-subtitle" style="margin-bottom: 28px;">
+            Tell Project X what's on your mind. We'll handle the rest.
+          </p>
+          <button class="projectx-send-btn" data-action="quickPreset" style="padding: 12px 28px; font-size: 15px; margin: 0 auto;">
+            Start with Project X →
+          </button>
+        </section>
+
+        <!-- Public Footer -->
+        <footer style="border-top: 1px solid var(--line); padding: 42px 36px; text-align: center; font-size: 13px; color: var(--muted); background: var(--surface);">
+          <div style="display: flex; justify-content: center; gap: 24px; margin-bottom: 16px; flex-wrap: wrap;">
+            <a href="privacy.html" class="projectx-nav-link">Privacy Policy</a>
+            <a href="terms.html" class="projectx-nav-link">Terms of Service</a>
+            <a href="billing.html" class="projectx-nav-link">Billing & Plans</a>
           </div>
-          <p>© 2026 Universal Creation Engine. Architectural precision for human ambition.</p>
+          <p style="margin: 0;">© 2026 Project X. Autonomous adaptive creation for human ambition.</p>
         </footer>
 
-        <!-- Authentication Modal Overlay -->
+        <!-- Authentication Modal Overlay with Prompt Preservation -->
         ${showModal ? `
           <div class="auth-modal-overlay">
             <div class="auth-card-editorial">
               <button id="authCloseBtn" class="auth-close-btn" aria-label="Close authentication modal">✕</button>
 
+              ${state.pendingLaunch ? `
+                <div class="saved-prompt-card">
+                  <div class="saved-prompt-header">
+                    <span class="check-badge">✓</span>
+                    <strong>We saved your prompt.</strong>
+                  </div>
+                  <div class="saved-prompt-sub">
+                    Create a Project X account to start.
+                  </div>
+                  <div class="saved-prompt-content">
+                    "${esc(state.pendingLaunch.intent)}"
+                  </div>
+                </div>
+              ` : ""}
+
               ${ui.authMode === "forgotPassword" ? `
                 <div class="pill-badge" style="margin-bottom: 8px;">PASSWORD RECOVERY</div>
                 <h2>Forgot your password?</h2>
                 <p>Enter the email associated with your account and we'll send you a secure reset link.</p>
-
-                ${state.pendingLaunch ? `
-                  <div class="pending-creation-banner" style="padding: 12px 14px; background: var(--surface-raised); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); margin-bottom: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px;">
-                      <span style="color: var(--emerald);">✦</span> READY TO MATERIALIZE
-                    </div>
-                    <div style="font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 4px;">${esc(state.pendingLaunch.title)}</div>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(state.pendingLaunch.intent)}</div>
-                  </div>
-                ` : ""}
 
                 ${ui.authNotice ? `
                   <div class="auth-notice-banner" style="padding: 12px 14px; background: var(--surface-subtle); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); font-size: 13px; color: var(--ink); margin-bottom: 16px; line-height: 1.5;">
@@ -1789,16 +2113,6 @@ if (typeof window !== 'undefined') window.Engine = Engine;
                 <h2>Create a new password</h2>
                 <p>Enter and confirm your new password below to update your account credentials.</p>
 
-                ${state.pendingLaunch ? `
-                  <div class="pending-creation-banner" style="padding: 12px 14px; background: var(--surface-raised); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); margin-bottom: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px;">
-                      <span style="color: var(--emerald);">✦</span> READY TO MATERIALIZE
-                    </div>
-                    <div style="font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 4px;">${esc(state.pendingLaunch.title)}</div>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(state.pendingLaunch.intent)}</div>
-                  </div>
-                ` : ""}
-
                 ${ui.authNotice ? `
                   <div class="auth-notice-banner" style="padding: 12px 14px; background: var(--surface-subtle); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); font-size: 13px; color: var(--ink); margin-bottom: 16px; line-height: 1.5;">
                     <div style="display: flex; gap: 8px; align-items: flex-start;">
@@ -1832,19 +2146,9 @@ if (typeof window !== 'undefined') window.Engine = Engine;
                   </div>
                 `}
               ` : `
-                <div class="pill-badge" style="margin-bottom: 8px;">CREATOR ACCESS GATE</div>
-                <h2>${state.pendingLaunch ? "Sign in to continue" : (sign ? "Create your workspace" : "Welcome back")}</h2>
-                <p>${state.pendingLaunch ? `Your creation <strong>"${esc(state.pendingLaunch.title)}"</strong> will be ready when you return.` : (sign ? "Turn any ambition into a working creation." : "Continue building where you left off.")}</p>
-
-                ${state.pendingLaunch ? `
-                  <div class="pending-creation-banner" style="padding: 12px 14px; background: var(--surface-raised); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); margin-bottom: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px;">
-                      <span style="color: var(--emerald);">✦</span> READY TO MATERIALIZE
-                    </div>
-                    <div style="font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 4px;">${esc(state.pendingLaunch.title)}</div>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(state.pendingLaunch.intent)}</div>
-                  </div>
-                ` : ""}
+                <div class="pill-badge" style="margin-bottom: 8px;">PROJECT X ACCOUNT</div>
+                <h2>${state.pendingLaunch ? "Start with Project X" : (sign ? "Create your workspace" : "Welcome back")}</h2>
+                <p>${state.pendingLaunch ? `Your prompt is saved. Create an account or continue to materialize your project.` : (sign ? "Turn any ambition into a working creation." : "Continue building where you left off.")}</p>
 
                 ${ui.authNotice ? `
                   <div class="auth-notice-banner" style="padding: 12px 14px; background: var(--surface-subtle); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); font-size: 13px; color: var(--ink); margin-bottom: 16px; line-height: 1.5;">
@@ -1857,7 +2161,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
                 ${!CONFIGURED ? `
                   <div style="padding: 10px 14px; background: var(--amber-surface); border: 1px solid var(--amber-line); border-radius: var(--radius-sm); font-size: 12px; color: var(--amber); margin-bottom: 16px;">
-                    Instant Demo Session active. Full persistence available.
+                    ⚡ Instant Demo Session active. Full workspace creation enabled.
                   </div>
                 ` : ""}
 
@@ -1907,97 +2211,189 @@ if (typeof window !== 'undefined') window.Engine = Engine;
   }
 
   function renderMorphTabContent(){
-    const tab=ui.morphTab||"astronomy";
+    const tab=ui.morphTab||"website";
+    if(tab==="cafe" || tab==="venture"){
+      return `
+        <div class="group-b-container">
+          <div class="projectx-demo-tabs-bar">
+            <span class="projectx-mini-tab active">Chat</span>
+            <span class="projectx-mini-tab">Goal & Strategy</span>
+            <span class="projectx-mini-tab">Plan</span>
+            <span class="projectx-mini-tab">Research</span>
+            <span class="projectx-mini-tab">Budget & Financials</span>
+            <span class="projectx-mini-tab">Checklist</span>
+            <span class="projectx-mini-tab">Timeline</span>
+            <span class="projectx-mini-tab">Resources</span>
+          </div>
+
+          <div class="group-b-hero-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+              <div>
+                <span class="projectx-pillar-badge group-b">GROUP B · STRATEGIC GUIDANCE</span>
+                <h3 style="margin:6px 0 2px 0; font-family:var(--font-display); font-size:20px;">Artisan Coffee Roastery & Cafe</h3>
+                <p style="margin:0; font-size:13px; color:var(--muted);">$50,000 CapEx Budget · 120 Daily Customer Target · 8-Month Break-Even</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" data-intent="Open an artisan coffee roastery and cafe with $50k budget, equipment sourcing, and permit plan">Launch Full Plan →</button>
+            </div>
+
+            <div class="group-b-stats-row">
+              <div class="group-b-stat-box">
+                <small>Initial CapEx</small>
+                <b>$48,500</b>
+              </div>
+              <div class="group-b-stat-box">
+                <small>Monthly OpEx</small>
+                <b>$14,200</b>
+              </div>
+              <div class="group-b-stat-box">
+                <small>Avg Ticket Size</small>
+                <b>$6.80</b>
+              </div>
+              <div class="group-b-stat-box">
+                <small>Permit Readiness</small>
+                <b style="color:var(--emerald);">4/6 Approved</b>
+              </div>
+            </div>
+          </div>
+
+          <div class="group-b-checklist">
+            <strong style="font-size:14px; margin-bottom:4px; display:block;">Phase 1: Location & Licensing Checklist</strong>
+            <label class="group-b-check-item done">
+              <input type="checkbox" checked disabled>
+              <span>Secure commercial retail lease in high-density foot traffic zone</span>
+            </label>
+            <label class="group-b-check-item done">
+              <input type="checkbox" checked disabled>
+              <span>Submit municipal food handler & health department permit application</span>
+            </label>
+            <label class="group-b-check-item">
+              <input type="checkbox" disabled>
+              <span>Source commercial espresso machine & water filtration system</span>
+            </label>
+            <label class="group-b-check-item">
+              <input type="checkbox" disabled>
+              <span>Establish wholesale single-origin green coffee bean vendor contract</span>
+            </label>
+          </div>
+        </div>`;
+    }
     if(tab==="game"){
       return `
-        <div class="morph-panel">
-          <div class="morph-preview-box">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 14px;">
-              <strong>[GAME] 2D Vector Arcade Runtime</strong>
-              <span class="pill-badge live">60 FPS ACTIVE</span>
-            </div>
-            <div style="height: 240px; background: #0b0c0b; border-radius: 8px; display: grid; place-items: center; color: #a5f3fc; font-family: var(--font-mono); font-size: 14px; border: 1px solid rgba(255,255,255,0.1);">
-              [ Vector Thruster Canvas & Particle Physics Sandbox ]
-            </div>
+        <div>
+          <div class="projectx-demo-tabs-bar">
+            <span class="projectx-mini-tab active">Preview / Play</span>
+            <span class="projectx-mini-tab">Code (game.js)</span>
+            <span class="projectx-mini-tab">Blueprint</span>
+            <span class="projectx-mini-tab">Tests</span>
+            <span class="projectx-mini-tab">Export</span>
           </div>
-          <div class="morph-details-box">
-            <h4 style="font-size: 20px;">Game Runtime Topology</h4>
-            <p style="font-size: 13px; color: var(--muted); line-height: 1.6;">
-              Automatically configures high-performance RAF requestAnimationFrame loops, keyboard state buffers, and SAT collision solvers.
-            </p>
-            <div class="pill-badge" style="width: max-content;">PRIMITIVES: SIMULATE + INPUT + PERSIST</div>
+
+          <div style="background: #090c15; border: 1px solid #1e293b; border-radius: var(--radius-md); padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center;">
+            <div style="height: 220px; background: #050811; border: 1px solid #334155; border-radius: 8px; display: grid; place-items: center; text-align: center; color: #38bdf8; font-family: var(--font-mono); font-size: 13px;">
+              <div>
+                <div style="font-size: 28px; margin-bottom: 6px;">🚀</div>
+                <div>Space Defender · 60 FPS Canvas</div>
+                <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Score: 240 · Shields: 3 · Active Lasers: 6</div>
+              </div>
+            </div>
+
+            <div>
+              <span class="projectx-pillar-badge group-a">GROUP A · GAME ENGINE</span>
+              <h4 style="font-size: 18px; margin: 4px 0 8px 0; color: #f8fafc;">2D Space Arcade Runtime</h4>
+              <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin: 0 0 14px 0;">
+                Autonomous 60fps requestAnimationFrame loop with physics bounds, particle explosion bursts, mobile touch controls, and high-score memory.
+              </p>
+              <button class="btn btn-primary btn-sm" data-intent="Build a 60fps retro 2D space shooter arcade game with lasers, particle explosions, and score tracking">
+                Launch Game in Studio →
+              </button>
+            </div>
           </div>
         </div>`;
     }
-    if(tab==="venture"){
+    if(tab==="hardware"){
       return `
-        <div class="morph-panel">
-          <div class="morph-preview-box">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 14px;">
-              <strong>[FINANCE] Venture DCF Valuation Matrix</strong>
-              <span class="pill-badge live">REACTIVE MATRIX</span>
-            </div>
-            <div style="height: 240px; background: var(--surface); border-radius: 8px; padding: 16px; border: 1px solid var(--line); display: grid; gap: 8px; font-family: var(--font-mono); font-size: 12px;">
-              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6px;">
-                <span>Year 1 Revenue Proj:</span> <strong>₹2.4M ARR</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6px;">
-                <span>Gross Margin:</span> <strong>84.2%</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6px;">
-                <span>Net Present Value (NPV):</span> <strong>₹18.9M</strong>
-              </div>
-            </div>
+        <div class="group-b-container">
+          <div class="projectx-demo-tabs-bar">
+            <span class="projectx-mini-tab active">Goal & Specs</span>
+            <span class="projectx-mini-tab">Requirements</span>
+            <span class="projectx-mini-tab">Research & Sourcing</span>
+            <span class="projectx-mini-tab">BOM & Components</span>
+            <span class="projectx-mini-tab">Manufacturing Plan</span>
           </div>
-          <div class="morph-details-box">
-            <h4 style="font-size: 20px;">Financial Modeling Workspace</h4>
-            <p style="font-size: 13px; color: var(--muted); line-height: 1.6;">
-              Binds multi-variable slider formulas to SVG sensitivity charts and exportable CSV matrices.
-            </p>
-            <div class="pill-badge" style="width: max-content;">PRIMITIVES: TRANSFORM + VISUALIZE + EXPORT</div>
+
+          <div class="group-b-hero-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+              <div>
+                <span class="projectx-pillar-badge group-b">GROUP B · HARDWARE ENGINEERING</span>
+                <h3 style="margin:6px 0 2px 0; font-family:var(--font-display); font-size:20px;">IoT Ambient Air Quality Monitor</h3>
+                <p style="margin:0; font-size:13px; color:var(--muted);">ESP32-S3 Microcontroller · NDIR CO2 Sensor · E-Ink Display · Custom Enclosure</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" data-intent="Design a physical IoT indoor air quality monitor with ESP32, e-ink display, sensor BOM, and enclosure specs">Launch Hardware Spec →</button>
+            </div>
+
+            <div class="group-b-stats-row">
+              <div class="group-b-stat-box">
+                <small>Target BOM Cost</small>
+                <b>$24.50 / unit</b>
+              </div>
+              <div class="group-b-stat-box">
+                <small>Battery Life</small>
+                <b>90 Days</b>
+              </div>
+              <div class="group-b-stat-box">
+                <small>Prototypes Tested</small>
+                <b>Rev 2 PCB</b>
+              </div>
+              <div class="group-b-stat-box">
+                <small>FCC Pre-Scan</small>
+                <b style="color:var(--emerald);">Compliant</b>
+              </div>
+            </div>
           </div>
         </div>`;
     }
-    if(tab==="world"){
-      return `
-        <div class="morph-panel">
-          <div class="morph-preview-box">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 14px;">
-              <strong>[MANUSCRIPT] Narrative Worldbuilding Codex</strong>
-              <span class="pill-badge live">GRAPH LINKED</span>
-            </div>
-            <div style="height: 240px; background: var(--surface); border-radius: 8px; padding: 16px; border: 1px solid var(--line); font-size: 13px; line-height: 1.6;">
-              <strong>Factions & Timeline:</strong>
-              <p style="color: var(--muted); margin-top: 6px;">Solar Guild ↔ Orbital Syndicate. Dependency graph links 24 characters across 4 primary story arcs.</p>
-            </div>
-          </div>
-          <div class="morph-details-box">
-            <h4 style="font-size: 20px;">Living Manuscript Codex</h4>
-            <p style="font-size: 13px; color: var(--muted); line-height: 1.6;">
-              Interlinks character registries, geographical timelines, and structured manuscript chapters.
-            </p>
-            <div class="pill-badge" style="width: max-content;">PRIMITIVES: ENTITY + GRAPH + NARRATIVE</div>
-          </div>
-        </div>`;
-    }
-    // Default astronomy
+    // Default website
     return `
-      <div class="morph-panel">
-        <div class="morph-preview-box">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 14px;">
-            <strong>[ASTROPHYSICS] Celestial Astrophysics Studio</strong>
-            <span class="pill-badge live">60 FPS ORBITS</span>
-          </div>
-          <div style="height: 240px; background: #0c0e12; border-radius: 8px; display: grid; place-items: center; color: #fde047; font-family: var(--font-mono); font-size: 14px; border: 1px solid rgba(255,255,255,0.1);">
-            [ Star Catalog & Gravitational Keplerian Orbit Model ]
-          </div>
+      <div>
+        <div class="projectx-demo-tabs-bar">
+          <span class="projectx-mini-tab active">Live Preview</span>
+          <span class="projectx-mini-tab">Code (index.html, styles.css)</span>
+          <span class="projectx-mini-tab">Blueprint</span>
+          <span class="projectx-mini-tab">Tests (41/41 Passed)</span>
+          <span class="projectx-mini-tab">Export & Deploy</span>
         </div>
-        <div class="morph-details-box">
-          <h4 style="font-size: 20px;">Astrophysics Laboratory</h4>
-          <p style="font-size: 13px; color: var(--muted); line-height: 1.6;">
-            Decomposes celestial mechanics into interactive coordinate grids, transit calculations, and step-by-step orbital exercises.
-          </p>
-          <div class="pill-badge" style="width: max-content;">PRIMITIVES: SIMULATE + LESSON + VISUALIZE</div>
+
+        <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 20px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: center;">
+          <div style="height: 220px; background: var(--surface-subtle); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 8px;">
+              <strong style="font-size: 13px;">SneakerVault · Spring Collection</strong>
+              <span class="pill-badge live" style="font-size: 10px;">Cart: 2 items ($320)</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div style="background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 11px;">
+                <b>Air Horizon Pro</b>
+                <div style="color: var(--muted);">$160 · In Stock</div>
+              </div>
+              <div style="background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 11px;">
+                <b>Velocity Matrix</b>
+                <div style="color: var(--muted);">$160 · In Stock</div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end;">
+              <button class="btn btn-primary btn-xs">Checkout ($320) →</button>
+            </div>
+          </div>
+
+          <div>
+            <span class="projectx-pillar-badge group-a">GROUP A · ECOMMERCE STORE</span>
+            <h4 style="font-size: 18px; margin: 4px 0 8px 0;">Production-Ready Web Application</h4>
+            <p style="font-size: 13px; color: var(--ink-secondary); line-height: 1.5; margin: 0 0 14px 0;">
+              Complete with catalog state, reactive shopping cart, modal checkout, and instant mobile responsiveness.
+            </p>
+            <button class="btn btn-primary btn-sm" data-intent="Build an ecommerce store with product grid, search filter, shopping cart, and checkout modal">
+              Open in Project X Studio →
+            </button>
+          </div>
         </div>
       </div>`;
   }
@@ -3867,11 +4263,55 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     return [...new Set(out)];
   }
 
+  function renderChatGateway(p){
+    return `
+      <div class="chat-gateway-container" style="display:flex;flex-direction:column;height:100vh;background:var(--surface);color:var(--ink);">
+        <header style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--surface);">
+          <button class="btn btn-ghost btn-sm" data-view="projects">
+            ← Projects
+          </button>
+          <div style="font-weight:600;font-size:15px;color:var(--ink);">
+            ${esc(p.title)}
+          </div>
+          <div style="width:70px;"></div>
+        </header>
+
+        <div style="flex:1;overflow-y:auto;padding:24px 20px;max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:16px;">
+          ${p.chat.map(msgHTML).join("")}
+        </div>
+
+        <div style="padding:16px 20px;border-top:1px solid var(--line);background:var(--surface);">
+          <div style="max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center;">
+            <textarea
+              id="chatInput"
+              rows="1"
+              placeholder="Type a message..."
+              style="flex:1;padding:12px 16px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-subtle);color:var(--ink);font-size:14px;outline:none;resize:none;"
+            >${esc(ui.composer)}</textarea>
+            <button
+              class="btn btn-primary"
+              id="sendBtn"
+              data-action="sendMessage"
+              style="padding:12px 20px;border-radius:var(--radius-md);font-weight:600;cursor:pointer;"
+              ${ui.thinking ? "disabled" : ""}
+            >
+              ${ui.thinking ? "…" : "→"}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function projectView(p){
     // Automatically sanitize any corrupted titles from chat concatenation
     if (p && p.title && /\b(i don'?t|it'?s|js ball)\b/i.test(p.title)) {
       p.title = p.title.replace(/\s+(i don'?t|it'?s|js ball)[\s\S]*/i, '').trim() || "Flappy Bird";
       saveLocal();
+    }
+
+    if (!p.requirementSatisfied || !p.understandingComplete) {
+      return renderChatGateway(p);
     }
 
     // Automatically clean up index.html if corrupted
@@ -3897,17 +4337,11 @@ if (typeof window !== 'undefined') window.Engine = Engine;
       }
     }
 
-    // Clean, intuitive 4-core workspace tabs
-    const coreTabs = [
-      { id: "preview", label: "Preview", desc: "Live running app" },
-      { id: "code", label: "Code", desc: "Files & editor" },
-      { id: "blueprint", label: "Blueprint", desc: "Specs & architecture" },
-      { id: "ship", label: "Export & Ship", desc: "Deploy & download" }
-    ];
-
-    // Standardize panel: default to "preview" if not set or legacy
-    if (!state.panel || state.panel === "discuss" || state.panel === "overview") {
-      state.panel = "preview";
+    // Adaptive workspace sections generated from intention & classification
+    const adaptiveSections = getAdaptiveWorkspaceSections(p);
+    const validPanelIds = adaptiveSections.map(s => s.id);
+    if (!state.panel || !validPanelIds.includes(state.panel) || state.panel === "discuss" || state.panel === "overview") {
+      state.panel = validPanelIds.includes("preview") ? "preview" : adaptiveSections[0].id;
     }
 
     // Default to split view on desktop for best studio experience
@@ -3975,13 +4409,10 @@ if (typeof window !== 'undefined') window.Engine = Engine;
             </div>
           </div>
 
-          <!-- Centered View Switcher -->
-          <div class="workspace-segmented-nav">
-            <button class="segmented-tab ${state.panel === "chat" ? "active" : ""}" data-panel="chat" title="AI Assistant Chat">
-              Chat
-            </button>
-            ${coreTabs.map(t => `
-              <button class="segmented-tab ${state.panel === t.id ? "active" : ""}" data-panel="${t.id}" title="${t.desc}">
+          <!-- Adaptive Section Navigation -->
+          <div class="workspace-segmented-nav" style="display:flex;gap:4px;overflow-x:auto;max-width:100%;padding-bottom:2px;">
+            ${adaptiveSections.map(t => `
+              <button class="segmented-tab ${state.panel === t.id ? "active" : ""}" data-panel="${t.id}" title="${t.desc}" style="white-space:nowrap;">
                 ${t.label}
               </button>
             `).join("")}
@@ -4156,6 +4587,18 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     $$('[data-suggest]').forEach(e=>
       e.addEventListener("click",()=>{
         const text = e.dataset.suggest;
+        ui.composer = text;
+        const input = $("#chatInput");
+        if(input) {
+          input.value = text;
+        }
+        sendMessage();
+      })
+    );
+
+    $$('[data-option-click]').forEach(e=>
+      e.addEventListener("click",()=>{
+        const text = e.dataset.optionClick;
         ui.composer = text;
         const input = $("#chatInput");
         if(input) {
@@ -5049,6 +5492,38 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
   function providerListHTML(){const known=["google","nvidia","openai","anthropic","openrouter","bytez","generic"];const labels={google:"Google Gemini",nvidia:"NVIDIA NIM",openai:"OpenAI",anthropic:"Anthropic",openrouter:"OpenRouter",bytez:"Bytez",generic:"OpenAI-compatible"};return `<div class="provider-grid">${known.map(id=>{const p=state.providers.find(x=>x.provider===id);return `<div class="provider-card ${p?"connected":""}"><div class="provider-top"><span class="provider-logo">${labels[id][0]}</span><div><b>${labels[id]}</b><small>${p?`Connected · ${esc(p.label||"Personal")}`:"Optional"}</small></div><span class="status-dot ${p?"on":""}"></span></div><p>${id==="generic"?"Bring an OpenAI-compatible endpoint.":"Connect this provider with one API key; models stay abstracted behind the router."}</p><div class="provider-actions"><button class="secondary small" data-provider="${id}">${p?"Reconnect":"Connect"}</button>${p?`<button class="secondary small danger-btn" data-provider-remove="${id}">Remove</button>`:""}</div></div>`}).join("")}</div>`}
 
+  function newModal(){
+    return `
+      <div class="modal-backdrop" data-close>
+        <div class="modal" data-stop>
+          <div class="modal-head">
+            <div>
+              <span class="section-label">CREATE NEW PROJECT</span>
+              <b>What would you like to create?</b>
+              <small>Describe your goal, website, app, or workflow.</small>
+            </div>
+            <button class="icon-btn" data-close>×</button>
+          </div>
+
+          <div style="margin-top:14px">
+            <textarea id="newText" class="textarea" rows="4" placeholder="e.g. A modern e-commerce storefront for artisan coffee...">${esc(ui.composer || "")}</textarea>
+          </div>
+
+          <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;">
+            <button class="suggestion-pill" data-example="A premium online sneaker shop with inventory and checkout">Shop</button>
+            <button class="suggestion-pill" data-example="A SaaS dashboard for tracking customer feedback">SaaS</button>
+            <button class="suggestion-pill" data-example="An AI support agent trained on my documentation">AI Agent</button>
+            <button class="suggestion-pill" data-example="A playable 2D game with levels and progression">Game</button>
+          </div>
+
+          <div class="modal-actions" style="margin-top:16px">
+            <button class="btn btn-secondary" data-close>Cancel</button>
+            <button class="btn btn-primary" id="createProjectBtn">Create Project →</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
   function providerModal(){if(!CONFIGURED)return `<div class="modal-backdrop" data-close><div class="modal compact" data-stop><div class="modal-head"><div><span class="section-label">BACKEND REQUIRED</span><b>Connect Supabase first</b><small>Provider credentials are stored by the authenticated Edge Function. GitHub Pages cannot store them safely by itself.</small></div><button class="icon-btn" data-close>×</button></div><div class="setup-inline"><b>What is missing</b><span>Supabase URL + publishable key in config.js, deployed schema, AI Edge Function and Auth.</span></div><div class="modal-actions"><button class="secondary" data-close>Close</button><button class="primary" data-view="setup">Open setup →</button></div></div></div>`;const id=ui.pendingProvider||"generic";const labels={google:"Google Gemini",nvidia:"NVIDIA NIM",openai:"OpenAI",anthropic:"Anthropic",openrouter:"OpenRouter",bytez:"Bytez",generic:"OpenAI-compatible"};return `<div class="modal-backdrop" data-close><div class="modal" data-stop><div class="modal-head"><div><b>Connect ${labels[id]}</b><small>One provider + API key. The router handles models internally.</small></div><button class="icon-btn" data-close>×</button></div><input type="hidden" id="providerId" value="${id}"><label>Provider</label><select id="providerSelect" class="select">${Object.entries(labels).map(([k,v])=>`<option value="${k}" ${k===id?"selected":""}>${v}</option>`).join("")}</select><label>Label</label><input id="providerLabel" class="input" placeholder="My AI key"><label>API key</label><div class="secret-field"><input id="providerKey" class="input" type="password" autocomplete="off" placeholder="Paste API key"><button id="toggleSecret" class="secondary small">Show</button></div>${id==="generic"?`<label>Compatible base URL</label><input id="providerBaseUrl" class="input" placeholder="https://example.com/v1">`:""}<div class="security-note">[SECURE] The frontend does not persist the raw key. Stored and validated exclusively on your authenticated backend.</div><div class="modal-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="saveProvider">Test & connect</button></div></div></div>`}
 
   function advancedAIModal(){
@@ -5267,6 +5742,22 @@ if (typeof window !== 'undefined') window.Engine = Engine;
         </div>
       </div>
     `;
+  }
+
+  function commandModal(){
+    return `<div class="modal-backdrop" data-close><div class="modal" data-stop><div class="modal-head"><div><b>Command Center</b><small>Quick actions and navigation</small></div><button class="icon-btn" data-close>×</button></div><div style="padding:16px 0"><input id="commandInput" class="input" placeholder="Type a command or search..."></div><div class="modal-actions"><button class="secondary" data-close>Close</button></div></div></div>`;
+  }
+
+  function searchModal(){
+    return `<div class="modal-backdrop" data-close><div class="modal" data-stop><div class="modal-head"><div><b>Search Project</b><small>Search across files and documentation</small></div><button class="icon-btn" data-close>×</button></div><div style="padding:16px 0"><input id="searchInput" class="input" placeholder="Search files..."></div><div class="modal-actions"><button class="secondary" data-close>Close</button></div></div></div>`;
+  }
+
+  function interviewModal(){
+    return `<div class="modal-backdrop" data-close><div class="modal" data-stop><div class="modal-head"><div><b>AI Project Interview</b><small>Clarify requirements with the AI partner</small></div><button class="icon-btn" data-close>×</button></div><div style="padding:16px 0"><p>Let's refine your project goals together.</p></div><div class="modal-actions"><button class="secondary" data-close>Close</button></div></div></div>`;
+  }
+
+  function outcomeModal(){
+    return `<div class="modal-backdrop" data-close><div class="modal" data-stop><div class="modal-head"><div><b>Outcome Summary</b><small>Review project deliverables</small></div><button class="icon-btn" data-close>×</button></div><div style="padding:16px 0"><p>All requirements and tests are successfully passing.</p></div><div class="modal-actions"><button class="secondary" data-close>Close</button></div></div></div>`;
   }
 
   function openModal(n){modal=n;renderModal()}
@@ -5648,30 +6139,25 @@ if (typeof window !== 'undefined') window.Engine = Engine;
     const isUser = m.role === "user";
     return `
       <div class="chat-message message ${m.role} ${m.error?"error":""}">
-        <div class="message-avatar message-mark" aria-label="${isUser ? "User" : "Builder"}">
+        <div class="message-avatar message-mark" aria-label="${isUser ? "User" : "Project X"}">
           ${isUser ? "Y" : "✦"}
         </div>
 
         <div class="message-body">
           <div class="message-meta">
-            <b>${isUser ? "You" : esc(AGENTS[m.mode]?.label||"Builder AI")}</b>
+            <b>${isUser ? "You" : "Project X"}</b>
             <small>${formatTime(m.ts)}</small>
           </div>
-
-          ${m.thinking ? `
-            <details class="thinking-block" open>
-              <summary>
-                <span>🧠 AI Reasoning & Architecture</span>
-              </summary>
-              <div class="thinking-content">
-                ${esc(m.thinking)}
-              </div>
-            </details>
-          ` : ""}
 
           <div class="message-text">
             ${esc(m.text)}
           </div>
+
+          ${m.options && m.options.length ? `
+            <div class="message-options-strip" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+              ${m.options.map(opt => `<button class="suggestion-pill" data-option-click="${esc(opt)}">${esc(opt)}</button>`).join("")}
+            </div>
+          ` : ""}
         </div>
       </div>`;
   }
@@ -5757,6 +6243,62 @@ if (typeof window !== 'undefined') window.Engine = Engine;
 
       case "code":
         return codePanel(p);
+
+      case "plan":
+      case "requirements":
+      case "design":
+        return blueprintPanel(p);
+
+      case "concept":
+        return conceptPanel(p);
+
+      case "location":
+        return locationPanel(p);
+
+      case "menu":
+      case "products":
+        return menuPanel(p);
+
+      case "operations":
+      case "suppliers":
+      case "legal":
+      case "marketing":
+      case "structure":
+      case "players":
+      case "training":
+      case "equipment":
+      case "venue":
+      case "components":
+      case "cost":
+      case "prototype":
+      case "manufacturing":
+        return operationsPanel(p);
+
+      case "sources":
+      case "notes":
+      case "analysis":
+      case "questions":
+      case "findings":
+        return researchPanel(p);
+
+      case "budget":
+        return startupDeckPanel(p);
+
+      case "resources":
+      case "checklist":
+      case "components":
+      case "assets":
+        return resourceCenterHTML(p);
+
+      case "test":
+      case "testing":
+        return qualityPanel("Automated tests & QA", p.tests || 100, "runTests", "Run tests");
+
+      case "export":
+        return shipPanel(p);
+
+      case "database":
+        return dataPanel(p);
 
       case "runs":
         return runsPanel(p);
@@ -7222,6 +7764,110 @@ if (typeof window !== 'undefined') window.Engine = Engine;
         if (t.dataset.restore) { restoreVersion(t.dataset.restore); return; }
       } catch (err) { console.error("Click core error", err); }
     }, true);
+  }
+
+  function conceptPanel(p) {
+    return `
+      <div class="panel">
+        <div class="domain-card-header">
+          <div>
+            <span class="section-label">PROJECT CONCEPT & VISION</span>
+            <h3>${esc(p.title)}</h3>
+            <p>${esc(p.intention || "Defining core vision, theme, and target audience.")}</p>
+          </div>
+        </div>
+        <div class="card-grid" style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+          <div class="card" style="padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface);">
+            <h4 style="margin-bottom:8px;font-weight:600;">Core Theme & Vibe</h4>
+            <p style="color:var(--muted);font-size:14px;line-height:1.5;">Immersive atmosphere centered around fan-favorite anime series, custom character-themed decor, LED neon lighting, and curated soundtracks.</p>
+          </div>
+          <div class="card" style="padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface);">
+            <h4 style="margin-bottom:8px;font-weight:600;">Target Audience</h4>
+            <p style="color:var(--muted);font-size:14px;line-height:1.5;">Anime enthusiasts, manga collectors, gaming communities, cosplayers, and local pop-culture fans looking for a community hub.</p>
+          </div>
+          <div class="card" style="padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface);">
+            <h4 style="margin-bottom:8px;font-weight:600;">Unique Value Proposition</h4>
+            <p style="color:var(--muted);font-size:14px;line-height:1.5;">Interactive cosplay photo booths, manga library lounge, themed seasonal beverage menu, and weekly community watch parties.</p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function locationPanel(p) {
+    return `
+      <div class="panel">
+        <div class="domain-card-header">
+          <div>
+            <span class="section-label">LOCATION & SITE PLANNING</span>
+            <h3>Real-Estate & Foot Traffic Strategy</h3>
+          </div>
+        </div>
+        <div style="margin-top:20px;display:flex;flex-direction:column;gap:16px;">
+          <div class="card" style="padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface);">
+            <h4 style="margin-bottom:6px;">Recommended Zones</h4>
+            <p style="color:var(--muted);font-size:14px;">High foot-traffic urban retail districts near transit stations, university campuses, or entertainment centers.</p>
+          </div>
+          <div class="card" style="padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface);">
+            <h4 style="margin-bottom:6px;">Space Requirements</h4>
+            <p style="color:var(--muted);font-size:14px;">1,200 - 1,800 sq ft. Zoning for food service (commercial kitchen exhaust, grease trap, ADA restrooms).</p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function menuPanel(p) {
+    return `
+      <div class="panel">
+        <div class="domain-card-header">
+          <div>
+            <span class="section-label">CURATED OFFERINGS</span>
+            <h3>Menu & Product Catalog</h3>
+          </div>
+        </div>
+        <div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;">
+          <div class="card" style="padding:16px;border:1px solid var(--line);border-radius:12px;">
+            <h4 style="margin-bottom:4px;">Signature Potions & Teas</h4>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Color-changing butterfly pea flower teas & matcha lattes.</p>
+            <b>Est. Margin: 75%</b>
+          </div>
+          <div class="card" style="padding:16px;border:1px solid var(--line);border-radius:12px;">
+            <h4 style="margin-bottom:4px;">Character Bento Boxes</h4>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Artisanal onigiri and character-shaped rice dishes.</p>
+            <b>Est. Margin: 65%</b>
+          </div>
+          <div class="card" style="padding:16px;border:1px solid var(--line);border-radius:12px;">
+            <h4 style="margin-bottom:4px;">Themed Pastries</h4>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Cat paw macarons and melonpan sweet buns.</p>
+            <b>Est. Margin: 70%</b>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function operationsPanel(p) {
+    return `
+      <div class="panel">
+        <div class="domain-card-header">
+          <div>
+            <span class="section-label">OPERATIONS & LOGISTICS</span>
+            <h3>Staffing, Compliance & Supply Chain</h3>
+          </div>
+        </div>
+        <div style="margin-top:20px;display:flex;flex-direction:column;gap:14px;">
+          <div class="card" style="padding:16px;border:1px solid var(--line);border-radius:12px;">
+            <h4 style="margin-bottom:4px;">Permits & Licenses</h4>
+            <p style="font-size:13px;color:var(--muted);">Food Service Establishment Permit, Health Department Certification, Business License, Signage Permits.</p>
+          </div>
+          <div class="card" style="padding:16px;border:1px solid var(--line);border-radius:12px;">
+            <h4 style="margin-bottom:4px;">Staffing Roster</h4>
+            <p style="font-size:13px;color:var(--muted);">Head Barista, Line Cook, Front-of-House Cosplay Baristas, Shift Supervisor.</p>
+          </div>
+          <div class="card" style="padding:16px;border:1px solid var(--line);border-radius:12px;">
+            <h4 style="margin-bottom:4px;">Supply Chain Vendors</h4>
+            <p style="font-size:13px;color:var(--muted);">Specialty tea importers, commercial bakery suppliers, merchandise distributors.</p>
+          </div>
+        </div>
+      </div>`;
   }
 
   initEngine();

@@ -1,6 +1,6 @@
 {
-  "name": "Builder — Universal Creation Engine",
-  "description": "Universal Creation Engine. Describe anything. Build it, test it, verify it, ship it.",
+  "name": "Project X",
+  "description": "Project X — Turn an idea, goal, or problem into something real. AI-powered creation, adaptive workspaces, and real-world guidance.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

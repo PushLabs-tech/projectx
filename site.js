@@ -3,12 +3,12 @@
   const C = window.BUILDER_CONFIG || {};
   const page = document.documentElement.dataset.page || 'app';
   const meta = {
-    app: { title: 'Builder — Universal Creation Engine', description: 'Turn an idea into a real project with focused AI agents for discussion, planning, building, visual refinement and research.' },
-    privacy: { title: 'Privacy Policy — Builder', description: 'Builder privacy policy and information about account, AI provider and analytics data.' },
-    terms: { title: 'Terms of Service — Builder', description: 'Builder terms of service.' },
-    thankyou: { title: 'Thank You — Builder', description: 'Your Builder account or payment flow has completed.' },
-    billing: { title: 'Billing — Builder', description: 'Manage Builder plans and subscriptions.' },
-    '404': { title: 'Page Not Found — Builder', description: 'The Builder page you requested could not be found.' }
+    app: { title: 'Project X — Turn an idea, goal, or problem into something real', description: 'Tell Project X what is on your mind. Project X understands, adapts, and builds or guides you to the outcome.' },
+    privacy: { title: 'Privacy Policy — Project X', description: 'Project X privacy policy and information about account, AI provider and data privacy.' },
+    terms: { title: 'Terms of Service — Project X', description: 'Project X terms of service.' },
+    thankyou: { title: 'Thank You — Project X', description: 'Your Project X account or payment flow has completed.' },
+    billing: { title: 'Billing & Plans — Project X', description: 'Manage Project X plans, intelligence tiers and usage.' },
+    '404': { title: 'Page Not Found — Project X', description: 'The Project X page you requested could not be found.' }
   }[page] || null;
   if (meta) {
     document.title = meta.title;
