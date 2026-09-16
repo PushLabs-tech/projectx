@@ -22,12 +22,10 @@ jobs:
           p = Path('app.js')
           s = p.read_text()
 
-          # Rebind controls after every render because render() replaces #appRoot HTML.
           render_anchor = '    renderShell();\n    renderModal();\n'
           if render_anchor in s and '    renderModal();\n    bindEvents();\n' not in s:
               s = s.replace(render_anchor, render_anchor + '    bindEvents();\n', 1)
 
-          # Add a capture-phase fallback for all declarative controls.
           marker = '  // CLICK_CORE_BRIDGE_V1\n'
           if marker not in s:
               anchor = '  initEngine();\n'
@@ -36,17 +34,150 @@ jobs:
                   raise SystemExit('initEngine anchor not found')
               s = s.replace(anchor, bridge + anchor, 1)
 
+          # ProjectX UX V2: one clean conversation first; derive the workspace from the intent.
+          marker2 = '  // PROJECTX_ADAPTIVE_UX_V2\n'
+          if marker2 not in s:
+              anchor2 = '  function bindAuth(){\n'
+              fn = r'''  // PROJECTX_ADAPTIVE_UX_V2
+  function projectXAdaptiveUX(){
+    const root = document.querySelector('#appRoot');
+    if (!root) return;
+
+    // Never show the generic personal welcome heading inside the product.
+    root.querySelectorAll('h1,h2,h3,[role="heading"]').forEach(el => {
+      const text = (el.textContent || '').trim();
+      if (/^welcome back\b/i.test(text)) el.classList.add('px-hide-generic-welcome');
+    });
+
+    const p = project();
+    if (!p || !state.projectId) return;
+
+    const intent = String(p.intention || p.intent || p.description || p.title || '').trim();
+    const type = detectType(intent);
+    const title = String(p.title || type || 'Project').trim();
+
+    let header = root.querySelector('.px-project-header');
+    if (!header) {
+      header = document.createElement('div');
+      header.className = 'px-project-header';
+      root.prepend(header);
+    }
+    header.innerHTML = `<div class="px-project-title">${esc(title)}</div>`;
+
+    // The first project state is intentionally just Chat. After the interviewer has
+    // enough information, the workspace exposes only the sections relevant to the task.
+    const hasAnswers = Number(ui.interviewStep || 0) > 0 || (Array.isArray(p.chat) && p.chat.length >= 2) || p.progress > 0;
+    const schemas = {
+      Website: ['Chat','Plan','Design','Preview','Code','Files','Test','Publish'],
+      App: ['Chat','Plan','Design','Preview','Code','Data','Test','Publish'],
+      Mobile: ['Chat','Plan','Design','Preview','Code','Data','Test','Publish'],
+      Game: ['Chat','Plan','Scenes','Assets','Code','Playtest','Test','Publish'],
+      Agent: ['Chat','Plan','Tools','Memory','Test','Deploy'],
+      Automation: ['Chat','Plan','Workflow','Integrations','Test','Deploy'],
+      API: ['Chat','Plan','Endpoints','Data','Test','Docs','Deploy'],
+      Data: ['Chat','Plan','Data','Analysis','Dashboard','Export'],
+      Document: ['Chat','Plan','Content','Review','Export'],
+      Presentation: ['Chat','Plan','Slides','Assets','Review','Export'],
+      Research: ['Chat','Research','Sources','Analysis','Findings','Report'],
+      'Business system': ['Chat','Plan','Customers','Operations','Analytics','Launch'],
+      'Creative project': ['Chat','Plan','Assets','Draft','Review','Export'],
+      Custom: ['Chat','Plan','Workspace','Output']
+    };
+    const sections = schemas[type] || schemas.App;
+
+    let nav = root.querySelector('.px-adaptive-sections');
+    if (!nav) {
+      nav = document.createElement('nav');
+      nav.className = 'px-adaptive-sections';
+      header.after(nav);
+    }
+    nav.innerHTML = sections.map((name, i) => `<button type="button" class="px-section ${i===0 ? 'active' : ''} ${!hasAnswers && i>0 ? 'px-section-pending' : ''}" data-px-section="${esc(name.toLowerCase())}">${esc(name)}</button>`).join('');
+
+    // Keep the original engine panels functional, but present them through the clean
+    // ProjectX section strip. Matching is intentionally semantic rather than brittle.
+    nav.querySelectorAll('[data-px-section]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wanted = btn.dataset.pxSection;
+        nav.querySelectorAll('.px-section').forEach(x => x.classList.toggle('active', x === btn));
+        const candidates = [...root.querySelectorAll('[data-panel]')];
+        const match = candidates.find(el => {
+          const panel = String(el.dataset.panel || '').toLowerCase();
+          const text = String(el.textContent || '').toLowerCase();
+          return panel === wanted || panel.includes(wanted) || text.trim() === wanted || text.includes(wanted);
+        });
+        if (match) match.click();
+        else if (wanted === 'chat') {
+          const chat = root.querySelector('textarea, input[placeholder*="message" i], input[placeholder*="tell" i]');
+          if (chat) chat.focus();
+        }
+      });
+    });
+
+    // Do not duplicate a second complicated tab system underneath ours.
+    root.querySelectorAll('[data-panel]').forEach(el => {
+      const parent = el.parentElement;
+      if (parent && parent.children.length >= 4 && !parent.classList.contains('px-adaptive-sections')) {
+        parent.classList.add('px-legacy-panel-strip');
+      }
+    });
+
+    // Before the interview is complete, visually keep the workspace focused on Chat.
+    if (!hasAnswers) {
+      nav.querySelectorAll('.px-section').forEach((el, i) => { if (i > 0) el.setAttribute('aria-disabled','true'); });
+    }
+  }
+
+'''
+              if anchor2 not in s:
+                  raise SystemExit('bindAuth anchor not found')
+              s = s.replace(anchor2, fn + anchor2, 1)
+
+          # Run after every render so the adaptive header/sections survive DOM replacement.
+          call_anchor = '    bindEvents();\n'
+          if '    projectXAdaptiveUX();\n' not in s and call_anchor in s:
+              s = s.replace(call_anchor, call_anchor + '    projectXAdaptiveUX();\n', 1)
+
           p.write_text(s)
           PY
 
-      - name: Syntax check
-        run: node --check app.js
+      - name: Simplify visual system
+        run: |
+          cat >> styles.css <<'CSS'
 
-      - name: Commit app fix
+/* ========================================================================
+   PROJECTX CLEAN UX V2
+   Keep the existing engine functional while removing visual complexity.
+   ======================================================================== */
+.px-hide-generic-welcome{display:none!important}
+.px-project-header{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px 8px;text-align:center}
+.px-project-title{font-family:var(--font-sans);font-size:clamp(24px,3vw,38px);font-weight:700;line-height:1.15;letter-spacing:-.035em;color:var(--ink)}
+.px-adaptive-sections{width:min(1100px,calc(100% - 32px));margin:8px auto 18px;display:flex;align-items:center;justify-content:center;gap:4px;overflow-x:auto;padding:4px;border-bottom:1px solid var(--line);scrollbar-width:none}
+.px-adaptive-sections::-webkit-scrollbar{display:none}
+.px-section{appearance:none;border:0;background:transparent;color:var(--muted);padding:9px 13px;font-size:12px;font-weight:600;white-space:nowrap;border-bottom:2px solid transparent;border-radius:0}
+.px-section:hover{color:var(--ink);background:var(--surface-subtle)}
+.px-section.active{color:var(--ink);border-bottom-color:var(--ink)}
+.px-section-pending{opacity:.55}
+.px-legacy-panel-strip{display:none!important}
+@media(max-width:720px){
+  .px-project-header{padding:20px 16px 6px}
+  .px-project-title{font-size:25px}
+  .px-adaptive-sections{width:calc(100% - 20px);justify-content:flex-start;margin-bottom:12px}
+  .px-section{padding:8px 10px;font-size:11px}
+}
+CSS
+
+      - name: Syntax and build checks
+        run: |
+          node --check app.js
+          npm install --no-audit --no-fund
+          npm test
+          npm run build
+
+      - name: Commit changes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app.js
+          git add app.js styles.css
           git diff --cached --quiet && exit 0
-          git commit -m 'fix: restore runtime click bindings'
+          git commit -m 'feat: simplify ProjectX adaptive workspace'
           git push
