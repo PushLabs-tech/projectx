@@ -33,13 +33,16 @@ jobs:
           p = Path('scripts/forensic_fix.py')
           s = p.read_text(encoding='utf-8')
           open_marker = "CORE = r'''"
-          close_marker = "\n'''\n\nwrite('projectx-core.js', CORE)"
+          write_marker = "\nwrite('projectx-core.js', CORE)"
           start = s.index(open_marker)
-          close = s.index(close_marker, start)
+          write_pos = s.index(write_marker, start)
+          close = s.rfind("\n'''", start, write_pos)
+          if close <= start:
+              raise SystemExit('CORE closing delimiter not found')
           inner = s[start + len(open_marker):close]
           if '"""' in inner:
               raise SystemExit('CORE payload contains a triple-double quote; refusing unsafe rewrite')
-          s = s[:start] + 'CORE = r"""' + inner + '"""' + s[close + len(close_marker):]
+          s = s[:start] + 'CORE = r"""' + inner + '"""' + s[close + len("\n'''"):]
           s = s.replace("\nprint('[forensic-fix] repository patched')\n'''\n\n# Basic preflight", "\nprint('[forensic-fix] repository patched')\n\n# Basic preflight", 1)
           old = "    start = source.find(marker)\n    if start < 0:\n        fail(f'function {name} not found')"
           new = "    start = source.find(marker)\n    if start >= 6 and source[start - 6:start] == 'async ':\n        start -= 6\n    if start < 0:\n        fail(f'function {name} not found')"
@@ -55,21 +58,24 @@ jobs:
         run: |
           ! grep -R -n "async async function" -- px-final.js projectx-core.js supabase/functions/ai/index.ts
           test ! -e projectx-output.js
+          grep -q "export function applyProjectMutation" projectx-core.js
+          grep -q "AUTHORITATIVE PROJECT CONTEXT v2" px-final.js
+          grep -q "function projectContext" supabase/functions/ai/index.ts
       - name: Diff check
         run: git diff --check
-      - name: Canonical mutation diagnosis
+      - name: Canonical mutation probe
         run: |
           node --input-type=module - <<'NODE'
           import { createProject, applySpecChange, validateSpec } from './projectx-core.js';
           const project = createProject({ title:'Probe', type:'Game', spec:{goal:'A browser game that avoids obstacles',users:['players'],requirements:['Avoid obstacles'],deliverables:['Playable game'],platform:'Web',game:{loop:'jump and avoid'}} });
           const before = project.specVersion;
-          console.log('BEFORE', before, JSON.stringify(project.spec));
           const result = applySpecChange(project, { features: { add:['Pause menu'] } });
-          console.log('RESULT', JSON.stringify(result));
-          console.log('AFTER', project.specVersion, JSON.stringify(project.spec));
-          console.log('APPLY_SPEC_CHANGE', applySpecChange.toString());
-          if (project.specVersion !== before + 1 || !project.spec.features.includes('Pause menu')) process.exit(1);
-          if (validateSpec({goal:'Build a study app for students',users:['students'],requirements:['cloud account sync'],constraints:['no backend'],deliverables:['working app'],platform:'mobile'},'Mobile').valid) process.exit(1);
+          console.log('MUTATION_RESULT', JSON.stringify(result));
+          console.log('MUTATION_VERSION', before, project.specVersion, JSON.stringify(project.spec.features));
+          if (project.specVersion !== before + 1) throw new Error('canonical mutation did not bump version');
+          if (!project.spec.features.includes('Pause menu')) throw new Error('canonical mutation did not add feature');
+          if (validateSpec({goal:'Build a study app for students',users:['students'],requirements:['cloud account sync'],constraints:['no backend'],deliverables:['working app'],platform:'mobile'},'Mobile').valid) throw new Error('semantic contradiction was accepted');
+          console.log('PASS: canonical mutation probe');
           NODE
       - name: Fix runtime regression test contract
         run: |
