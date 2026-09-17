@@ -30,6 +30,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p = Path('scripts/forensic_fix.py')
           s = p.read_text(encoding='utf-8')
           open_marker = "CORE = r'''"
@@ -51,8 +52,42 @@ jobs:
           python3 -m py_compile scripts/forensic_fix.py
       - name: Apply forensic fixes
         run: python3 scripts/forensic_fix.py
+      - name: Generated-source sanity
+        run: |
+          ! grep -R -n "async async function" -- px-final.js projectx-core.js supabase/functions/ai/index.ts
+          test ! -e projectx-output.js
       - name: Diff check
         run: git diff --check
+      - name: Canonical mutation probe
+        run: |
+          node --input-type=module - <<'NODE'
+          import { createProject, applySpecChange, validateSpec } from './projectx-core.js';
+          const project = createProject({
+            title: 'Probe', type: 'Game',
+            spec: {
+              goal: 'A browser game that avoids obstacles', users: ['players'],
+              requirements: ['Avoid obstacles'], deliverables: ['Playable game'], platform: 'Web',
+              game: { loop: 'jump and avoid' }
+            }
+          });
+          const before = project.specVersion;
+          applySpecChange(project, { features: { add: ['Pause menu'] } });
+          if (project.specVersion !== before + 1) throw new Error(`mutation did not bump version: ${project.specVersion} vs ${before + 1}`);
+          if (!project.spec.features.includes('Pause menu')) throw new Error('mutation did not add feature');
+          if (validateSpec({ goal: 'Build a study app for students', users: ['students'], requirements: ['cloud account sync'], constraints: ['no backend'], deliverables: ['working app'], platform: 'mobile' }, 'Mobile').valid) throw new Error('semantic contradiction was accepted');
+          console.log('PASS: canonical mutation probe');
+          NODE
+      - name: Fix runtime regression test contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('scripts/projectx-runtime-test.mjs')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r"applySpecChange\(game,\s*\{\s*features:\s*\['Pause menu'\]\s*\}\);", "applySpecChange(game, { features: { replace: ['Pause menu'] } });", s, count=1)
+          s=re.sub(r"assert\.equal\(game\.specVersion, before \+ 1\);", "assert.equal(game.specVersion, before + 1);\nassert.equal(game.tests.status, 'stale');", s, count=1)
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Syntax and regression tests
         run: npm test
       - name: Production build
