@@ -32,6 +32,7 @@ jobs:
           node --check site.js
           node --check dashboard-clean.js
           node --check clean-home.js
+          node --check px-final.js
       - name: Engine and regression tests
         run: npm test
       - name: Build production bundle
