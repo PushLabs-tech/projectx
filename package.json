@@ -1,29 +1,17 @@
 {
-  "name": "builder-universal-v15",
+  "name": "projectx",
   "private": true,
-  "version": "15.0.0",
+  "version": "31.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
-    "lint": "node --check app.js && node --check universal-engine.js && node scripts/smoke-test.mjs",
-    "serve": "npx serve .",
-    "check": "node scripts/smoke-test.mjs",
-    "check:app": "node --check app.js",
+    "check": "node --check px-final.js && node --check projectx-core.js && node scripts/projectx-runtime-test.mjs",
     "security:scan": "node scripts/security-scan.mjs",
-    "test:router": "node scripts/model-router-test.mjs",
-    "test:backend": "node scripts/backend-contract-test.mjs",
-    "test:runtime": "node scripts/runtime-harness-test.mjs",
-    "test:adaptive": "node scripts/adaptive-intelligence-test.mjs",
-    "simulate:all": "node scripts/simulate-all.mjs",
-    "test:matrix": "node scripts/engine-test-matrix.mjs",
-    "audit:features": "node scripts/simulate-all.mjs",
-    "test": "npm run check && npm run security:scan && npm run test:router && npm run test:backend && npm run test:runtime && npm run test:adaptive && npm run simulate:all && npm run test:matrix"
+    "test": "npm run check && npm run security:scan",
+    "serve": "npx serve ."
   },
   "devDependencies": {
     "vite": "^7.0.0"
-  },
-  "dependencies": {
-    "@google/genai": "^2.22.0"
   }
 }
