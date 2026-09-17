@@ -26,6 +26,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Normalize patcher source
         run: |
           python3 - <<'PY'
@@ -42,8 +44,7 @@ jobs:
           inner = s[start + len(open_marker):close]
           if '"""' in inner:
               raise SystemExit('CORE payload contains a triple-double quote; refusing unsafe rewrite')
-          s = s[:start] + 'CORE = r"""' + inner + '"""' + s[close + len("\n'''"):]
-          s = s.replace("\nprint('[forensic-fix] repository patched')\n'''\n\n# Basic preflight", "\nprint('[forensic-fix] repository patched')\n\n# Basic preflight", 1)
+          s = s[:start] + 'CORE = r"""' + inner + '"""' + s[close + len("\n'''"):] 
           old = "    start = source.find(marker)\n    if start < 0:\n        fail(f'function {name} not found')"
           new = "    start = source.find(marker)\n    if start >= 6 and source[start - 6:start] == 'async ':\n        start -= 6\n    if start < 0:\n        fail(f'function {name} not found')"
           if old not in s:
