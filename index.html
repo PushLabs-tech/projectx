@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <meta name="description" content="ProjectX — turn an idea, goal, or problem into something real.">
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=26.0.0">
-  <link rel="stylesheet" href="styles.css?v=26.0.0">
-  <link rel="stylesheet" href="clean-home.css?v=26.0.0">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=27.0.0">
+  <link rel="stylesheet" href="styles.css?v=27.0.0">
+  <link rel="stylesheet" href="clean-home.css?v=27.0.0">
   <script type="importmap">{"imports":{"./universal-engine.js":"./universal-engine-fixed.js"}}</script>
 </head>
 <body>
@@ -18,20 +18,23 @@
   <div id="modal"></div>
   <div id="toast" aria-live="polite"></div>
 
-  <script type="module" src="./dashboard-clean.js?v=26.0.0"></script>
-  <script type="module" src="./settings-clean.js?v=26.0.0"></script>
-  <script type="module" src="./config.js?v=26.0.0"></script>
-  <script type="module" src="./site.js?v=26.0.0"></script>
+  <script type="module" src="./dashboard-clean.js?v=27.0.0"></script>
+  <script type="module" src="./settings-clean.js?v=27.0.0"></script>
+  <script type="module" src="./config.js?v=27.0.0"></script>
+  <script type="module" src="./site.js?v=27.0.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="./app.js?v=26.0.0"></script>
+  <script type="module" src="./app.js?v=27.0.0"></script>
 
   <!-- Compatibility bridge: preserve projects created by the previous ProjectX shell. -->
-  <script type="module" src="./projectx-compat.js?v=26.0.0"></script>
+  <script type="module" src="./projectx-compat.js?v=27.0.0"></script>
 
   <!-- Final adaptive ProjectX shell: one-chat-first flow, AI classification, working project Chat, AI-generated sections, and AI Settings. -->
-  <script type="module" src="./projectx-adaptive.js?v=26.0.0"></script>
+  <script type="module" src="./projectx-adaptive.js?v=27.0.0"></script>
 
   <!-- Gemini rate-limit guard: spacing, retry/backoff, lighter-model fallback, and smaller request windows. -->
-  <script type="module" src="./projectx-ai-guard.js?v=26.0.0"></script>
+  <script type="module" src="./projectx-ai-guard.js?v=27.0.0"></script>
+
+  <!-- Real game output: adds a playable Playtest tab for Game projects. -->
+  <script type="module" src="./projectx-output.js?v=27.0.0"></script>
 </body>
 </html>
