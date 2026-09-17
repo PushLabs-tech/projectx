@@ -44,12 +44,7 @@ const FALLBACK_SECTIONS = {
   ]
 };
 
-export const safeId = value => String(value ?? '')
-  .trim()
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, '-')
-  .replace(/^-+|-+$/g, '')
-  .slice(0, 80) || `section-${Math.random().toString(36).slice(2, 8)}`;
+export const safeId = value => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || `section-${Math.random().toString(36).slice(2, 8)}`;
 
 export const sanitizePath = value => {
   const path = String(value ?? '').replace(/\\/g, '/').replace(/^\/+/, '').trim();
@@ -70,54 +65,23 @@ export function normalizeSections(sections, type = 'Other') {
     const id = safeId(raw.id || name);
     if (seen.has(id)) return;
     seen.add(id);
-    out.push({
-      id,
-      name: name.slice(0, 60),
-      purpose: String(raw.purpose || `Work on ${name}.`).slice(0, 220),
-      dependsOn: Array.isArray(raw.dependsOn) ? raw.dependsOn.map(safeId).filter(Boolean).slice(0, 8) : [],
-      kind: String(raw.kind || 'workspace').slice(0, 30)
-    });
+    out.push({ id, name: name.slice(0, 60), purpose: String(raw.purpose || `Work on ${name}.`).slice(0, 220), dependsOn: Array.isArray(raw.dependsOn) ? raw.dependsOn.map(safeId).filter(Boolean).slice(0, 8) : [], kind: String(raw.kind || 'workspace').slice(0, 30) });
   };
   input.forEach(add);
   if (!out.length) (FALLBACK_SECTIONS[type] || FALLBACK_SECTIONS.Other).forEach(([name, purpose]) => add({ name, purpose }));
-  return [
-    { id: 'chat', name: 'Chat', purpose: 'The project conversation and change interface.', dependsOn: [], kind: 'conversation' },
-    ...out
-  ].slice(0, SECTION_LIMIT);
+  return [{ id: 'chat', name: 'Chat', purpose: 'The project conversation and change interface.', dependsOn: [], kind: 'conversation' }, ...out].slice(0, SECTION_LIMIT);
 }
 
 const arr = value => Array.isArray(value) ? value.map(v => String(v ?? '').trim()).filter(Boolean) : [];
 
 export function emptySpec() {
-  return {
-    goal: '',
-    users: [],
-    requirements: [],
-    constraints: [],
-    features: [],
-    decisions: [],
-    dependencies: [],
-    assets: [],
-    deliverables: [],
-    acceptanceCriteria: [],
-    successCriteria: [],
-    openQuestions: [],
-    platform: '',
-    technology: [],
-    visualDirection: '',
-    currentState: 'discovery',
-    game: { kind: '', player: '', controls: '', loop: '', theme: '', progression: '', multiplayer: false }
-  };
+  return { goal: '', users: [], requirements: [], constraints: [], features: [], decisions: [], dependencies: [], assets: [], deliverables: [], acceptanceCriteria: [], successCriteria: [], openQuestions: [], platform: '', technology: [], visualDirection: '', currentState: 'discovery', game: { kind: '', player: '', controls: '', loop: '', theme: '', progression: '', multiplayer: false } };
 }
 
 export function mergeSpec(base = emptySpec(), patch = {}) {
   const next = { ...emptySpec(), ...base };
-  for (const field of ['goal', 'platform', 'visualDirection', 'currentState']) {
-    if (typeof patch[field] === 'string' && patch[field].trim()) next[field] = patch[field].trim();
-  }
-  for (const field of ['users', 'requirements', 'constraints', 'features', 'decisions', 'dependencies', 'assets', 'deliverables', 'acceptanceCriteria', 'successCriteria', 'openQuestions', 'technology']) {
-    if (Array.isArray(patch[field])) next[field] = [...new Set(arr(patch[field]))];
-  }
+  for (const field of ['goal', 'platform', 'visualDirection', 'currentState']) if (typeof patch[field] === 'string' && patch[field].trim()) next[field] = patch[field].trim();
+  for (const field of ['users', 'requirements', 'constraints', 'features', 'decisions', 'dependencies', 'assets', 'deliverables', 'acceptanceCriteria', 'successCriteria', 'openQuestions', 'technology']) if (Array.isArray(patch[field])) next[field] = [...new Set(arr(patch[field]))];
   if (patch.game && typeof patch.game === 'object') next.game = { ...next.game, ...patch.game };
   return next;
 }
@@ -136,41 +100,17 @@ export function validateSpec(spec, projectType = 'Other') {
 
 export function buildDependencyMap(sections = []) {
   const ids = new Set(sections.map(s => s.id));
-  return sections.map(section => ({
-    ...section,
-    dependsOn: (section.dependsOn || []).filter(id => ids.has(id))
-  }));
+  return sections.map(section => ({ ...section, dependsOn: (section.dependsOn || []).filter(id => ids.has(id)) }));
 }
 
 export function invalidateArtifacts(project) {
   const artifacts = project.artifacts || {};
-  for (const [path, artifact] of Object.entries(artifacts)) {
-    if (artifact && Number(artifact.specVersion || 0) !== Number(project.specVersion)) artifact.stale = true;
-  }
+  for (const artifact of Object.values(artifacts)) if (artifact && Number(artifact.specVersion || 0) !== Number(project.specVersion)) artifact.stale = true;
   project.artifacts = artifacts;
 }
 
 export function createProject({ id, title, type = 'Other', intent = '', spec = {}, sections = [], conversation = [] } = {}) {
-  const normalizedSections = normalizeSections(sections, type);
-  return {
-    id: id || `px-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    title: String(title || 'Untitled project').trim().slice(0, 120),
-    type: String(type || 'Other'),
-    intent: String(intent || spec.goal || '').trim(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    specVersion: 1,
-    understanding: { confidence: 0, missing: [], ambiguities: [], method: 'pending' },
-    spec: mergeSpec(emptySpec(), spec),
-    sections: buildDependencyMap(normalizedSections),
-    selectedSection: 'chat',
-    conversation: Array.isArray(conversation) ? conversation : [],
-    sectionContent: {},
-    artifacts: {},
-    versions: [],
-    status: 'discovery',
-    sync: { remoteId: null, lastSyncedAt: null, mode: 'local' }
-  };
+  return { id: id || `px-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: String(title || 'Untitled project').trim().slice(0, 120), type: String(type || 'Other'), intent: String(intent || spec.goal || '').trim(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), specVersion: 1, understanding: { confidence: 0, missing: [], ambiguities: [], method: 'pending' }, spec: mergeSpec(emptySpec(), spec), sections: buildDependencyMap(normalizeSections(sections, type)), selectedSection: 'chat', conversation: Array.isArray(conversation) ? conversation : [], sectionContent: {}, artifacts: {}, versions: [], status: 'discovery', sync: { remoteId: null, lastSyncedAt: null, mode: 'local' } };
 }
 
 export function applySpecChange(project, patch) {
@@ -189,62 +129,30 @@ export function applySpecChange(project, patch) {
 export function assemblePreviewHtml(files = {}) {
   const safeFiles = Object.fromEntries(Object.entries(files).map(([path, content]) => [sanitizePath(path), String(content ?? '')]).filter(([path]) => path));
   let html = safeFiles['index.html'] || safeFiles['src/index.html'];
-  if (!html) {
-    const first = Object.keys(safeFiles).find(p => /\.html?$/i.test(p));
-    html = first ? safeFiles[first] : '<!doctype html><html><body><div id="app"></div></body></html>';
-  }
+  if (!html) { const first = Object.keys(safeFiles).find(p => /\.html?$/i.test(p)); html = first ? safeFiles[first] : '<!doctype html><html><body><div id="app"></div></body></html>'; }
   html = String(html);
-  html = html.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi, (tag, href) => {
-    const path = sanitizePath(href.replace(/^\.\//, ''));
-    const css = path && safeFiles[path];
-    return css != null ? `<style data-projectx-file="${path}">${css}</style>` : tag;
-  });
-  html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi, (tag, src) => {
-    const path = sanitizePath(src.replace(/^\.\//, ''));
-    const js = path && safeFiles[path];
-    return js != null ? `<script data-projectx-file="${path}">${js.replace(/<\/script/gi, '<\\/script')}</script>` : tag;
-  });
-  if (!/<meta[^>]+name=["']viewport["']/i.test(html)) {
-    html = html.replace(/<head>/i, '<head><meta name="viewport" content="width=device-width,initial-scale=1">');
-  }
+  html = html.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi, (tag, href) => { const path = sanitizePath(href.replace(/^\.\//, '')); const css = path && safeFiles[path]; return css != null ? `<style data-projectx-file="${path}">${css}</style>` : tag; });
+  html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi, (tag, src) => { const path = sanitizePath(src.replace(/^\.\//, '')); const js = path && safeFiles[path]; return js != null ? `<script data-projectx-file="${path}">${js.replace(/<\/script/gi, '<\\/script')}</script>` : tag; });
+  if (!/<meta[^>]+name=["']viewport["']/i.test(html)) html = html.replace(/<head>/i, '<head><meta name="viewport" content="width=device-width,initial-scale=1">');
   const guard = `<script>(function(){window.addEventListener('error',function(e){parent.postMessage({type:'PROJECTX_RUNTIME_ERROR',message:String(e.message||'Runtime error')},'*')});window.addEventListener('unhandledrejection',function(e){parent.postMessage({type:'PROJECTX_RUNTIME_ERROR',message:String(e.reason?.message||e.reason||'Unhandled rejection')},'*')});})();<\/script>`;
   return html.replace(/<head>/i, `<head>${guard}`);
 }
 
 export function serializeForPersistence(project) {
-  return {
-    id: project.id,
-    title: project.title,
-    type: project.type,
-    intention: project.intent,
-    specVersion: project.specVersion,
-    spec: project.spec,
-    understanding: project.understanding,
-    workspace: { sections: project.sections },
-    selectedSection: project.selectedSection,
-    status: project.status,
-    conversation: project.conversation.slice(-100),
-    files: project.files || {},
-    artifacts: project.artifacts || {},
-    versions: project.versions || [],
-    updatedAt: project.updatedAt
-  };
+  return { id: project.id, title: project.title, type: project.type, intention: project.intent, specVersion: project.specVersion, spec: project.spec, understanding: project.understanding, workspace: { sections: project.sections }, selectedSection: project.selectedSection, status: project.status, conversation: project.conversation.slice(-100), files: project.files || {}, artifacts: project.artifacts || {}, versions: project.versions || [], updatedAt: project.updatedAt };
 }
 
 export function migrateProject(raw = {}) {
-  const p = createProject({
-    id: raw.id,
-    title: raw.title,
-    type: raw.type || raw.project_type || 'Other',
-    intent: raw.intent || raw.intention || raw.goal || '',
-    spec: raw.spec || raw.projectSpec || {},
-    sections: raw.sections || raw.workspace?.sections || [],
-    conversation: raw.conversation || raw.messages || []
-  });
-  p.specVersion = Number(raw.specVersion || 1);
+  const p = createProject({ id: raw.id, title: raw.title, type: raw.type || raw.project_type || 'Other', intent: raw.intent || raw.intention || raw.goal || '', spec: raw.spec || raw.projectSpec || {}, sections: raw.sections || raw.workspace?.sections || [], conversation: raw.conversation || raw.messages || [] });
+  p.createdAt = raw.createdAt || raw.created_at || p.createdAt;
+  p.updatedAt = raw.updatedAt || raw.updated_at || p.updatedAt;
+  p.specVersion = Number(raw.specVersion || raw.spec_version || 1);
   p.understanding = raw.understanding || p.understanding;
   p.artifacts = raw.artifacts || {};
+  p.files = raw.files || {};
   p.versions = Array.isArray(raw.versions) ? raw.versions : [];
   p.status = raw.status || 'draft';
+  p.selectedSection = raw.selectedSection || raw.selected_section || 'chat';
+  p.sync = raw.sync || { remoteId: p.id, lastSyncedAt: p.updatedAt, mode: 'cloud' };
   return p;
 }
