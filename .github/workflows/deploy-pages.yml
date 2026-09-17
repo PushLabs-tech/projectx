@@ -30,7 +30,9 @@ jobs:
         run: |
           node --check app.js
           node --check site.js
-      - name: Engine verification
+          node --check dashboard-clean.js
+          node --check clean-home.js
+      - name: Engine and regression tests
         run: npm test
       - name: Build production bundle
         run: npm run build
