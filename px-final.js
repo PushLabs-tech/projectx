@@ -4,7 +4,7 @@ import {
   normalizeSections,
   mergeSpec,
   validateSpec,
-  applySpecChange,
+  applyProjectMutation,
   sanitizePath,
   assemblePreviewHtml,
   serializeForPersistence,
@@ -196,9 +196,72 @@ async function syncRemoteProjects(){await refreshSession();if(!session)return;tr
 async function syncRemoteProject(project){if(!session||!settingsState.autoSave)return;try{const result=await edge('persistProject',{project:serializeForPersistence(project)});project.sync={remoteId:result.projectId||project.id,mode:'cloud',lastSyncedAt:now()};persistLocal();}catch(e){project.sync={remoteId:null,mode:'local',lastSyncedAt:project.sync?.lastSyncedAt||null,error:e.message};persistLocal();}}
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{}}}
 function renderProject(project){shell(`<div class="project"><div class="kicker">${esc(project.type)} · PROJECT</div><h1 class="project-title">${esc(project.title)}</h1><div class="sections">${project.sections.map(s=>`<button class="tab ${project.selectedSection===s.id?'active':''}" data-section="${esc(s.id)}">${esc(s.name)}</button>`).join('')}</div><div id="project-body" class="body"></div></div>`,'projects');$$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);}
-async function renderSection(project,section){const body=$('#project-body');if(!body||!section)return;if(section.id==='chat')return renderProjectChat(project);const name=section.name.toLowerCase();if(/playtest|preview|output/.test(name))return renderOutput(project);if(/code|files|assets/.test(name))return renderFiles(project);if(/test|qa|verify/.test(name))return renderTests(project);if(/publish|launch|deploy|report/.test(name))return renderDelivery(project);return renderGeneratedSection(project,section);}
+async function renderSection(project,section){
+  const body=$('#project-body');
+  if(!body||!section)return;
+  switch(section.kind){
+    case 'conversation': return renderProjectChat(project);
+    case 'output':
+    case 'publish': return renderOutput(project);
+    case 'code': return renderFiles(project);
+    case 'test': return renderTests(project);
+    case 'planning':
+    case 'research':
+    case 'workspace':
+    default: return renderGeneratedSection(project,section);
+  }
+}
 const projectAgentSystem=`You are ProjectX's project agent. The canonical project specification is the source of truth. Return JSON only: {"intent":"answer|change|build|test|research|publish","message":string,"changed":boolean,"specPatch":{},"workspaceSections":[],"fileOperations":[{"op":"write|delete","path":"safe/relative/path","content":"complete file content"}],"needsBuild":boolean}. Only set changed=true for real project changes. Never claim a file, artifact, build, test, research result, or deployment exists without returning the corresponding operation or verified result. For software/game changes prefer real file operations.`;
-function renderProjectChat(project,prefill=''){const body=$('#project-body');const messages=project.conversation.length?project.conversation.slice(-MAX_HISTORY):[{role:'assistant',text:'I have the project model in context. What should we change or work on next?'}];body.innerHTML=`<div class="box"><div class="sub">Project Chat updates the canonical project brain. Changes increment the project version and invalidate stale outputs.</div><div id="project-log" class="conversation"></div><form id="project-form" class="form"><textarea id="project-input" placeholder="Ask ProjectX to change, build, test, research, or explain something..."></textarea><button class="primary" id="project-send">Send</button></form></div>`;drawConversation(messages,'#project-log');const input=$('#project-input'),send=$('#project-send');input.value=prefill;$('#project-form').onsubmit=async e=>{e.preventDefault();const text=input.value.trim();if(!text||send.disabled)return;send.disabled=true;messages.push({role:'user',text});drawConversation(messages,'#project-log');input.value='';try{const data=await aiJson('discuss',{project,history:messages,message:text,system:projectAgentSystem},5500);if(!data)throw new Error('The AI returned invalid project action data.');if(data.changed){snapshot(project,'Before change');applySpecChange(project,data.specPatch||{});if(Array.isArray(data.workspaceSections)&&data.workspaceSections.length)project.sections=buildDependencyMap(normalizeSections(data.workspaceSections,project.type));applyFileOperations(project,Array.isArray(data.fileOperations)?data.fileOperations:[]);project.status=data.needsBuild?'needs-build':'changed';}messages.push({role:'assistant',text:String(data.message||'Done.')});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);await syncRemoteProject(project);renderProject(project);}catch(error){messages.push({role:'assistant',text:`I couldn't complete that request: ${error.message}`});drawConversation(messages,'#project-log');}finally{send.disabled=false;}};input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#project-form').requestSubmit();}};}
+function renderProjectChat(project,prefill=''){
+  const body=$('#project-body');
+  const messages=project.conversation.length?project.conversation.slice(-MAX_HISTORY):[{role:'assistant',text:'I have the canonical project state in context. What should we change or work on next?'}];
+  body.innerHTML='<div class="box"><div class="sub">Project Chat changes the canonical project state. Real mutations create a new version and invalidate dependent output.</div><div id="project-log" class="conversation"></div><form id="project-form" class="form"><textarea id="project-input" placeholder="Ask ProjectX to change, build, research, test, or explain something..."></textarea><button class="primary" id="project-send">Send</button></form></div>';
+  drawConversation(messages,'#project-log');
+  const input=$('#project-input'),send=$('#project-send');
+  input.value=prefill;
+  $('#project-form').onsubmit=async e=>{
+    e.preventDefault();
+    const text=input.value.trim();
+    if(!text||send.disabled)return;
+    send.disabled=true;
+    messages.push({role:'user',text});
+    drawConversation(messages,'#project-log');
+    input.value='';
+    try{
+      const data=await aiJson('discuss',{project,history:messages,message:text,system:projectAgentSystem},5500);
+      if(!data)throw new Error('The AI returned invalid project action data.');
+      const wantsMutation=Boolean(
+        data.changed||
+        (data.specPatch&&typeof data.specPatch==='object'&&Object.keys(data.specPatch).length)||
+        (Array.isArray(data.workspaceSections)&&data.workspaceSections.length)||
+        (Array.isArray(data.fileOperations)&&data.fileOperations.length)||
+        (Array.isArray(data.agents)&&data.agents.length)
+      );
+      if(wantsMutation){
+        snapshot(project,'Before change');
+        const mutation=applyProjectMutation(project,{
+          specPatch:data.specPatch||{},
+          workspaceSections:Array.isArray(data.workspaceSections)?data.workspaceSections:undefined,
+          agents:Array.isArray(data.agents)?data.agents:undefined,
+          fileOperations:Array.isArray(data.fileOperations)?data.fileOperations:[]
+        });
+        if(!mutation.changed)throw new Error('The AI requested a mutation but nothing in the canonical project state changed.');
+        project.status=data.needsBuild?'needs-build':'changed';
+        project.executionState={...(project.executionState||{}),lastAgent:'orchestrator'};
+      }
+      if(data.changed&&!wantsMutation)throw new Error('The AI claimed a change without returning an executable mutation.');
+      messages.push({role:'assistant',text:String(data.message||'Done.')});
+      project.conversation=messages.slice(-MAX_HISTORY);
+      saveProject(project);
+      await syncRemoteProject(project);
+      renderProject(project);
+    }catch(error){
+      messages.push({role:'assistant',text:`I couldn't complete that request: ${error.message}`});
+      drawConversation(messages,'#project-log');
+    }finally{send.disabled=false;}
+  };
+  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#project-form').requestSubmit();}};
+}
 function applyFileOperations(project,operations){project.files=project.files||{};for(const op of operations){const path=sanitizePath(op.path);if(!path)continue;if(op.op==='write'&&typeof op.content==='string'&&op.content.length<=600000)project.files[path]=op.content;if(op.op==='delete')delete project.files[path];}if(Object.keys(project.files).length)project.artifacts={...(project.artifacts||{}),manifest:{specVersion:project.specVersion,files:Object.keys(project.files)}};}
 async function renderGeneratedSection(project,section){const body=$('#project-body');body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${esc(section.name)}</h2><div class="sub">${esc(section.purpose)}</div></div><button class="ghost" id="section-refresh">${project.sectionContent?.[section.id]?.specVersion===project.specVersion?'Refresh':'Generate'}</button></div><div id="section-content" style="margin-top:14px"><div class="sub">Generating from project spec v${project.specVersion}…</div></div></div>`;$('#section-refresh').onclick=()=>{delete project.sectionContent[section.id];saveProject(project);renderGeneratedSection(project,section)};const cached=project.sectionContent?.[section.id];if(cached?.specVersion===project.specVersion){drawSectionContent(cached);return;}try{const data=await aiJson('plan',{project,history:[],message:`Generate the ${section.name} section from the current canonical spec.`,system:'Return JSON only: {"summary":string,"items":[{"title":string,"detail":string,"status":"proposed|ready|blocked|unknown"}],"nextActions":string[],"openQuestions":string[]}. Never invent completed work.'},3200);const content={specVersion:project.specVersion,summary:String(data?.summary||''),items:Array.isArray(data?.items)?data.items.slice(0,20):[],nextActions:Array.isArray(data?.nextActions)?data.nextActions.slice(0,10):[],openQuestions:Array.isArray(data?.openQuestions)?data.openQuestions.slice(0,10):[]};project.sectionContent={...(project.sectionContent||{}),[section.id]:content};saveProject(project);await syncRemoteProject(project);drawSectionContent(content);}catch(error){$('#section-content').innerHTML=`<div class="sub">Generation failed: ${esc(error.message)}. No project data was changed.</div>`;}}
 function drawSectionContent(data){$('#section-content').innerHTML=`<div class="sub">${esc(data.summary)}</div>${(data.items||[]).map(item=>`<div class="item"><b>${esc(item.title||'Item')}</b><p>${esc(item.detail||'')} <span class="status ${item.status==='ready'?'ok':item.status==='blocked'?'bad':'warn'}">${esc(item.status||'unknown')}</span></p></div>`).join('')}<div class="grid">${data.nextActions?.length?`<div class="box"><b>Next actions</b>${data.nextActions.map(x=>`<div class="sub">• ${esc(x)}</div>`).join('')}</div>`:''}${data.openQuestions?.length?`<div class="box"><b>Open questions</b>${data.openQuestions.map(x=>`<div class="sub">• ${esc(x)}</div>`).join('')}</div>`:''}</div>`;}
