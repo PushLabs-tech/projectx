@@ -19,6 +19,8 @@ jobs:
           node-version: 22
       - name: Apply UX patch
         run: node scripts/apply-projectx-ux.mjs
+      - name: Apply canonical runtime fix
+        run: node scripts/one-time-runtime-fix.mjs
       - name: Verify
         run: |
           node --check app.js
@@ -32,5 +34,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app.js styles.css px-final.js
           git diff --cached --quiet && exit 0
-          git commit -m 'feat: ProjectX adaptive clean workspace'
+          git commit -m 'fix: canonical runtime mutations and section routing'
           git push
