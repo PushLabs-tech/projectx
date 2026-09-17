@@ -13,22 +13,9 @@ assert.doesNotMatch(index, /dashboard-clean\.js|projectx-adaptive\.js|projectx-o
 assert.match(vite, /base:\s*['"]\/projectx\//);
 
 const game = createProject({
-  title: 'Monkey Flight',
-  type: 'Game',
-  intent: 'A browser game about a monkey dodging obstacles',
-  spec: {
-    goal: 'A browser game about a monkey dodging obstacles',
-    users: ['players'],
-    requirements: ['Avoid obstacles', 'Score points'],
-    deliverables: ['Playable browser game'],
-    platform: 'Web',
-    game: { loop: 'jump and avoid obstacles' }
-  },
-  sections: [
-    { name: 'Gameplay', purpose: 'Define the loop.' },
-    { name: 'Playtest', purpose: 'Run the game.' },
-    { name: 'Code', purpose: 'Inspect files.' }
-  ]
+  title: 'Monkey Flight', type: 'Game', intent: 'A browser game about a monkey dodging obstacles',
+  spec: { goal: 'A browser game about a monkey dodging obstacles', users: ['players'], requirements: ['Avoid obstacles', 'Score points'], deliverables: ['Playable browser game'], platform: 'Web', game: { loop: 'jump and avoid obstacles' } },
+  sections: [{ name: 'Gameplay', purpose: 'Define the loop.' }, { name: 'Playtest', purpose: 'Run the game.' }, { name: 'Code', purpose: 'Inspect files.' }]
 });
 
 assert.equal(game.sections[0].name, 'Chat');
@@ -38,15 +25,17 @@ assert.equal(sanitizePath('/absolute/path'), 'absolute/path');
 assert.equal(normalizeSections([{ name: 'Custom Mechanics', purpose: 'Project-specific mechanics.' }], 'Game')[1].name, 'Custom Mechanics');
 
 const before = game.specVersion;
-applySpecChange(game, { features: ['Pause menu'] });
+applySpecChange(game, { features: { add: ['Pause menu'] } });
 assert.equal(game.specVersion, before + 1);
 assert.deepEqual(game.spec.features, ['Pause menu']);
+assert.equal(game.tests.status, 'stale');
 
-const files = {
-  'index.html': '<!doctype html><html><head><link rel="stylesheet" href="styles.css"></head><body><script src="app.js"></script></body></html>',
-  'styles.css': 'body{font-family:system-ui}',
-  'app.js': 'document.body.dataset.ready="1";'
-};
+const beforeRemove = game.specVersion;
+applySpecChange(game, { features: { remove: ['Pause menu'] } });
+assert.equal(game.specVersion, beforeRemove + 1);
+assert.deepEqual(game.spec.features, []);
+
+const files = { 'index.html': '<!doctype html><html><head><link rel="stylesheet" href="styles.css"></head><body><script src="app.js"></script></body></html>', 'styles.css': 'body{font-family:system-ui}', 'app.js': 'document.body.dataset.ready="1";' };
 const preview = assemblePreviewHtml(files);
 assert.match(preview, /body\{font-family/);
 assert.match(preview, /dataset\.ready/);
@@ -66,7 +55,7 @@ assert.doesNotMatch(runtime, /window\.ProjectXAI/);
 
 console.log('PASS: single runtime entrypoint');
 console.log('PASS: canonical project model');
-console.log('PASS: dynamic sections and validation');
+console.log('PASS: semantic add/remove mutation');
 console.log('PASS: spec version invalidation');
 console.log('PASS: real artifact assembly and runtime error bridge');
 console.log('PASS: cloud persistence hooks');
