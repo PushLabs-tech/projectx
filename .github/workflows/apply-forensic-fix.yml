@@ -41,9 +41,9 @@ jobs:
           while i < len(s):
               if state == 'code':
                   if s.startswith("r'''", i):
-                      out.append('r"""'); i += 4; state = 'triple_double'; continue
+                      out.append('r"""'); i += 4; state = 'triple_single'; continue
                   if s.startswith("'''", i):
-                      out.append('"""'); i += 3; state = 'triple_double'; continue
+                      out.append('"""'); i += 3; state = 'triple_single'; continue
                   ch = s[i]
                   out.append(ch)
                   if ch == '#': state = 'comment'
@@ -58,8 +58,8 @@ jobs:
                   if ch == '\\' and i < len(s): out.append(s[i]); i += 1; continue
                   if ch == quote: state = 'code'
                   continue
-              if state == 'triple_double':
-                  if s.startswith('"""', i):
+              if state == 'triple_single':
+                  if s.startswith("'''", i):
                       out.append('"""'); i += 3; state = 'code'; continue
                   ch = s[i]; out.append(ch); i += 1
           p.write_text(''.join(out), encoding='utf-8')
