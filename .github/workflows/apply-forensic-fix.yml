@@ -28,6 +28,16 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Normalize patcher quoting
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/forensic_fix.py')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("r'''", 'r"""').replace("'''", '"""')
+          p.write_text(s, encoding='utf-8')
+          PY
+          python3 -m py_compile scripts/forensic_fix.py
       - name: Apply forensic fixes
         run: python3 scripts/forensic_fix.py
       - name: Diff check
