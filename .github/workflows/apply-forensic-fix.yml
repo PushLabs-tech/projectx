@@ -34,8 +34,35 @@ jobs:
           from pathlib import Path
           p = Path('scripts/forensic_fix.py')
           s = p.read_text(encoding='utf-8')
-          s = s.replace("r'''", 'r"""').replace("'''", '"""')
-          p.write_text(s, encoding='utf-8')
+          out = []
+          i = 0
+          state = 'code'
+          quote = ''
+          while i < len(s):
+              if state == 'code':
+                  if s.startswith("r'''", i):
+                      out.append('r"""'); i += 4; state = 'triple_double'; continue
+                  if s.startswith("'''", i):
+                      out.append('"""'); i += 3; state = 'triple_double'; continue
+                  ch = s[i]
+                  out.append(ch)
+                  if ch == '#': state = 'comment'
+                  elif ch in "'\"": state = 'string'; quote = ch
+                  i += 1; continue
+              if state == 'comment':
+                  ch = s[i]; out.append(ch); i += 1
+                  if ch == '\n': state = 'code'
+                  continue
+              if state == 'string':
+                  ch = s[i]; out.append(ch); i += 1
+                  if ch == '\\' and i < len(s): out.append(s[i]); i += 1; continue
+                  if ch == quote: state = 'code'
+                  continue
+              if state == 'triple_double':
+                  if s.startswith('"""', i):
+                      out.append('"""'); i += 3; state = 'code'; continue
+                  ch = s[i]; out.append(ch); i += 1
+          p.write_text(''.join(out), encoding='utf-8')
           PY
           python3 -m py_compile scripts/forensic_fix.py
       - name: Apply forensic fixes
