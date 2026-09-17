@@ -28,13 +28,10 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Syntax checks
         run: |
-          node --check app.js
-          node --check site.js
-          node --check dashboard-clean.js
-          node --check clean-home.js
           node --check px-final.js
-          node --check px-runtime-patches.js
-      - name: Engine and regression tests
+          node --check projectx-core.js
+          node --check scripts/projectx-runtime-test.mjs
+      - name: ProjectX runtime contract
         run: npm test
       - name: Build production bundle
         run: npm run build
