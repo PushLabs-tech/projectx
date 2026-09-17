@@ -1,0 +1,45 @@
+name: Apply ProjectX forensic fixes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/forensic_fix.py'
+      - '.github/workflows/apply-forensic-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: projectx-forensic-fix
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[forensic-fix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Apply forensic fixes
+        run: python3 scripts/forensic_fix.py
+      - name: Diff check
+        run: git diff --check
+      - name: Syntax and regression tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit verified fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "[forensic-fix] canonical state, context, versioning, and artifact fixes"
+          git push
