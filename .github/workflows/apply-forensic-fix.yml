@@ -42,6 +42,7 @@ jobs:
           if '"""' in inner:
               raise SystemExit('CORE payload contains a triple-double quote; refusing unsafe rewrite')
           s = s[:start] + 'CORE = r"""' + inner + '"""' + s[close + len(close_marker):]
+          s = s.replace("\nprint('[forensic-fix] repository patched')\n'''\n\n# Basic preflight", "\nprint('[forensic-fix] repository patched')\n\n# Basic preflight", 1)
           p.write_text(s, encoding='utf-8')
           PY
           python3 -m py_compile scripts/forensic_fix.py
