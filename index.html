@@ -15,6 +15,36 @@
   <div id="modal" hidden></div>
   <div id="toast" aria-live="polite"></div>
   <script src="./config.js?v=31.0.0"></script>
+  <script>
+    (() => {
+      const KEY = 'projectx_settings_v6';
+      const PRIMARY = 'gemini-3.5-flash-lite';
+      const FALLBACK = 'gemini-3.6-flash';
+      const SUPPORTED = new Set([PRIMARY, FALLBACK]);
+      const LEGACY = /^(gemini-2\.5-flash|gemini-2\.0-flash)/;
+      const migrate = value => {
+        try {
+          const settings = value && typeof value === 'object' ? value : {};
+          if (!SUPPORTED.has(settings.model) || LEGACY.test(String(settings.model || ''))) settings.model = PRIMARY;
+          return JSON.stringify(settings);
+        } catch {
+          return JSON.stringify({ model: PRIMARY });
+        }
+      };
+      try {
+        const existing = localStorage.getItem(KEY);
+        localStorage.setItem(KEY, migrate(existing ? JSON.parse(existing) : {}));
+        const originalSetItem = Storage.prototype.setItem;
+        if (!Storage.prototype.__projectxModelCompat) {
+          Storage.prototype.setItem = function(key, value) {
+            if (key === KEY) return originalSetItem.call(this, key, migrate(JSON.parse(value || '{}')));
+            return originalSetItem.call(this, key, value);
+          };
+          Object.defineProperty(Storage.prototype, '__projectxModelCompat', { value: true, configurable: false, enumerable: false });
+        }
+      } catch {}
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="module" src="./px-final.js?v=31.0.0"></script>
 </body>
