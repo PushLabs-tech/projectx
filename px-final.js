@@ -167,7 +167,7 @@ function renderInterview(history,meta){shell(`<div class="interview"><div class=
 function drawConversation(history,selector){const el=$(selector);if(!el)return;el.innerHTML=history.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');el.scrollTop=el.scrollHeight;}
 function mergeDiscoveryProject(previous={},next={}){
   const out={...(previous||{})};
-  const scalar=['title','goal','platform','visualDirection','currentState'];
+  const scalar=['title','goal','type','platform','visualDirection','currentState'];
   for(const key of scalar) if(next&&typeof next[key]==='string'&&next[key].trim()) out[key]=next[key].trim();
   for(const key of ['users','requirements','constraints','features','decisions','dependencies','assets','deliverables','acceptanceCriteria','successCriteria','technology']){
     if(Array.isArray(next?.[key])) out[key]=[...new Set([...(Array.isArray(out[key])?out[key]:[]),...next[key].map(v=>String(v??'').trim()).filter(Boolean)])];
@@ -199,9 +199,11 @@ async function continueInterview(history, answers, meta={}){
     const group=String(data.classification?.group||discoveryUnderstanding.group||'').trim().toUpperCase();
     if(group!=='REAL_WORLD'&&group!=='NON_REAL_WORLD')throw new Error('The AI did not return a valid REAL_WORLD/NON_REAL_WORLD classification.');
     const mergedProject=mergeDiscoveryProject(discoveryProject,data.project);
+    const priorWorkspace=Array.isArray(meta.brain?.workspace)?meta.brain.workspace:[];
+    const workspaceCandidate=Array.isArray(data.workspace?.sections)&&data.workspace.sections.length?data.workspace.sections:priorWorkspace;
     const category=String(data.category||discoveryUnderstanding.category||'').trim();
     const summary=String(data.summary||discoveryUnderstanding.summary||'').trim();
-    meta.brain={project:mergedProject,understanding:{confidence:Number(data?.confidence||0),missing:Array.isArray(data?.missing)?data.missing:[],ambiguities:Array.isArray(data?.ambiguities)?data.ambiguities:[],group,category,summary}};
+    meta.brain={project:mergedProject,workspace:workspaceCandidate,understanding:{confidence:Number(data?.confidence||0),missing:Array.isArray(data?.missing)?data.missing:[],ambiguities:Array.isArray(data?.ambiguities)?data.ambiguities:[],group,category,summary}};
 
     renderInterviewUnderstanding({...data,project:mergedProject,category,summary});
     const type=normalizeProjectType(mergedProject.type||data.project.type||'Other');
@@ -212,7 +214,7 @@ async function continueInterview(history, answers, meta={}){
     const ambiguities=Array.isArray(data.ambiguities)?data.ambiguities:[];
     const missing=[...new Set([...quality.missing,...declaredMissing,...(Array.isArray(spec.openQuestions)?spec.openQuestions:[])])];
     const confidence=Number(data.confidence||0);
-    const workspace=Array.isArray(data.workspace?.sections)?data.workspace.sections.filter(s=>s&&String(s.name||'').trim()):[];
+    const workspace=(Array.isArray(workspaceCandidate)?workspaceCandidate:[]).filter(s=>s&&String(s.name||'').trim()).slice(0,8);
     const done=data.done===true&&quality.valid&&confidence>=.82&&missing.length===0&&ambiguities.length===0&&workspace.length>=2;
     if(!done){
       const question=String(data.question||'').trim();
@@ -222,9 +224,9 @@ async function continueInterview(history, answers, meta={}){
       $('#interview-status')&&($('#interview-status').textContent=String(Math.round(confidence*100))+'% understood · refining from your input');
       return;
     }
-    const project=createProject({title:data.project.title,type,intent:data.project.goal||history[0].text,spec,sections:workspace,conversation:history,agents:data.agents});
+    const project=createProject({title:mergedProject.title||data.project.title,type,intent:mergedProject.goal||history[0].text,spec,sections:workspace,conversation:history,agents:data.agents});
     project.category=safeCategory||type;
-    project.understanding={confidence,missing:[],ambiguities:[],method:session?'secure-ai':'guest-ai',group,groupLabel:group==='REAL_WORLD'?'REAL-WORLD':'NON-REAL-WORLD',category:safeCategory||type,executionType:type,classification:data.classification||{group,label:group,reason:'Classification established from the request.'},summary:summary||''};
+    project.understanding={confidence,missing:[],ambiguities:[],method:session?'secure-ai':'guest-ai',group,groupLabel:group==='REAL_WORLD'?'REAL-WORLD':'NON-REAL-WORLD',category:safeCategory||type,executionType:type,classification:data.classification||{group,label:group==='REAL_WORLD'?'REAL-WORLD':'NON-REAL-WORLD',reason:'Classification established from the request.'},summary:summary||''};
     project.status='ready';
     saveProject(project,true);
     await syncRemoteProject(project);
