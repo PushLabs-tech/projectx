@@ -173,15 +173,15 @@ function effectiveMaxTokens(max){
   return max;
 }
 const AGENT_FOR_MODE = { understand:'interviewer', plan:'planner', artifact:'builder', discuss:'orchestrator' };
-async function repairDiscoveryPoll(payload, parsed){
+async function repairDiscoveryPoll(payload, parsed, maxTokens = 2600){
   const base=parsed&&typeof parsed==='object'?parsed:{};
-  const repairSystem=`You are ProjectX's discovery poll generator. Return JSON only. Preserve the project information in the supplied result. Add poll:{decision:string,options:[string,string,string,string]}. Generate exactly four concise options from the actual project context and the user's latest input. Options must be materially different and help choose one important missing project detail. Do not output a question. Do not include the fifth option; ProjectX adds it as the fixed "Describe in your own words" choice.`;
+  const repairSystem=`You are ProjectX's discovery poll generator. Return JSON only. Base every poll on the actual project context and the user's latest input. Preserve useful project information. Return poll with a short decision label and exactly four concise, concrete options. The decision is not a question. Options must be genuine candidate choices for the most important missing project detail. Never use generic placeholders, canned fallback phrases, unrelated choices, or question-form options. Do not include 'Describe in your own words'; ProjectX adds it as option five.`;
   try{
     const result=await directGemini(
       [{role:'user',text:`CURRENT PROJECT RESULT:\n${JSON.stringify(base)}\n\nLATEST USER INPUT:\n${String(payload.message||'')}`}],
       repairSystem,
       true,
-      Math.min(2200,max)
+      Math.min(2600,maxTokens)
     );
     const repaired=parseJson(result.text||'');
     if(repaired&&repaired.project&&validDiscoveryPollLocal(repaired.poll)) return repaired;
@@ -191,9 +191,14 @@ async function repairDiscoveryPoll(payload, parsed){
 
 function validDiscoveryPollLocal(value){
   const decision=String(value?.decision||'').trim();
-  const options=Array.isArray(value?.options)?[...new Set(value.options.map(v=>String(v||'').trim()).filter(Boolean))].slice(0,4):[];
-  return Boolean(decision&&options.length===4);
+  const raw=Array.isArray(value?.options)?value.options.map(v=>String(v||'').trim()).filter(Boolean):[];
+  const options=[...new Set(raw)].filter(v=>v.toLowerCase()!=='describe in your own words');
+  if(!decision||/?`s*$/.test(decision)||options.length!==4)return false;
+  if(options.some(v=>/?`s*$/.test(v)||v.length>160))return false;
+  return true;
 }
+
+
 
 async function aiJson(mode, payload, max = 3500) {
   max=effectiveMaxTokens(max);
@@ -268,9 +273,6 @@ function home(){shell(`<div class="wrap"><div class="center"><div class="kicker"
 async function beginCreation(text){const intent=String(text||'').trim();if(!intent)return;if(!session&&!localGuestKey())return aiRequiredModal('ProjectX needs an AI connection. You can use a free-tier Gemini key in this browser, or sign in and use a server-side provider connection.');const history=[{role:'user',text:intent}],meta={answers:[],brain:null};renderInterview(history,meta);await continueInterview(history,meta.answers,meta);}
 function renderInterview(history,meta){
   shell(`<div class="interview poll-interview">
-    <div class="kicker">PROJECT X · DISCOVERY</div>
-    <h1 class="hero-title" style="font-size:46px">Let’s shape it.</h1>
-    <p class="sub">Choose one option. The next poll adapts to your choice.</p>
     <div id="interview-poll" class="discovery-poll" aria-live="polite"></div>
   </div>`,'home');
   meta.initialIntent=String(history?.[0]?.text||'').trim();
@@ -292,15 +294,18 @@ function mergeDiscoveryProject(previous={},next={}){
 function renderDiscoveryPoll(poll,meta,history){
   const root=$('#interview-poll');
   if(!root)return;
-  const aiOptions=Array.isArray(poll?.options)?poll.options.map(v=>String(v||'').trim()).filter(Boolean):[];
-  const options=[...new Set(aiOptions)].slice(0,4);
-  while(options.length<4) options.push(['Keep it focused on the core outcome','Cover the main workflow end to end','Prioritize a polished experience','Leave room for future expansion'][options.length]);
-  options.push('Describe in your own words');
   const decision=String(poll?.decision||'').trim();
+  const aiOptions=Array.isArray(poll?.options)?poll.options.map(v=>String(v||'').trim()).filter(Boolean):[];
+  const options=[...new Set(aiOptions)].filter(v=>v.toLowerCase()!=='describe in your own words').slice(0,4);
+  if(!decision||/?`s*$/.test(decision)||options.length!==4||options.some(v=>/?`s*$/.test(v))){
+    root.innerHTML='<div class="poll-card"><div class="poll-title">The AI could not generate a contextual poll.</div></div>';
+    return;
+  }
+  options.push('Describe in your own words');
   root.innerHTML=`<div class="poll-card">
     <div class="poll-head">
       <div class="poll-eyebrow">PROJECT DECISION</div>
-      <div class="poll-title">${esc(decision||'Choose what fits best')}</div>
+      <div class="poll-title">${esc(decision)}</div>
     </div>
     <div class="poll-options">
       ${options.map((option,i)=>`<button type="button" class="poll-option" data-poll-index="${i}"><span class="poll-radio"></span><span>${esc(option)}</span></button>`).join('')}
@@ -329,6 +334,7 @@ function renderDiscoveryPoll(poll,meta,history){
     if((e.ctrlKey||e.metaKey)&&e.key==='Enter')$('#poll-custom-send')?.click();
   });
 }
+
 async function submitDiscoveryChoice(value,history,meta){
   const text=String(value||'').trim();
   if(!text)return;
@@ -356,19 +362,7 @@ function renderInterviewUnderstanding(data){
   ].filter(Boolean).slice(0,4);
   root.innerHTML=`<div class="understanding-main"><div class="understanding-copy"><div class="understanding-eyebrow">PROJECT BRIEF</div><div class="understanding-title">What ProjectX understands</div><div class="sub understanding-summary">${esc(summary||'Building the project brief from your request.')}</div>${category?`<div class="understanding-category">Focus · ${esc(category)}</div>`:''}${known.length?`<div class="understanding-known">${known.map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}${missing.length?`<div class="understanding-meta"><span>Project brief is still being refined</span></div>`:''}</div></div>`;
 }
-function discoveryFallbackPoll(data,quality,missing,project){
-  const fields=[...(Array.isArray(quality?.missing)?quality.missing:[]),...(Array.isArray(missing)?missing:[])].map(v=>String(v||'').toLowerCase());
-  const has=k=>fields.some(v=>v===k||v.includes(k));
-  if(has('users'))return {decision:'Primary audience',options:['Customers or end users','A specific professional or team audience','Students or learners','A broad general audience']};
-  if(has('requirements'))return {decision:'Core capabilities',options:['Focus on the essential workflow','Support the main workflow end to end','Add advanced capabilities early','Prioritize speed and simplicity']};
-  if(has('deliverables'))return {decision:'Primary deliverable',options:['A working finished result','A clear plan and roadmap','A polished document or report','A reusable system or toolkit']};
-  if(has('platform'))return {decision:'Target platform',options:['Web browser','Mobile device','Desktop application','Flexible across platforms']};
-  if(has('goal'))return {decision:'Primary outcome',options:['Solve the core problem','Make the process easier','Create something people can use','Turn the idea into an executable plan']};
-  if(has('constraint'))return {decision:'Main constraint',options:['Keep it simple','Keep costs low','Use existing tools','Prioritize speed to launch']};
-  return {decision:'First-version focus',options:['The essential outcome','The fastest useful first version','A polished experience','Flexibility for future growth']};
-}
-const interviewSystem = "You are ProjectX's discovery architect. The user's original request is the source of truth. Follow this order exactly: (1) classify the request as REAL_WORLD or NON_REAL_WORLD before deciding any lower-level category; (2) visibly explain the classification in the returned data; (3) infer the most useful AI-derived category only after that classification; (4) present one AI-generated poll at a time using exactly four concise, materially different options; the fifth option is always exactly 'Describe in your own words'; never request a free-form answer unless that fifth option is selected; continue until the intent, target users, concrete requirements, constraints, desired deliverables, relevant platform/domain details, and important ambiguities are understood. REAL_WORLD means an actual real-world objective, activity, organization, plan, decision, business, event, research effort, or problem. NON_REAL_WORLD means a fictional, digital, creative, software, simulated, or virtual creation. Do not force a lower category from a fixed list. Return JSON only: {\"done\":boolean,\"question\":string,\"poll\":{\"decision\":string,\"options\":[string,string,string,string]},\"confidence\":number,\"missing\":string[],\"ambiguities\":string[],\"classification\":{\"group\":\"REAL_WORLD|NON_REAL_WORLD\",\"label\":string,\"reason\":string},\"category\":string,\"domainPack\":{\"name\":string,\"terms\":string[],\"considerations\":string[],\"metrics\":string[]},\"project\":{\"title\":string,\"type\":\"Game|Website|App|Mobile|Business|Business system|Research|Document|Presentation|Data|Dashboard|Internal tool|Agent|Automation|API|Creative project|Other\",\"goal\":string,\"users\":string[],\"requirements\":string[],\"constraints\":string[],\"features\":string[],\"decisions\":string[],\"dependencies\":string[],\"assets\":string[],\"deliverables\":string[],\"acceptanceCriteria\":string[],\"successCriteria\":string[],\"openQuestions\":string[],\"platform\":string,\"technology\":string[],\"visualDirection\":string,\"plan\":[{\"title\":string,\"status\":\"proposed|ready|blocked|done|unknown\",\"steps\":string[]}],\"game\":{\"kind\":string,\"player\":string,\"controls\":string,\"loop\":string,\"theme\":string,\"progression\":string,\"multiplayer\":boolean}},\"workspace\":{\"sections\":[{\"name\":string,\"purpose\":string,\"dependsOn\":string[],\"kind\":\"workspace|output|research|planning|code|test|publish\",\"agent\":string,\"capabilities\":string[]}]},\"agents\":[{\"key\":string,\"name\":string,\"purpose\":string,\"tools\":string[]}],\"summary\":string}. The classification must be present in the JSON for internal routing, but never expose the classification labels to the user interface. When done, set done=true only when the project is sufficiently understood. When done=false, question MUST be a concise, non-empty, high-value question tied to the single most important missing user-facing detail. When done, workspace.sections must contain 2-8 genuinely relevant sections derived from this specific project. Never use generic fallback section sets. Do not add Code, Files, Preview, Playtest, Research, or Business sections unless the user's project actually requires that work. Chat is added by the runtime. Never invent facts.";
-async function continueInterview(history, answers, meta={}){
+const interviewSystem = "You are ProjectX's discovery architect. Treat the user's original request as the source of truth. Drive discovery with exactly one AI-generated poll at a time. The poll is the only discovery interaction: poll.decision is a short contextual label, never a question. Generate exactly four concrete, realistic, context-specific candidate options from the user's request, current project state, latest answer, and the most important missing detail. Never use generic fallback phrases, canned choices, unrelated options, or question-form options. Never include Describe in your own words in the four AI options; the runtime adds it as option five. Return the same discovery JSON shape ProjectX expects, with question empty, poll containing four AI options, and the existing project, classification, category, domainPack, workspace, agents, confidence, missing, ambiguities, and summary fields. When done=false, the poll must be valid. When done=true, poll may be omitted. Never invent facts.";async function continueInterview(history, answers, meta={}){
   $('#interview-status')&&($('#interview-status').textContent='Thinking…');
   try{
     const discoveryProject=meta.brain?.project||{};
@@ -396,9 +390,10 @@ async function continueInterview(history, answers, meta={}){
     const workspace=(Array.isArray(workspaceCandidate)?workspaceCandidate:[]).filter(s=>s&&String(s.name||'').trim()).slice(0,8);
     const done=data.done===true&&quality.valid&&confidence>=.82&&missing.length===0&&ambiguities.length===0&&workspace.length>=2;
     if(!done){
-      const poll=(data?.poll&&Array.isArray(data.poll.options))?data.poll:discoveryFallbackPoll(data,quality,missing,mergedProject);
-      renderDiscoveryPoll(poll,meta,history);
-
+      if(!validDiscoveryPollLocal(data?.poll)){
+        throw new Error('The AI returned invalid contextual poll options. No generic choices were substituted.');
+      }
+      renderDiscoveryPoll(data.poll,meta,history);
       return;
     }
     const project=createProject({title:mergedProject.title||data.project.title,type,intent:mergedProject.goal||history[0].text,spec,sections:workspace,conversation:history,agents:Array.isArray(mergedProject.agents)?mergedProject.agents:[],plan:Array.isArray(mergedProject.plan)?mergedProject.plan:[]});
