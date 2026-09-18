@@ -433,6 +433,53 @@ export async function chat(
       )
     );
 
+  if (provider === "google") {
+    const isGemini38 = /^gemini-3\\.8-flash$/i.test(String(model).trim());
+    const system = messages
+      .filter((message) => message?.role === "system")
+      .map((message) => String(message?.content || ""))
+      .filter(Boolean)
+      .join("\\n\\n");
+    const contents = messages
+      .filter((message) => message?.role !== "system")
+      .map((message) => ({
+        role: message?.role === "assistant" ? "model" : "user",
+        parts: [{ text: String(message?.content || "") }]
+      }));
+
+    const generationConfig: Record<string, unknown> = {
+      maxOutputTokens: maxTokens
+    };
+    // Gemini 3.8 removed legacy sampling controls; keep the request
+    // compatible with the stable GenerateContent API.
+    if (!isGemini38) generationConfig.temperature = temperature;
+    
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": credential.apiKey
+        },
+        body: JSON.stringify({
+          ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+          contents,
+          generationConfig
+        }),
+        signal: AbortSignal.timeout(60_000)
+      }
+    );
+
+    const data = await readJson(response);
+    return {
+      text: Array.isArray(data?.candidates?.[0]?.content?.parts)
+        ? data.candidates[0].content.parts.map((part: any) => String(part?.text || "")).join("")
+        : "",
+      usage: data?.usageMetadata || null
+    };
+  }
+
   if (provider === "bytez") {
     const headers:
       Record<string, string> = {
