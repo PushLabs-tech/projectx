@@ -146,6 +146,84 @@ function historyMessages(h: any[] = []) {
   return h.slice(-12).filter(x => x?.text).map(x => ({ role: x.role === "assistant" ? "assistant" : "user", content: `[MESSAGE]\n${limitText(x.text, 8000)}\n[/MESSAGE]` }));
 }
 
+function parseDiscoveryJson(text: string): any | null {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch {}
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced) { try { return JSON.parse(fenced[1]); } catch {} }
+  for (let start = 0; start < raw.length; start++) {
+    if (raw[start] !== "{") continue;
+    let depth = 0, quote = false, escape = false;
+    for (let i = start; i < raw.length; i++) {
+      const ch = raw[i];
+      if (quote) {
+        if (escape) { escape = false; continue; }
+        if (ch === "\\") { escape = true; continue; }
+        if (ch === '"') quote = false;
+        continue;
+      }
+      if (ch === '"') { quote = true; continue; }
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          try { return JSON.parse(raw.slice(start, i + 1)); } catch {}
+          break;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function discoveryRecovery(message: string, current: any = {}) {
+  const text = String(message || "").trim();
+  const lower = text.toLowerCase();
+  const type = String(current?.type || "").trim() || (/\b(game|website|web site|app|application|dashboard|api|software|ui|tool)\b/i.test(lower) ? "Website" : "Other");
+  const group = /\b(game|website|web site|app|application|dashboard|api|software|ui|tool|simulation|digital|virtual|fictional|story)\b/i.test(lower) ? "NON_REAL_WORLD" : "REAL_WORLD";
+  const project = {
+    title: String(current?.title || text.slice(0, 80) || "New project").trim(),
+    type,
+    goal: String(current?.goal || text).trim(),
+    users: Array.isArray(current?.users) ? current.users : [],
+    requirements: Array.isArray(current?.requirements) ? current.requirements : [],
+    constraints: Array.isArray(current?.constraints) ? current.constraints : [],
+    features: Array.isArray(current?.features) ? current.features : [],
+    decisions: Array.isArray(current?.decisions) ? current.decisions : [],
+    dependencies: Array.isArray(current?.dependencies) ? current.dependencies : [],
+    assets: Array.isArray(current?.assets) ? current.assets : [],
+    deliverables: Array.isArray(current?.deliverables) ? current.deliverables : [],
+    acceptanceCriteria: Array.isArray(current?.acceptanceCriteria) ? current.acceptanceCriteria : [],
+    successCriteria: Array.isArray(current?.successCriteria) ? current.successCriteria : [],
+    openQuestions: Array.isArray(current?.openQuestions) ? current.openQuestions : [],
+    platform: String(current?.platform || "").trim(),
+    technology: Array.isArray(current?.technology) ? current.technology : [],
+    visualDirection: String(current?.visualDirection || "").trim(),
+    game: current?.game && typeof current.game === "object" ? current.game : {},
+    plan: Array.isArray(current?.plan) ? current.plan : []
+  };
+  const missing = !project.users.length ? ["users"] :
+    type !== "Other" && !project.requirements.length ? ["requirements"] :
+    !project.deliverables.length ? ["deliverables"] : [];
+  return {
+    done: false,
+    question: missing[0] === "users" ? "Who is this primarily for?" :
+      missing[0] === "requirements" ? "What are the most important things this needs to do?" :
+      "What should ProjectX produce for you at the end?",
+    confidence: Math.min(0.62, Number(current?.understanding?.confidence || 0.4) || 0.4),
+    missing,
+    ambiguities: [],
+    classification: { group, label: group === "REAL_WORLD" ? "REAL-WORLD" : "NON-REAL-WORLD", reason: "Internal routing classification." },
+    category: String(current?.category || current?.type || type),
+    domainPack: {},
+    project,
+    workspace: { sections: Array.isArray(current?.workspace?.sections) ? current.workspace.sections : [] },
+    agents: Array.isArray(current?.agents) ? current.agents : [],
+    summary: String(current?.summary || "Building the project brief from your request.")
+  };
+}
+
 function ensureDiscoveryQuestion(result: any) {
   const out = result && typeof result === "object" ? { ...result } : {};
   const project = out.project && typeof out.project === "object" ? out.project : {};
@@ -497,12 +575,13 @@ async function chat(user: any, body: any) {
       const result = await providerChat(m.credential, m.id, messages, { providerKey: m.credential.providerKey, maxTokens: mode === "artifact" ? 10000 : mode === "understand" ? 3600 : 5000 });
       await admin.from("ai_usage").insert({ user_id: user.id, project_id: project?.id || null, action: mode, provider: m.provider, model: m.id, units: 1 });
       if (["understand", "artifact", "plan"].includes(mode)) {
-        try {
-          const parsed = JSON.parse(result.text);
-          return { ok: true, result: mode === "understand" ? ensureDiscoveryQuestion(parsed) : parsed, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
-        } catch {
-          return { ok: true, text: result.text, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
+        const parsed = mode === "understand" ? parseDiscoveryJson(result.text) : (() => { try { return JSON.parse(result.text); } catch { return null; } })();
+        if (mode === "understand") {
+          const safe = parsed && parsed.project ? parsed : discoveryRecovery(String(body.message || ""), project);
+          return { ok: true, result: ensureDiscoveryQuestion(safe), model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
         }
+        if (parsed) return { ok: true, result: parsed, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
+        return { ok: true, text: result.text, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
       }
       return { ok: true, text: result.text, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
     } catch (e) {
