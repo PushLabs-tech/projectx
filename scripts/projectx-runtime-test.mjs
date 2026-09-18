@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createProject, normalizeSections, validateSpec, applySpecChange, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
+import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -35,6 +35,23 @@ applySpecChange(game, { features: { remove: ['Pause menu'] } });
 assert.equal(game.specVersion, beforeRemove + 1);
 assert.deepEqual(game.spec.features, []);
 
+const researchProject = createProject({
+  title: 'EV Market Research', type: 'Research',
+  spec: { goal: 'Research the EV market for a school project', deliverables: ['Research brief'] },
+  sections: [{ name: 'Sources', kind: 'research', purpose: 'Track source-backed evidence.' }]
+});
+const researchMutation = applyProjectMutation(researchProject, {
+  researchPatch: {
+    query: 'EV adoption',
+    addSources: [{ url: 'https://example.com/report', title: 'Example report' }],
+    addFindings: [{ finding: 'Example finding', sourceUrl: 'https://example.com/report', confidence: 0.9 }]
+  }
+});
+assert.equal(researchMutation.researchChanged, true);
+assert.deepEqual(researchProject.research.queries, ['EV adoption']);
+assert.equal(researchProject.research.sources[0].url, 'https://example.com/report');
+assert.equal(researchProject.research.findings[0].confidence, 0.9);
+
 const files = { 'index.html': '<!doctype html><html><head><link rel="stylesheet" href="styles.css"></head><body><script src="app.js"></script></body></html>', 'styles.css': 'body{font-family:system-ui}', 'app.js': 'document.body.dataset.ready="1";' };
 const preview = assemblePreviewHtml(files);
 assert.match(preview, /body\{font-family/);
@@ -59,6 +76,9 @@ assert.match(runtime, /project.tests=/);
 assert.match(runtime, /rebuild-from-tests/);
 assert.match(runtime, /status==='passed'\?'verified':'needs-fix'/);
 assert.match(runtime, /projectArtifactKind/);
+assert.match(runtime, /renderResearchSection/);
+assert.match(runtime, /edge\('research'/);
+assert.match(runtime, /source-backed research/);
 assert.match(runtime, /Generate deliverable/);
 assert.match(runtime, /document-output/);
 assert.match(runtime, /Deliverable exists/);
