@@ -138,7 +138,33 @@ async function directGemini(messages, system, jsonMode = false, maxOutputTokens 
   throw last;
 }
 
-const parseJson = text => { try { return JSON.parse(text); } catch { const m = String(text).match(/\{[\s\S]*\}/); if (m) { try { return JSON.parse(m[0]); } catch {} } return null; } };
+const parseJson = text => {
+  const raw = String(text ?? '').trim();
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch {}
+  const fenced = raw.match(/\\`\\`\\`(?:json)?\\s*([\\s\\S]*?)\\s*\\`\\`\\`/i);
+  if (fenced) { try { return JSON.parse(fenced[1]); } catch {} }
+  for (let start = 0; start < raw.length; start++) {
+    if (raw[start] !== '{') continue;
+    let depth = 0, quote = false, escape = false;
+    for (let i = start; i < raw.length; i++) {
+      const ch = raw[i];
+      if (quote) {
+        if (escape) { escape = false; continue; }
+        if (ch === '\\\\') { escape = true; continue; }
+        if (ch === '"') quote = false;
+        continue;
+      }
+      if (ch === '"') { quote = true; continue; }
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) { try { return JSON.parse(raw.slice(start, i + 1)); } catch {} break; }
+      }
+    }
+  }
+  return null;
+};
 
 function effectiveMaxTokens(max){
   const mode=String(settingsState.executionMode||'Mostly Automatic');
@@ -154,7 +180,29 @@ async function aiJson(mode, payload, max = 3500) {
   if (session?.access_token) {
     const result = await edge('chat', { mode, agent, project: serializeForPersistence(payload.project || {}), message: payload.message || '', history: payload.history || [], model: preferred });
     if (result.result && typeof result.result === 'object') return result.result;
-    return parseJson(result.text || '');
+    const parsed = parseJson(result.text || '');
+    if (parsed && typeof parsed === 'object') return parsed;
+    if (mode === 'understand') {
+      const seed = payload.project && typeof payload.project === 'object' ? payload.project : {};
+      const text = String(payload.message || '').trim();
+      const lower = text.toLowerCase();
+      const type = String(seed.type || (/\\b(game|website|app|application|dashboard|api|software|tool)\\b/i.test(lower) ? 'Website' : 'Other'));
+      return {
+        done:false,
+        question: seed.users?.length ? (seed.requirements?.length ? 'What should ProjectX produce for you at the end?' : 'What are the most important things this needs to do?') : 'Who is this primarily for?',
+        confidence:0.4,
+        missing: seed.users?.length ? (seed.requirements?.length ? ['deliverables'] : ['requirements']) : ['users'],
+        ambiguities:[],
+        classification:{group:'PROJECT',label:'internal',reason:'internal'},
+        category:seed.category || type,
+        domainPack:{},
+        project:{...seed,goal:String(seed.goal||text)},
+        workspace:{sections:Array.isArray(seed.workspace?.sections)?seed.workspace.sections:[]},
+        agents:Array.isArray(seed.agents)?seed.agents:[],
+        summary:String(seed.summary||'Building the project brief from your request.')
+      };
+    }
+    return null;
   }
   const result = await directGemini(payload.history || [{ role: 'user', text: payload.message || JSON.stringify(payload) }], payload.system || 'You are ProjectX.', true, max);
   return parseJson(result.text);
