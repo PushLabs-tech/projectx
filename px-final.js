@@ -413,6 +413,8 @@ function renderProjectSecurity(project){
     {name:'No shell execution APIs',pass:!(/(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i.test(text)),detail:'Generated project files are scanned for direct command execution APIs.'},
     {name:'No eval constructors',pass:!(/\b(?:eval|new Function)\s*\(/i.test(text)),detail:'Generated files are scanned for eval/new Function.'},
     {name:'No javascript URLs',pass:!(/javascript\s*:/i.test(text)),detail:'Generated files are scanned for javascript: URLs.'},
+    {name:'No obvious embedded credentials',pass:!(/(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{12,}['"]/i.test(text)),detail:'Generated files are scanned for credential-like assignments.'},
+    {name:'No insecure HTTP resources',pass:!(/(?:src|href|fetch\s*\()\s*[^\n]{0,80}http:\/\//i.test(text)),detail:'Generated files are scanned for plaintext HTTP resources.'},
     {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.'}
   ];
   toolShell('SECURITY','Project security checks','Fast local checks on generated files. This does not replace a full security review.','<div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'PASS':'FAIL')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div>');
