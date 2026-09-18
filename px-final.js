@@ -285,7 +285,7 @@ function toolShell(kicker,title,description,body){
 }
 function brainList(title,items){
   const values=(items||[]).filter(Boolean);
-  return '<div class="brain-group"><b>'+esc(title)+'</b>'+(values.length?values.map(x=>'<div class="brain-row">'+esc(x)+'</div>').join(''):'<div class="sub">Nothing recorded yet.</div>')+'</div>';
+  return '<div class="brain-group"><b>'+esc(title)+'</b>'+(values.length?values.map(x=>'<div class="brain-row">'+esc(typeof x==='string'?x:(x.name||x.title||x.url||x.content||JSON.stringify(x)))+'</div>').join(''):'<div class="sub">Nothing recorded yet.</div>')+'</div>';
 }
 function renderBrain(project){
   const u=project.understanding||{},s=project.spec||{};
