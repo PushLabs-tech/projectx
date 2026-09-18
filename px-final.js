@@ -424,7 +424,7 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
   try{
     const discoveryProject=meta.brain?.project||{};
     const discoveryUnderstanding=meta.brain?.understanding||{};
-    const data=await aiJson('understand',{project:{...discoveryProject,understanding:discoveryUnderstanding},history,message:payload.messageOverride||history[history.length-1]?.text||'',system:interviewSystem},3600);
+    const data=await aiJson('understand',{project:{...discoveryProject,understanding:discoveryUnderstanding},history,message:meta.messageOverride||history[history.length-1]?.text||'',system:interviewSystem},3600);
     if(!data||!data.project)throw new Error('The AI returned no usable project-understanding result.');
     const group=String(data.classification?.group||discoveryUnderstanding.group||'').trim().toUpperCase();
     if(group!=='REAL_WORLD'&&group!=='NON_REAL_WORLD')throw new Error('The AI did not return a valid REAL_WORLD/NON_REAL_WORLD classification.');
@@ -446,6 +446,7 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
     const confidence=Number(data.confidence||0);
     const workspace=(Array.isArray(workspaceCandidate)?workspaceCandidate:[]).filter(s=>s&&String(s.name||'').trim()).slice(0,8);
     const done=data.done===true&&quality.valid&&confidence>=.82&&missing.length===0&&ambiguities.length===0&&workspace.length>=2;
+    meta.messageOverride='';
     if(!done){
       if(!validDiscoveryPollLocal(data?.poll)){
         throw new Error('The AI returned invalid contextual poll options. No generic choices were substituted.');
