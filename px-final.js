@@ -165,6 +165,17 @@ function home(){shell(`<div class="wrap"><div class="center"><div class="kicker"
 async function beginCreation(text){const intent=String(text||'').trim();if(!intent)return;if(!session&&!localGuestKey())return aiRequiredModal('ProjectX needs an AI connection. You can use a free-tier Gemini key in this browser, or sign in and use a server-side provider connection.');const history=[{role:'user',text:intent}],meta={answers:[],brain:null};renderInterview(history,meta);await continueInterview(history,meta.answers,meta);}
 function renderInterview(history,meta){shell(`<div class="interview"><div class="kicker">PROJECT X · ONE CHAT</div><h1 class="hero-title" style="font-size:46px">Let’s understand it.</h1><p class="sub">Stay in this one conversation until the project is sufficiently understood.</p><div id="interview-understanding" class="understanding" aria-live="polite"></div><div id="interview-log" class="conversation"></div><form id="interview-form" class="form"><textarea id="interview-input" placeholder="Answer in your own words..."></textarea><button id="interview-send">Send</button></form><div id="interview-status" class="sub" style="text-align:center;margin-top:8px">Thinking…</div></div>`,'home');drawConversation(history,'#interview-log');$('#interview-form').onsubmit=async e=>{e.preventDefault();const input=$('#interview-input'),send=$('#interview-send'),text=input.value.trim();if(!text||send.disabled)return;send.disabled=true;history.push({role:'user',text});meta.answers.push(text);input.value='';drawConversation(history,'#interview-log');try{await continueInterview(history,meta.answers,meta);}finally{send.disabled=false;}};$('#interview-input').onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#interview-form').requestSubmit();}};}
 function drawConversation(history,selector){const el=$(selector);if(!el)return;el.innerHTML=history.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');el.scrollTop=el.scrollHeight;}
+function mergeDiscoveryProject(previous={},next={}){
+  const out={...(previous||{})};
+  const scalar=['title','goal','platform','visualDirection','currentState'];
+  for(const key of scalar) if(next&&typeof next[key]==='string'&&next[key].trim()) out[key]=next[key].trim();
+  for(const key of ['users','requirements','constraints','features','decisions','dependencies','assets','deliverables','acceptanceCriteria','successCriteria','technology']){
+    if(Array.isArray(next?.[key])) out[key]=[...new Set([...(Array.isArray(out[key])?out[key]:[]),...next[key].map(v=>String(v??'').trim()).filter(Boolean)])];
+  }
+  if(Array.isArray(next?.openQuestions)) out.openQuestions=next.openQuestions.map(v=>String(v??'').trim()).filter(Boolean);
+  if(next?.game&&typeof next.game==='object') out.game={...(out.game||{}),...Object.fromEntries(Object.entries(next.game).filter(([k,v])=>typeof v==='boolean'?true:String(v??'').trim()))};
+  return out;
+}
 function renderInterviewUnderstanding(data){
   const root=$('#interview-understanding');
   if(!root)return;
@@ -184,14 +195,18 @@ async function continueInterview(history, answers, meta={}){
     const discoveryProject=meta.brain?.project||{};
     const discoveryUnderstanding=meta.brain?.understanding||{};
     const data=await aiJson('understand',{project:{...discoveryProject,understanding:discoveryUnderstanding},history,message:history[history.length-1]?.text||'',system:interviewSystem},3600);
-    meta.brain={project:data?.project||discoveryProject,understanding:{confidence:Number(data?.confidence||0),missing:Array.isArray(data?.missing)?data.missing:[],ambiguities:Array.isArray(data?.ambiguities)?data.ambiguities:[],group:String(data?.classification?.group||discoveryUnderstanding.group||'').toUpperCase(),category:String(data?.category||discoveryUnderstanding.category||'').trim(),summary:String(data?.summary||'').trim()}};
     if(!data||!data.project)throw new Error('The AI returned no usable project-understanding result.');
-    const group=String(data.classification?.group||'').trim().toUpperCase();
+    const group=String(data.classification?.group||discoveryUnderstanding.group||'').trim().toUpperCase();
     if(group!=='REAL_WORLD'&&group!=='NON_REAL_WORLD')throw new Error('The AI did not return a valid REAL_WORLD/NON_REAL_WORLD classification.');
-    renderInterviewUnderstanding(data);
-    const type=normalizeProjectType(data.project.type||'Other');
-    const category=String(data.category||'').trim().slice(0,120);
-    const spec=mergeSpec({},data.project);
+    const mergedProject=mergeDiscoveryProject(discoveryProject,data.project);
+    const category=String(data.category||discoveryUnderstanding.category||'').trim();
+    const summary=String(data.summary||discoveryUnderstanding.summary||'').trim();
+    meta.brain={project:mergedProject,understanding:{confidence:Number(data?.confidence||0),missing:Array.isArray(data?.missing)?data.missing:[],ambiguities:Array.isArray(data?.ambiguities)?data.ambiguities:[],group,category,summary}};
+
+    renderInterviewUnderstanding({...data,project:mergedProject,category,summary});
+    const type=normalizeProjectType(mergedProject.type||data.project.type||'Other');
+    const safeCategory=category.slice(0,120);
+    const spec=mergeSpec({},mergedProject);
     const quality=validateSpec(spec,type);
     const declaredMissing=Array.isArray(data.missing)?data.missing:[];
     const ambiguities=Array.isArray(data.ambiguities)?data.ambiguities:[];
@@ -208,8 +223,8 @@ async function continueInterview(history, answers, meta={}){
       return;
     }
     const project=createProject({title:data.project.title,type,intent:data.project.goal||history[0].text,spec,sections:workspace,conversation:history,agents:data.agents});
-    project.category=category||type;
-    project.understanding={confidence,missing:[],ambiguities:[],method:session?'secure-ai':'guest-ai',group,groupLabel:group==='REAL_WORLD'?'REAL-WORLD':'NON-REAL-WORLD',category:category||type,executionType:type,classification:type,summary:data.summary||''};
+    project.category=safeCategory||type;
+    project.understanding={confidence,missing:[],ambiguities:[],method:session?'secure-ai':'guest-ai',group,groupLabel:group==='REAL_WORLD'?'REAL-WORLD':'NON-REAL-WORLD',category:safeCategory||type,executionType:type,classification:data.classification||{group,label:group,reason:'Classification established from the request.'},summary:summary||''};
     project.status='ready';
     saveProject(project,true);
     await syncRemoteProject(project);
