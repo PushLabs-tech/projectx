@@ -352,9 +352,20 @@ async function renderOutput(project){
   const current=output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
   const title=software?(project.type==='Game'?'Playtest':'Output'):'Deliverable';
   const description=current?'Current output generated from the project brain.':software?'No current artifact exists yet.':'No document deliverable exists yet.';
-  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button></div><div id="output-area" style="margin-top:14px"async function buildArtifact(project){
+  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button></div><div id="output-area" style="margin-top:14px"></div></div>`;
+  $('#build-output').onclick=()=>buildArtifact(project);
+  if(current){
+    if(software)mountArtifact(project);
+    else{
+      const docPath=Object.keys(project.files||{}).find(p=>/\.(md|txt|csv|json)$/i.test(p))||Object.keys(project.files||{})[0];
+      $('#output-area').innerHTML=`<div class="document-output"><pre class="document-text">${esc(docPath?project.files[docPath]:'No document content.')}</pre></div>`;
+    }
+  }else $('#output-area').innerHTML='<div class="placeholder">ProjectX will generate the deliverable from the current canonical specification.</div>';
+}
+async function buildArtifact(project){
   if(!session&&!localGuestKey())return aiRequiredModal('Connect Gemini before ProjectX can build the real artifact.');
   const button=$('#build-output'),area=$('#output-area'),software=projectArtifactKind(project.type)==='software';
+  if(!button||!area)return;
   button.disabled=true;
   area.innerHTML='<div class="sub">ProjectX is generating and validating the real deliverable…</div>';
   try{
@@ -372,7 +383,7 @@ async function renderOutput(project){
       const structural=[
         {name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'},
         {name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'},
-        {name:'No obvious placeholder markers',pass:!(/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\n'))),detail:/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\n'))?'Placeholder marker found.':'No obvious placeholder marker found.'}
+        {name:'No obvious placeholder markers',pass:!(/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'))),detail:/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'))?'Placeholder marker found.':'No obvious placeholder marker found.'}
       ];
       if(!structural.every(x=>x.pass))throw new Error(structural.filter(x=>!x.pass).map(x=>x.detail).join(' '));
       const runtime=await browserRuntimeCheck(files);
@@ -382,7 +393,7 @@ async function renderOutput(project){
     }else{
       const docPaths=Object.keys(files).filter(p=>/\.(md|txt|csv|json)$/i.test(p));
       if(!docPaths.length)throw new Error('The AI did not return a usable document deliverable.');
-      const text=docPaths.map(p=>String(files[p])).join('\n');
+      const text=docPaths.map(p=>String(files[p])).join('\\n');
       const checks=[
         {name:'Document exists',pass:text.trim().length>40,detail:text.trim().length>40?'Document content is present.':'Document content is too short.'},
         {name:'No obvious placeholder markers',pass:!(/\b(TODO|FIXME|coming soon)\b/i.test(text)),detail:/\b(TODO|FIXME|coming soon)\b/i.test(text)?'Placeholder marker found.':'No obvious placeholder marker found.'}
@@ -404,7 +415,14 @@ async function renderOutput(project){
     area.innerHTML=`<div class="placeholder">Generation failed: ${esc(error.message)}. Your previous deliverable was kept.</div>`;
   }finally{button.disabled=false;}
 }
-y(x=>x.pass);
+function mountArtifact(project){const area=$('#output-area');if(!area)return;area.innerHTML='<div class="artifact"><iframe id="project-frame" sandbox="allow-scripts" title="Project output"></iframe></div>';const frame=$('#project-frame');frame.srcdoc=assemblePreviewHtml(project.files||{});runtimeTestCleanup?.();const onMessage=e=>{if(e.data?.type==='PROJECTX_RUNTIME_ERROR')notify(`Project runtime error: ${e.data.message}`,'error');};window.addEventListener('message',onMessage);runtimeTestCleanup=()=>window.removeEventListener('message',onMessage);}
+function renderFiles(project){const paths=Object.keys(project.files||{}).sort(),first=paths[0]||null;const body=$('#project-body');body.innerHTML=`<div class="box"><div class="files"><div class="file-list">${paths.map((path,i)=>`<button class="${i===0?'active':''}" data-file="${esc(path)}">${esc(path)}</button>`).join('')||'<div class="sub">No generated files yet.</div>'}</div><div style="padding-left:14px"><div class="row"><b id="file-name">${esc(first||'No file selected')}</b>${first?'<button class="download" id="download-file">Download</button>':''}</div><pre id="file-code" class="code">${esc(first?project.files[first]:'Build the project to create real files.')}</pre></div></div></div>`;$$('[data-file]',body).forEach(button=>button.onclick=()=>{$$('[data-file]',body).forEach(x=>x.classList.remove('active'));button.classList.add('active');const path=button.dataset.file;$('#file-name').textContent=path;$('#file-code').textContent=project.files[path];});$('#download-file')?.addEventListener('click',()=>downloadText(first,project.files[first]));}
+function downloadText(name,content,type='text/plain'){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name.split('/').pop();a.click();setTimeout(()=>URL.revokeObjectURL(url),500);}
+async function renderTests(project){
+  const body=$('#project-body');
+  const saved=project.tests?.specVersion===project.specVersion&&Array.isArray(project.tests?.results)?project.tests.results:[];
+  const drawResults=(results,status)=>{
+    const passed=results.every(x=>x.pass);
     $('#test-results').innerHTML=`<div class="sub" style="margin-bottom:9px">Last run: ${status|| (passed?'passed':'failed')}.</div><div class="result-list">${results.map(result=>`<div class="result ${result.pass?'pass':'fail'}"><b>${result.pass?'PASS':'FAIL'} · ${esc(result.name)}</b><div class="sub">${esc(result.detail)}</div></div>`).join('')}</div>${passed?'':'<div class="actions" style="margin-top:12px"><button class="ghost" id="rebuild-from-tests">Rebuild with AI</button></div>'}`;
     $('#rebuild-from-tests')?.addEventListener('click',()=>{renderOutput(project);buildArtifact(project);});
   };
@@ -424,8 +442,7 @@ y(x=>x.pass);
     }finally{button.disabled=false;}
   };
 }
-async function runTests(project){const results=[],files=project.files||{},html=files['index.html']||files['src/index.html']||'';results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'});results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'});const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\n'));
-results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});results.push(await browserRuntimeCheck(files));return results;}
+async function runTests(project){const results=[],files=project.files||{},html=files['index.html']||files['src/index.html']||'';results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'});results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'});const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'));results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});results.push(await browserRuntimeCheck(files));return results;}
 function browserRuntimeCheck(files){return new Promise(resolve=>{const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.style.cssText='position:fixed;left:-99999px;width:800px;height:600px;opacity:0';document.body.appendChild(frame);let settled=false;const finish=result=>{if(settled)return;settled=true;window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove();resolve(result);};const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.'});};window.addEventListener('message',onMessage);const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.'}),2200);frame.srcdoc=assemblePreviewHtml(files);});}
 function renderDelivery(project){
   const body=$('#project-body'),software=projectArtifactKind(project.type)==='software';
