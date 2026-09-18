@@ -105,15 +105,6 @@ async function authAction(action, email, password) {
   return data;
 }
 
-async function socialAuth(provider) {
-  const client = ensureSupabase();
-  if (!client) throw new Error('Supabase authentication is not configured.');
-  const redirectTo = location.origin + location.pathname;
-  const { data, error } = await client.auth.signInWithOAuth({ provider, options: { redirectTo } });
-  if (error) throw error;
-  return data;
-}
-
 async function signOut() { try { projectRealtimeChannel&&await ensureSupabase()?.removeChannel(projectRealtimeChannel); } catch {} projectRealtimeChannel=null; try { await ensureSupabase()?.auth.signOut(); } catch {} session = null; }
 
 async function edge(action, payload = {}) {
@@ -297,200 +288,153 @@ function installOptionalAnalytics(){
   window.__projectxAnalyticsInstalled=true;
 }
 const CSS = `#px-app{position:fixed;inset:0;z-index:2147483000;background:#f8fafc;color:#171a1f;font:14px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}#px-app *{box-sizing:border-box}#px-app button,#px-app input,#px-app textarea,#px-app select{font:inherit}#px-app button:focus-visible,#px-app input:focus-visible,#px-app textarea:focus-visible,#px-app select:focus-visible{outline:2px solid #2674ff;outline-offset:2px}#px-app button:disabled{opacity:.55;cursor:not-allowed}@media (prefers-reduced-motion: reduce){#px-app *,#px-app *::before,#px-app *::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}#px-app .side{position:fixed;inset:0 auto 0 0;width:240px;background:#fafbfc;border-right:1px solid #e5e8eb;padding:24px 14px;display:flex;flex-direction:column;overflow:auto}.logo{font-size:21px;font-weight:800;letter-spacing:-.04em;padding:0 10px 24px}.new,.primary{border:0;border-radius:8px;background:#171a1f;color:#fff;cursor:pointer}.new{height:38px;font-size:12px;font-weight:700}.nav{display:grid;gap:2px;margin-top:12px}.nav button,.recent button,.assist-btn{border:1px solid transparent;background:transparent;color:#68717d;text-align:left;padding:9px 10px;border-radius:8px;font-size:11px;cursor:pointer}.nav button.active,.nav button:hover,.recent button:hover,.assist-btn:hover{background:#eef0f3;color:#171a1f}.label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#9aa2ad;padding:0 10px 8px}.divider{height:1px;background:#e5e8eb;margin:18px 7px}.acct{margin-top:auto;border:1px solid #dde1e5;border-radius:10px;background:#fff;padding:9px;font-size:11px}.main{margin-left:240px;height:100%;overflow:auto}.top{height:58px;border-bottom:1px solid #eceef1;display:flex;justify-content:flex-end;align-items:center;gap:7px;padding:0 28px}.top button,.ghost,.download{border:1px solid #dfe3e7;background:#fff;color:#505966;border-radius:7px;padding:8px 11px;font-size:11px;cursor:pointer}.wrap,.interview,.panel,.project{width:min(1040px,calc(100% - 48px));margin:auto;padding:42px 0}.center{text-align:center}.kicker{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#a0a7b0}.hero-title,.project-title{font-size:clamp(34px,4.5vw,52px);line-height:1.04;letter-spacing:-.045em;margin:12px 0;font-weight:720}.sub{color:#78818d;line-height:1.55;font-size:13px}.composer{border:1px solid #d7dce2;border-radius:12px;max-width:900px;margin:26px auto 0;overflow:hidden}.composer textarea{width:100%;min-height:140px;border:0;outline:0;resize:vertical;padding:18px}.composer-foot{border-top:1px solid #edf0f2;display:flex;justify-content:space-between;align-items:center;padding:7px}.send{width:39px;height:39px;border:0;border-radius:8px;background:#171a1f;color:#fff;cursor:pointer}.send:disabled,.primary:disabled{opacity:.45;cursor:wait}.chips{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin:16px 0}.chip{border:1px solid #dfe3e7;background:#fff;border-radius:999px;padding:7px 10px;font-size:10px;color:#68717d;cursor:pointer}.conversation{display:grid;gap:9px;max-height:58vh;overflow:auto;margin:20px 0}.discovery-poll{max-width:720px;margin:26px auto 0}.poll-card{border:1px solid #dfe4e9;border-radius:16px;background:#fff;box-shadow:0 10px 32px rgba(25,34,45,.06);padding:18px}.poll-head{padding:2px 4px 13px}.poll-eyebrow{font-size:9px;letter-spacing:.15em;font-weight:800;color:#9aa3ad}.poll-title{margin-top:5px;font-size:16px;font-weight:750;letter-spacing:-.015em;color:#171a1f}.poll-options{display:grid;gap:8px}.poll-option{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:1px solid #e0e5e9;background:#fff;border-radius:10px;padding:12px 13px;color:#303842;font-size:12px;line-height:1.45;cursor:pointer;transition:border-color .15s ease,background .15s ease,transform .15s ease}.poll-option:hover{border-color:#aeb7c0;background:#fafbfc;transform:translateY(-1px)}.poll-option.selected{border-color:#171a1f;background:#f4f5f6}.poll-radio{width:16px;height:16px;border:1.5px solid #b6bec7;border-radius:50%;flex:0 0 auto;position:relative}.poll-option.selected .poll-radio{border-color:#171a1f}.poll-option.selected .poll-radio:after{content:"";position:absolute;inset:3px;border-radius:50%;background:#171a1f}.poll-custom{display:grid;gap:8px;margin-top:10px}.poll-custom textarea{width:100%;min-height:88px;border:1px solid #d7dce2;border-radius:10px;padding:12px;outline:0;resize:vertical;font:12px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.poll-custom .primary{justify-self:end;padding:9px 14px}.poll-status{max-width:720px;margin:9px auto 0;text-align:center}.msg{max-width:84%;padding:11px 14px;border-radius:13px;white-space:pre-wrap;font-size:13px;line-height:1.5}.msg.ai{background:#f3f4f5}.msg.user{background:#171a1f;color:#fff;justify-self:end}.form{display:flex;gap:7px;border:1px solid #d7dce2;border-radius:12px;padding:7px}.form textarea{flex:1;min-height:45px;border:0;outline:0;resize:none;padding:9px}.form button{border:0;border-radius:8px;background:#171a1f;color:#fff;padding:0 16px;cursor:pointer}.project-context{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:8px 0 4px;color:#6f7884;font-size:11px}.project-tools{display:flex;gap:6px;overflow:auto;padding:10px 0 6px}.tool-btn{border:1px solid #e1e5e9;background:#fff;border-radius:999px;padding:6px 9px;color:#66707c;font-size:10px;white-space:nowrap;cursor:pointer}.tool-btn:hover,.tool-btn:focus{border-color:#aeb6bf;color:#171a1f}.brain-group{padding:12px 0;border-top:1px solid #edf0f2}.brain-group:first-child{border-top:0;padding-top:0}.brain-row{padding:7px 0;color:#3e4650;font-size:12px;line-height:1.45}.preview-toolbar{display:flex;gap:6px;justify-content:center;margin-bottom:9px}.code-editor{width:100%;min-height:560px;margin-top:10px;border:1px solid #e1e5e9;border-radius:8px;padding:12px;background:#fbfcfd;color:#252a30;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical;box-sizing:border-box}.preview-toolbar .ghost.active{background:#171a1f;color:#fff}.artifact{display:flex;justify-content:center;border:1px solid #e1e5e9;border-radius:10px;background:#f6f7f8;overflow:auto;padding:12px}.artifact iframe{border:0;background:#fff;min-height:620px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:width .2s ease}.preview-desktop iframe{width:100%}.preview-tablet iframe{width:768px;max-width:100%}.preview-mobile iframe{width:390px;max-width:100%}.architecture-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.architecture-node{border:1px solid #e5e8eb;border-radius:10px;padding:12px;background:#fbfcfd}.simulation-score{font-size:24px;letter-spacing:-.03em;margin-bottom:14px}.version-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-top:1px solid #edf0f2}.version-row:first-child{border-top:0}.project-context+.project-tools{margin-top:2px}.project-tools+.sections{margin-top:4px}.context-group{font-size:9px;letter-spacing:.12em;font-weight:800;color:#171a1f}.project-context+.sections{margin-top:10px}.sections{display:flex;overflow:auto;border-bottom:1px solid #e6e9ec;justify-content:center}.tab{border:0;background:transparent;padding:12px 13px;color:#7b8490;font-size:11px;font-weight:700;white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer}.tab.active{color:#171a1f;border-bottom-color:#171a1f}.body{padding-top:24px}.box{border:1px solid #e1e5e9;border-radius:11px;background:#fff;padding:16px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.section-block{padding:11px 12px;margin:10px 0;border:1px solid #edf0f2;border-radius:9px;background:#fbfcfd}.document-output{border:1px solid #e1e5e9;border-radius:10px;background:#fbfcfd;overflow:auto;max-height:650px}.document-text{margin:0;padding:18px;white-space:pre-wrap;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#252a30}.section-block b{font-size:12px}.section-block p{margin:4px 0 0;color:#6f7884;font-size:12px;line-height:1.5}.item{border-top:1px solid #edf0f2;padding:12px 0}.item:first-child{border-top:0}.item b{font-size:12px}.item p{margin:4px 0;color:#6f7884;font-size:12px;line-height:1.5}.files{display:grid;grid-template-columns:220px 1fr;min-height:470px}.file-list{border-right:1px solid #e7eaed;padding-right:10px;overflow:auto}.file-list button{width:100%;border:0;background:transparent;text-align:left;padding:8px;border-radius:6px;font-size:11px;color:#65707c;cursor:pointer}.file-list button.active,.file-list button:hover{background:#f0f2f4;color:#171a1f}.code{margin:0;background:#f7f8f9;border-radius:8px;padding:14px;white-space:pre-wrap;overflow:auto;max-height:560px;font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}.artifact iframe{width:100%;height:620px;border:1px solid #dfe3e7;border-radius:9px;background:#fff}.result-list{display:grid;gap:8px}.result{border:1px solid #e1e5e9;border-radius:9px;padding:11px}.result.pass{border-color:#cde8d5}.result.fail{border-color:#efcaca}.settings{display:grid;grid-template-columns:190px 1fr;gap:25px}.settings-nav{display:grid;align-content:start;gap:2px;border-right:1px solid #e5e8eb;padding-right:12px}.settings-nav button{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:7px;color:#68717d;font-size:11px;cursor:pointer}.settings-nav button.active,.settings-nav button:hover{background:#eef0f3;color:#171a1f}.input,.select{height:35px;border:1px solid #d9dee3;border-radius:7px;padding:0 9px;outline:0;background:#fff;font-size:11px}.input.full{width:100%}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px 0}.row+.row{border-top:1px solid #edf0f2}.status{font-size:10px;font-weight:700}.ok{color:#287a45}.bad{color:#a33a3a}.warn{color:#8f6b11}.placeholder{border:1px dashed #d9dee3;border-radius:8px;padding:12px;color:#8a939d;font-size:11px;line-height:1.5}.modal-bg{position:fixed;inset:0;z-index:2147483600;background:rgba(15,19,24,.34);display:grid;place-items:center;padding:20px}.modal{width:min(540px,100%);background:#fff;border-radius:14px;padding:22px;box-shadow:0 18px 70px rgba(0,0,0,.18)}.modal h2{margin:0 0 7px;font-size:22px;letter-spacing:-.04em}.actions{display:flex;justify-content:flex-end;gap:7px;margin-top:17px}.actions button{height:35px;padding:0 11px;border-radius:7px;border:1px solid #d9dee3;background:#fff;cursor:pointer;font-size:10px}.actions .primary{background:#171a1f;color:#fff;border-color:#171a1f}.understanding{max-width:900px;margin:18px auto 0}.understanding-main{border:1px solid #dfe4e9;border-radius:14px;padding:18px 20px;background:#fff;box-shadow:0 8px 28px rgba(25,34,45,.05)}.understanding-copy{min-width:0}.understanding-eyebrow{font-size:9px;letter-spacing:.16em;font-weight:800;color:#929ba6}.understanding-title{font-size:15px;font-weight:760;letter-spacing:-.01em;margin:5px 0 3px}.understanding-summary{font-size:12px;line-height:1.6;max-width:760px}.understanding-category{display:inline-block;margin-top:10px;font-size:10px;color:#4f5863;background:#f2f5f7;border:1px solid #e2e6ea;border-radius:999px;padding:5px 8px}.understanding-known{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.understanding-known span{font-size:10px;color:#4f5863;background:#f6f8fa;border:1px solid #e3e7eb;border-radius:999px;padding:5px 8px}.understanding-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:9px;font-size:10px;color:#6f7884}.notice{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2147483700;background:#171a1f;color:#fff;padding:10px 14px;border-radius:10px;font-size:12px;max-width:calc(100vw - 28px);box-shadow:0 10px 30px rgba(0,0,0,.14)}.notice.error{background:#8e2d2d}.notice.success{background:#1f6d3c}.approval-card{margin-top:12px;padding:13px;border:1px solid #d8dde2;border-radius:10px;background:#fafbfc}.approval-card .kicker{margin-bottom:5px}.approval-card .brain-group{margin-top:10px}.analytics-banner{position:fixed;left:18px;right:18px;bottom:18px;z-index:2147483690;display:flex;justify-content:space-between;gap:15px;align-items:center;border:1px solid #d7dce2;border-radius:12px;background:#fff;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.1)}@media(max-width:720px){.analytics-banner{align-items:flex-start;flex-direction:column}}@media(max-width:820px){#px-app .side{inset:0 0 auto;width:auto;height:58px;flex-direction:row;align-items:center;padding:7px 10px;overflow:hidden}.logo{padding:0 8px;font-size:19px}.new{height:34px;padding:0 10px;margin-right:7px}.nav{display:flex;flex:1;justify-content:center;margin:0}.nav span,.divider,.label,.assist-btn,.recent{display:none}.acct{margin:0}.main{margin-left:0;padding-top:58px}.top{height:50px;padding:0 12px}.wrap,.interview,.panel,.project{width:calc(100% - 28px);padding:38px 0}.grid{grid-template-columns:1fr}.settings{grid-template-columns:1fr}.settings-nav{display:flex;overflow:auto;border-right:0;border-bottom:1px solid #e5e8eb;padding-bottom:8px}.files{grid-template-columns:1fr}.file-list{border-right:0;border-bottom:1px solid #e7eaed;padding-right:0;padding-bottom:8px}.sections{justify-content:flex-start}.msg{max-width:92%}}
-.public-home{min-height:100vh;background:#faf7f2;color:#303238;overflow:auto;position:relative}
-.public-home:before{content:"";position:absolute;inset:0;background:radial-gradient(700px 340px at 50% 76%,rgba(244,218,202,.34),transparent 68%);pointer-events:none}
-.public-nav{position:relative;z-index:2;height:72px;width:min(1120px,calc(100% - 40px));margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:22px}
-.public-brand{border:0;background:transparent;color:#303238;display:flex;align-items:center;gap:9px;font-size:20px;font-weight:800;letter-spacing:-.045em;cursor:pointer;padding:0}
-.public-brand-mark{width:24px;height:24px;display:grid;place-items:center}.public-brand-mark svg{width:21px;height:21px}
-.public-nav-links{display:flex;align-items:center;gap:30px;margin-left:auto;margin-right:10px}.public-nav-links a{color:#51565f;text-decoration:none;font-size:12px}.public-nav-links a:hover{color:#111}
-.public-nav-actions{display:flex;align-items:center;gap:8px}.public-nav-login,.public-nav-create{height:38px;padding:0 13px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}.public-nav-login{border:1px solid #e0ddd8;background:transparent;color:#454a52}.public-nav-create{border:1px solid #ff4b14;background:#ff4b14;color:#fff}
-.public-hero{position:relative;z-index:1;width:min(980px,calc(100% - 32px));margin:0 auto;text-align:center;padding:104px 0 34px}.public-eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#96918a;font-weight:700}.public-hero h1{margin:18px 0 12px;font-size:clamp(46px,7vw,72px);line-height:1.02;letter-spacing:-.065em;font-weight:500;color:#3a3b40}.public-hero p{max-width:650px;margin:0 auto;color:#70727a;font-size:15px;line-height:1.6}
-.public-composer{width:min(760px,100%);margin:32px auto 0;background:#fff;border:1px solid #dedbd6;border-radius:15px;box-shadow:0 8px 28px rgba(44,38,31,.05);overflow:hidden;text-align:left}.public-composer textarea{width:100%;min-height:104px;border:0;outline:0;resize:none;padding:17px 18px;color:#303238;font-size:13px;line-height:1.55;background:transparent}.public-composer textarea::placeholder{color:#8d8d91}.public-composer-foot{display:flex;align-items:center;justify-content:space-between;padding:8px 9px 9px;border-top:1px solid #efedea}.public-composer-plus{width:34px;height:34px;border:0;border-radius:8px;background:transparent;color:#6c7178;font-size:23px;line-height:1;cursor:pointer}.public-composer-send{min-width:64px;height:36px;border:0;border-radius:8px;background:#ff5a1f;color:#fff;font-size:12px;font-weight:700;cursor:pointer}.public-composer-send:hover{background:#f34d13}
-.public-categories{display:flex;align-items:center;justify-content:center;gap:10px;margin:17px auto 0;flex-wrap:wrap}.public-category{min-width:92px;border:1px solid #e0ddd8;background:rgba(255,255,255,.72);border-radius:11px;padding:9px 12px 10px;color:#51555c;font-size:10px;cursor:pointer}.public-category:hover{border-color:#c8c3bd;background:#fff}.public-category-icon{display:block;font-size:15px;margin-bottom:4px;color:#73777d}
-.public-examples{position:relative;z-index:1;width:min(820px,calc(100% - 32px));margin:24px auto 70px;text-align:center}.public-examples-label{display:flex;align-items:center;justify-content:center;gap:8px;color:#8a8b90;font-size:11px;margin-bottom:10px}.public-example-refresh{border:0;background:transparent;color:#696c72;cursor:pointer;font-size:14px}.public-example-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.public-example{border:1px solid #ddd9d4;background:#fff;border-radius:8px;padding:9px 11px;color:#555960;font-size:11px;cursor:pointer}.public-example:hover{border-color:#c8c3bd;color:#23262b}.public-note{margin-top:13px;color:#a09e9b;font-size:10px}
-@media(max-width:760px){.public-nav{width:calc(100% - 24px);height:64px}.public-nav-links{display:none}.public-nav-actions{margin-left:auto}.public-nav-login,.public-nav-create{height:35px}.public-hero{padding-top:75px}.public-hero h1{font-size:clamp(42px,13vw,60px)}.public-composer{margin-top:26px}.public-category{min-width:78px}.public-examples{margin-bottom:40px}}
 
-.workspace-active{background:#171719!important}
-.workspace-active .side{background:#1d1d1f;border-right:1px solid #2d2d30;color:#fff}
-.workspace-active .logo{color:#fff}
-.workspace-active .new{background:#2a2a2d;color:#fff;border:1px solid #39393d}
-.workspace-active .nav button,.workspace-active .recent button{color:#a7a7ac}
-.workspace-active .nav button.active,.workspace-active .nav button:hover,.workspace-active .recent button:hover{background:#2a2a2d;color:#fff}
-.workspace-active .divider{background:#303034}
-.workspace-active .label{color:#74747a}
-.workspace-active .acct{background:#222225;border-color:#343438;color:#d6d6da}
-.workspace-active .acct .sub{color:#89898f}
-.workspace-active .main{background:#171719}
-.workspace-active .top{display:none}
-.workspace-home-screen{min-height:100%;background:radial-gradient(560px 300px at 50% 72%,rgba(82,44,28,.28),transparent 68%),#171719;color:#eee;overflow:auto}
-.workspace-home-inner{width:min(820px,calc(100% - 34px));margin:0 auto;padding:clamp(92px,15vh,150px) 0 72px}
-.workspace-greeting{text-align:center}.workspace-greeting .kicker{color:#77777d}.workspace-greeting h1{margin:12px 0 8px;font-size:clamp(35px,5vw,54px);line-height:1.02;letter-spacing:-.055em;color:#ececef;font-weight:600}.workspace-greeting p{max-width:660px;margin:0 auto;color:#8f8f96;font-size:13px;line-height:1.65}
-.workspace-suggestions{margin:25px auto 0}.workspace-suggestion-label{color:#77777d;font-size:10px;margin-bottom:8px}.workspace-suggestion-row{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}.workspace-suggestion-row button,.workspace-capabilities button{border:1px solid #36363a;background:#202023;color:#c9c9ce;border-radius:999px;padding:8px 11px;font-size:10px;cursor:pointer}.workspace-suggestion-row button:hover,.workspace-capabilities button:hover{background:#29292d;color:#fff}.workspace-suggestion-row button:first-letter{color:#ff7a4d}
-.workspace-composer{margin-top:22px;border:1px solid #36363a;border-radius:14px;background:#202022;box-shadow:0 16px 50px rgba(0,0,0,.18);overflow:hidden}.workspace-composer textarea{width:100%;min-height:105px;padding:17px;border:0;outline:0;resize:none;background:transparent;color:#ededf0;font-size:13px;line-height:1.55}.workspace-composer textarea::placeholder{color:#77777d}.workspace-composer-foot{display:flex;align-items:center;justify-content:space-between;padding:8px 9px;border-top:1px solid #303034}.workspace-compose-left{display:flex;align-items:center;gap:8px;color:#707076;font-size:9px;min-width:0}.workspace-compose-left span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.workspace-compose-left button{width:30px;height:30px;border:0;background:transparent;color:#8b8b91;font-size:20px;border-radius:7px;cursor:pointer}.workspace-compose-left button:hover{background:#2a2a2d;color:#fff}.workspace-compose-right{display:flex;align-items:center;gap:8px}.workspace-mode{border:1px solid #343438;background:#242427;border-radius:7px;padding:7px 9px;color:#9c9ca2;font-size:9px}.workspace-compose-right #workspace-send{width:31px;height:31px;border:0;border-radius:8px;background:#f1f1f2;color:#151517;font-size:16px;cursor:pointer}.workspace-compose-right #workspace-send:hover{background:#fff}
-.workspace-capabilities{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin-top:16px}.workspace-capabilities button{border-radius:8px;padding:7px 10px;color:#97979d}.workspace-footer-note{text-align:center;margin-top:23px;color:#65656b;font-size:9px}
-@media(max-width:820px){.workspace-active .side{inset:0 0 auto;width:auto;height:56px;padding:7px 9px;background:#1d1d1f}.workspace-active .main{margin-left:0;padding-top:56px}.workspace-active .nav{display:flex}.workspace-active .nav button{display:none}.workspace-active .nav button:first-child{display:block}.workspace-active .new{height:34px}.workspace-active .acct{margin-left:auto}.workspace-home-inner{width:calc(100% - 24px);padding-top:75px}.workspace-greeting h1{font-size:clamp(34px,10vw,50px)}.workspace-compose-left span{display:none}}
+.public-home-ref{min-height:100vh;background:#faf8f5;color:#33353a;overflow:auto}
+.public-home-ref-nav{height:70px;width:min(1120px,calc(100% - 36px));margin:0 auto;display:flex;align-items:center;gap:28px}
+.public-brand-ref{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:800;letter-spacing:-.045em}
+.public-mark-ref{width:24px;height:24px;display:grid;place-items:center;color:#ff5520}.public-mark-ref svg{width:21px;height:21px}
+.public-nav-ref-links{display:flex;gap:28px;margin-left:auto}.public-nav-ref-links a{text-decoration:none;color:#64666b;font-size:11px}.public-nav-ref-links a:hover{color:#25272b}
+.public-nav-ref-actions{display:flex;gap:8px}.public-login-ref,.public-create-ref{height:38px;padding:0 13px;border-radius:8px;font-size:11px;cursor:pointer}.public-login-ref{border:1px solid #e0dcd7;background:transparent;color:#45474c}.public-create-ref{border:1px solid #ff5520;background:#ff5520;color:#fff}
+.public-hero-ref{width:min(900px,calc(100% - 28px));margin:0 auto;text-align:center;padding:115px 0 28px}.public-hero-ref h1{margin:14px 0 10px;font-size:clamp(46px,7vw,74px);font-weight:500;letter-spacing:-.065em;line-height:1.02;color:#3d3e43}.public-hero-ref>p{max-width:650px;margin:0 auto;color:#777a80;font-size:14px;line-height:1.65}
+.public-composer-ref{max-width:760px;margin:31px auto 0;border:1px solid #ddd9d4;background:#fff;border-radius:14px;text-align:left;overflow:hidden;box-shadow:0 8px 30px rgba(46,38,30,.045)}.public-composer-ref textarea{width:100%;height:105px;border:0;outline:0;resize:none;padding:17px;background:transparent;color:#33353a;font-size:13px}.public-composer-ref textarea::placeholder{color:#999a9e}.public-composer-footer-ref{display:flex;align-items:center;gap:10px;padding:8px;border-top:1px solid #eeeae6;color:#98999c;font-size:9px}.public-composer-footer-ref span{flex:1;text-align:center}.public-composer-footer-ref button{width:33px;height:33px;border:0;border-radius:8px;background:transparent;color:#777a80;font-size:21px;cursor:pointer}.public-composer-footer-ref button:last-child{background:#ff5a24;color:#fff;font-size:17px}.public-types-ref{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;margin-top:17px}.public-types-ref button{width:88px;padding:9px 7px 8px;border:1px solid #e0ddd8;border-radius:11px;background:rgba(255,255,255,.75);color:#5e6065;font-size:10px;cursor:pointer}.public-types-ref button:hover{background:#fff;border-color:#cbc6c0}.public-types-ref button:first-line{font-size:15px}.public-types-ref span{display:block;margin-top:4px}
+.public-examples-ref{width:min(850px,calc(100% - 28px));margin:12px auto 60px;text-align:center}.public-examples-title{font-size:10px;color:#8b8c90;margin-bottom:10px}.public-examples-title button{border:0;background:transparent;color:#676a70;cursor:pointer}.public-example-row{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}.public-example-chip{border:1px solid #ddd9d4;background:#fff;color:#55585e;border-radius:8px;padding:8px 10px;font-size:10px;cursor:pointer}.public-example-chip:hover{border-color:#c6c0ba;color:#25272b}.public-how-ref{width:min(850px,calc(100% - 28px));margin:0 auto 80px;padding:20px 0;border-top:1px solid #e6e2dd;text-align:center}.public-how-ref span{font-size:9px;letter-spacing:.12em;color:#9b9a97}.public-how-ref p{max-width:600px;margin:8px auto 0;color:#8b8c91;font-size:11px;line-height:1.6}
+.workspace-home-ref{min-height:100%;background:radial-gradient(560px 250px at 50% 72%,rgba(90,51,31,.17),transparent 70%),#f7f8fa;padding-bottom:60px}.workspace-home-ref-inner{width:min(800px,calc(100% - 30px));margin:auto;padding:clamp(85px,14vh,135px) 0 40px}.workspace-home-ref .kicker{text-align:center;color:#9a9da3}.workspace-home-ref h1{text-align:center;margin:10px 0 8px;font-size:clamp(34px,5vw,52px);line-height:1.03;letter-spacing:-.055em;font-weight:600;color:#202329}.workspace-lede{text-align:center;max-width:650px;margin:0 auto;color:#81868e;font-size:13px;line-height:1.6}.workspace-suggestions{margin:25px auto 0}.workspace-suggestions>span{display:block;color:#91949a;font-size:10px;margin-bottom:8px}.workspace-suggestion-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.workspace-suggestion-row button{border:1px solid #dfe2e6;background:#fff;border-radius:999px;padding:8px 11px;color:#5e646c;font-size:10px;cursor:pointer}.workspace-suggestion-row button:hover{border-color:#c7cbd0;background:#fbfbfb}.workspace-composer-ref{margin:22px auto 0;border:1px solid #d7dbe0;border-radius:13px;background:#fff;overflow:hidden;box-shadow:0 10px 26px rgba(29,35,42,.05)}.workspace-composer-ref textarea{width:100%;height:112px;border:0;outline:0;resize:none;padding:17px;background:#fff;color:#22262b;font-size:13px}.workspace-composer-ref textarea::placeholder{color:#9da1a6}.workspace-composer-footer{display:flex;align-items:center;gap:8px;border-top:1px solid #eef0f2;padding:7px 8px;color:#91959a;font-size:9px}.workspace-composer-footer span{flex:1}.workspace-composer-footer button{width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:#777d84;font-size:20px;cursor:pointer}.workspace-composer-footer button:last-child{background:#202327;color:#fff;font-size:16px}.workspace-modes{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin-top:13px}.workspace-modes button{border:1px solid #dde0e4;background:#fff;color:#72777e;border-radius:8px;padding:7px 10px;font-size:9px;cursor:pointer}.workspace-modes button:hover{background:#f7f8f9;color:#30353b}
+@media(max-width:760px){.public-home-ref-nav{width:calc(100% - 20px);height:62px}.public-nav-ref-links{display:none}.public-nav-ref-actions{margin-left:auto}.public-hero-ref{padding-top:78px}.public-hero-ref h1{font-size:clamp(42px,12vw,62px)}.public-composer-footer-ref span{display:none}.workspace-home-ref-inner{padding-top:65px}.workspace-home-ref .workspace-lede{font-size:12px}}
 
-.auth-ref-bg{background:rgba(10,10,11,.62);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
-.auth-ref-modal{position:relative;width:min(500px,calc(100% - 30px));background:#faf7f2;border:1px solid #e5dfd6;border-radius:18px;padding:31px 28px 23px;box-shadow:0 24px 90px rgba(0,0,0,.28);text-align:center;color:#24262a}.auth-ref-close{position:absolute;right:10px;top:8px;width:31px;height:31px;border:0;background:transparent;color:#6d6b69;font-size:21px;cursor:pointer;border-radius:8px}.auth-ref-close:hover{background:#eee9e2}.auth-ref-mark{display:flex;justify-content:center;margin-bottom:9px}.auth-ref-mark .public-brand-mark{width:32px;height:32px;color:#ff5a1f}.auth-ref-modal>.kicker{color:#aaa39a}.auth-ref-modal h2{margin:9px 0 6px;font-size:28px;letter-spacing:-.05em;font-weight:600}.auth-ref-modal>.sub{max-width:400px;margin:0 auto;color:#797773;font-size:12px}.auth-ref-socials{display:grid;gap:8px;margin-top:20px}.auth-ref-socials button{height:43px;border:1px solid #dfd6cb;border-radius:9px;background:#fbf8f4;color:#31343a;font-size:12px;cursor:pointer}.auth-ref-socials button:hover{background:#fff;border-color:#cfc5b9}.auth-ref-socials span{display:inline-grid;place-items:center;width:20px;margin-right:7px;font-weight:800}.auth-ref-divider{display:flex;align-items:center;gap:10px;margin:19px 0 10px;color:#9a9690;font-size:10px}.auth-ref-divider:before,.auth-ref-divider:after{content:"";height:1px;flex:1;background:#ded8d0}.auth-ref-name-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.auth-ref-modal .input{height:43px;background:#fff;border-color:#ddd7d0}.auth-ref-status{min-height:28px;text-align:left;color:#7e4d4d;font-size:10px;line-height:1.45;padding-top:8px}.auth-ref-submit{width:100%;height:45px;border:0;border-radius:9px;background:#202124;color:#fff;font-size:12px;font-weight:700;cursor:pointer}.auth-ref-submit:hover{background:#111}.auth-ref-switch{margin-top:13px;color:#8a8782;font-size:10px}.auth-ref-switch button{border:0;background:none;color:#202124;font:inherit;font-weight:700;cursor:pointer;text-decoration:underline}.auth-ref-note{margin:15px 0 0;color:#aaa49b;font-size:9px;line-height:1.5}
-@media(max-width:560px){.auth-ref-modal{padding:27px 18px 20px}.auth-ref-modal h2{font-size:24px}}`;
+`;
 function installCss(){if($('#px-style'))return;const style=document.createElement('style');style.id='px-style';style.textContent=CSS;document.head.appendChild(style);}
 function ensureShell(){installCss();let root=$('#px-app');if(!root){root=document.createElement('div');root.id='px-app';document.body.appendChild(root);}return root;}
-function shell(body, active='home'){
-  const root=ensureShell();
-  root.classList.remove('workspace-active');
-  const recents=state.projects.slice(0,6);
-  root.innerHTML=`<aside class="side"><div class="logo">ProjectX</div><button class="new" data-nav="home">+ New project</button><nav class="nav"><button data-nav="home" class="${active==='home'?'active':''}">Home</button><button data-nav="projects" class="${active==='projects'?'active':''}">Projects</button><button data-nav="assistant" class="${active==='assistant'?'active':''}">Assistant</button><button data-nav="analytics" class="${active==='analytics'?'active':''}">Analytics</button><button data-nav="settings" class="${active==='settings'?'active':''}">Settings</button></nav><div class="divider"></div><div class="label">Recent</div><div class="recent">${recents.map(p=>`<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('')||'<div class="sub" style="padding:6px 10px">No projects yet</div>'}</div><div class="acct">${session?.user?.email?`Signed in as ${esc(session.user.email)}`:'Guest workspace'}<div class="sub" style="font-size:10px;margin-top:2px">${session?'Cloud sync enabled':'Local sync enabled'}</div></div></aside><main class="main"><div class="top"><button data-nav="home">Home</button>${session?'<button data-action="signout">Sign out</button>':'<button data-action="signin">Sign in</button>'}</div>${body}</main>`;
-  root.onclick=async e=>{
-    const nav=e.target.closest('[data-nav]')?.dataset.nav;if(nav)return navigate(nav);
-    const open=e.target.closest('[data-open]')?.dataset.open;if(open)return openProject(open);
-    const action=e.target.closest('[data-action]')?.dataset.action;
-    if(action==='signin')return authModal();
-    if(action==='signout'){await signOut();home();}
-  };
-  return root;
-}
-
-function workspaceHome(){
-  const username=String(session?.user?.user_metadata?.full_name||session?.user?.user_metadata?.name||session?.user?.email||'there').split('@')[0].split(' ')[0]||'there';
-  const root=shell(`<div class="workspace-home-screen">
-    <div class="workspace-home-inner">
-      <div class="workspace-greeting">
-        <div class="kicker">PROJECTX WORKSPACE</div>
-        <h1>What are we working on today?</h1>
-        <p>Start with a goal, problem, idea, or task. ProjectX figures out the kind of work and builds the right workspace around it.</p>
-      </div>
-
-      <div class="workspace-suggestions">
-        <div class="workspace-suggestion-label">Suggested for you</div>
-        <div class="workspace-suggestion-row">
-          <button data-work-example="Help me turn an idea into a clear plan">✦ <span>Turn an idea into a plan</span></button>
-          <button data-work-example="Research a problem and give me an evidence-backed action plan">⌕ <span>Research a problem</span></button>
-          <button data-work-example="Plan and build a small business from scratch">◫ <span>Plan a business</span></button>
-          <button data-work-example="Build a polished website for my project">▣ <span>Build a website</span></button>
-        </div>
-      </div>
-
-      <div class="workspace-composer">
-        <textarea id="workspace-input" placeholder="Start chatting or describe what you want to accomplish…"></textarea>
-        <div class="workspace-composer-foot">
-          <div class="workspace-compose-left">
-            <button id="workspace-plus" type="button" aria-label="Add to project">+</button>
-            <span>ProjectX can handle planning, building, research, creation, and more.</span>
-          </div>
-          <div class="workspace-compose-right">
-            <span class="workspace-mode">Mostly Automatic</span>
-            <button id="workspace-send" type="button" aria-label="Start project">→</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="workspace-capabilities">
-        <button data-work-example="Build a website or web app for me">Build</button>
-        <button data-work-example="Research this topic and organize the evidence">Research</button>
-        <button data-work-example="Create a step-by-step plan for this goal">Plan</button>
-        <button data-work-example="Create a presentation or other deliverable">Create</button>
-        <button data-work-example="Help me solve a real-world problem">Solve</button>
-        <button data-work-example="Make a game prototype with the right systems and structure">Game</button>
-      </div>
-
-      <div class="workspace-footer-note">${esc(username)}, your workspace adapts to the work — not the other way around.</div>
-    </div>
-  </div>`,'home');
-  root.classList.add('workspace-active');
-
-  const input=$('#workspace-input');
-  const send=async()=>{const value=input.value.trim();if(!value){input.focus();return;}await beginCreation(value);};
-  $('#workspace-send').onclick=send;
-  $('#workspace-plus').onclick=()=>input.focus();
-  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send();}};
-  $$('.workspace-home-screen [data-work-example]').forEach(btn=>btn.onclick=()=>{input.value=btn.dataset.workExample||'';input.focus();});
-}
-
+function shell(body, active='home'){const root=ensureShell();const recents=state.projects.slice(0,6);root.innerHTML=`<aside class="side"><div class="logo">ProjectX</div><button class="new" data-nav="home">+ New project</button><nav class="nav"><button data-nav="home" class="${active==='home'?'active':''}">Home</button><button data-nav="projects" class="${active==='projects'?'active':''}">Projects</button><button data-nav="assistant" class="${active==='assistant'?'active':''}">Assistant</button><button data-nav="analytics" class="${active==='analytics'?'active':''}">Analytics</button><button data-nav="settings" class="${active==='settings'?'active':''}">Settings</button></nav><div class="divider"></div><div class="label">Recent</div><div class="recent">${recents.map(p=>`<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('')||'<div class="sub" style="padding:6px 10px">No projects yet</div>'}</div><div class="acct">${session?.user?.email?`Signed in as ${esc(session.user.email)}`:'Guest workspace'}<div class="sub" style="font-size:10px;margin-top:2px">${session?'Cloud sync enabled':'Local sync enabled'}</div></div></aside><main class="main"><div class="top"><button data-nav="home">Home</button>${session?'<button data-action="signout">Sign out</button>':'<button data-action="signin">Sign in</button>'}</div>${body}</main>`;root.onclick=async e=>{const nav=e.target.closest('[data-nav]')?.dataset.nav;if(nav)return navigate(nav);const open=e.target.closest('[data-open]')?.dataset.open;if(open)return openProject(open);const action=e.target.closest('[data-action]')?.dataset.action;if(action==='signin')return authModal();if(action==='signout'){await signOut();home();}};return root;}
+function workspaceHome(){shell(`<div class="wrap"><div class="center"><div class="kicker">PROJECT X</div><h1 class="hero-title">What do you want to accomplish?</h1><p class="sub" style="max-width:680px;margin:0 auto">Describe the outcome in plain language. ProjectX will clarify what is missing, shape the right workspace, and help you move from idea to something usable.</p><div class="chips" aria-label="How ProjectX works"><span class="chip" style="cursor:default">1 · Describe the outcome</span><span class="chip" style="cursor:default">2 · Refine the important details</span><span class="chip" style="cursor:default">3 · Build and verify</span></div><div class="composer"><textarea id="start-input" placeholder="Example: Build a landing page for my sneaker-cleaning business…"></textarea><div class="composer-foot"><span class="sub">${session?'Signed in · AI connection available':localGuestKey()?'Free Gemini key ready':'AI connection needed to begin'}</span><button class="send" id="start-send" aria-label="Start project">→</button></div></div><div class="sub" style="margin-top:12px">You do not need to know the project type or structure first. Start with the result you want.</div></div></div>`,'home');const input=$('#start-input');$('#start-send').onclick=()=>beginCreation(input.value);input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#start-send').click();}};}
 function publicHome(){
   const root=ensureShell();
-  root.innerHTML=`<div class="public-home">
-    <nav class="public-nav" aria-label="ProjectX">
-      <button class="public-brand" aria-label="ProjectX home">
-        <span class="public-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg></span>
-        <span>ProjectX</span>
-      </button>
-      <div class="public-nav-links">
-        <a href="#public-build">Product</a>
-        <a href="#public-build">Use cases</a>
-        <a href="#public-examples">Examples</a>
-        <a href="#public-build">How it works</a>
-      </div>
-      <div class="public-nav-actions">
-        <button class="public-nav-login" id="public-signin">Sign in</button>
-        <button class="public-nav-create" id="public-signup">Create account</button>
-      </div>
-    </nav>
-    <main>
-      <section class="public-hero" id="public-build">
-        <div class="public-eyebrow">PROJECTX WORKSPACE</div>
-        <h1>What will you build?</h1>
-        <p>Turn an idea, goal, or problem into something real — with ProjectX understanding the work before it starts building.</p>
-        <div class="public-composer">
-          <textarea id="public-intent" placeholder="Tell ProjectX what you want to build or accomplish…"></textarea>
-          <div class="public-composer-foot">
-            <button type="button" class="public-composer-plus" id="public-plus" aria-label="Focus prompt">+</button>
-            <button type="button" class="public-composer-send" id="public-build-btn">Build →</button>
-          </div>
-        </div>
-        <div class="public-categories" aria-label="Common project types">
-          <button class="public-category" data-example="Build a website for my business"><span class="public-category-icon">▣</span>Website</button>
-          <button class="public-category" data-example="Build a mobile app for my idea"><span class="public-category-icon">▯</span>Mobile</button>
-          <button class="public-category" data-example="Design a polished product experience"><span class="public-category-icon">◈</span>Design</button>
-          <button class="public-category" data-example="Create a presentation for my project"><span class="public-category-icon">▤</span>Slides</button>
-          <button class="public-category" data-example="Build an interactive game"><span class="public-category-icon">▷</span>Game</button>
-          <button class="public-category" data-example="Research a problem and give me an evidence-backed plan"><span class="public-category-icon">⌕</span>Research</button>
-        </div>
-      </section>
-      <section class="public-examples" id="public-examples">
-        <div class="public-examples-label">Try an example <button class="public-example-refresh" id="public-example-refresh" aria-label="New examples">↻</button></div>
-        <div class="public-example-row">
-          <button class="public-example" data-example="Build a sales pipeline tracker for a small business">Sales pipeline tracker</button>
-          <button class="public-example" data-example="Create a beginner running tracker with goals and progress">Beginner running tracker</button>
-          <button class="public-example" data-example="Build a simple multiplayer browser game">Browser game</button>
-          <button class="public-example" data-example="Create a launch plan for my new product">Product launch plan</button>
-        </div>
-        <div class="public-note">Start with the outcome. You do not need to know the structure first.</div>
-      </section>
-    </main>
-  </div>`;
-
+  root.innerHTML=`<div style="min-height:100vh;display:grid;place-items:center;background:#fff;color:#171a1f;padding:32px"><div style="width:min(760px,100%);text-align:center"><div style="font-size:22px;font-weight:800;letter-spacing:-.04em">ProjectX</div><h1 style="margin:32px 0 12px;font-size:clamp(40px,7vw,72px);line-height:1;letter-spacing:-.06em">Turn an idea into something real.</h1><p style="max-width:620px;margin:0 auto;color:#707987;font-size:15px;line-height:1.6">Describe what you want to accomplish, and ProjectX will help you understand it, plan it, build it, and move it forward.</p><div style="display:flex;justify-content:center;gap:9px;margin-top:24px;flex-wrap:wrap"><button class="primary" id="public-signin" style="height:42px;padding:0 17px">Sign in</button><button class="ghost" id="public-signup" style="height:42px;padding:0 17px">Create account</button></div></div></div>`;
   $('#public-signin').onclick=()=>authModal();
   $('#public-signup').onclick=()=>authModal('signup');
-  $('#public-plus').onclick=()=>$('#public-intent')?.focus();
-
-  const input=$('#public-intent');
-  const run=async()=>{
-    const value=input.value.trim();
-    if(!value){input.focus();return;}
-    await beginCreation(value);
-  };
-  $('#public-build-btn').onclick=run;
-  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();run();}};
-
-  $$('.public-home [data-example]').forEach(btn=>{
-    btn.onclick=()=>{input.value=btn.dataset.example||'';input.focus();};
-  });
-
-  $('#public-example-refresh').onclick=()=>{
-    const examples=[
-      ['Inventory dashboard','Build an inventory dashboard for a small business'],
-      ['Portfolio website','Create a portfolio site for a student designer'],
-      ['Study planner','Build a study planner that adapts to my subjects and deadlines'],
-      ['Game prototype','Make a small browser game with a clear progression loop']
-    ];
-    $$('.public-example').forEach((button,i)=>{button.textContent=examples[i][0];button.dataset.example=examples[i][1];});
-  };
 }
 
 function home(){
-  if(session)return workspaceHome();
-  publicHome();
+  if(session){
+    shell(`<div class="workspace-home-ref">
+      <div class="workspace-home-ref-inner">
+        <div class="kicker">PROJECTX WORKSPACE</div>
+        <h1>What are we working on today?</h1>
+        <p class="workspace-lede">Start with a goal, problem, idea, or task. ProjectX adapts the workspace to whatever you are actually trying to accomplish.</p>
+
+        <div class="workspace-suggestions">
+          <span>Suggested for you</span>
+          <div class="workspace-suggestion-row">
+            <button data-home-example="Help me turn an idea into a clear plan">✦ Turn an idea into a plan</button>
+            <button data-home-example="Research a problem and organize the evidence">⌕ Research a problem</button>
+            <button data-home-example="Plan a business from scratch">◫ Plan a business</button>
+          </div>
+        </div>
+
+        <div class="workspace-composer-ref">
+          <textarea id="home-input" placeholder="Start chatting or describe what you want to accomplish…"></textarea>
+          <div class="workspace-composer-footer">
+            <button id="home-add" type="button" aria-label="Focus input">+</button>
+            <span>ProjectX can plan, research, build, create, test, and coordinate work.</span>
+            <button id="home-send" type="button" aria-label="Start project">→</button>
+          </div>
+        </div>
+
+        <div class="workspace-modes">
+          <button data-home-example="Build a website or web app for me">Build</button>
+          <button data-home-example="Research this topic and summarize the evidence">Research</button>
+          <button data-home-example="Create a step-by-step plan for this goal">Plan</button>
+          <button data-home-example="Create a presentation, document, or other deliverable">Create</button>
+          <button data-home-example="Help me solve a real-world problem">Solve</button>
+          <button data-home-example="Make a game prototype">Game</button>
+        </div>
+      </div>
+    </div>`,'home');
+
+    const input=$('#home-input');
+    const send=async()=>{
+      const value=input.value.trim();
+      if(!value){input.focus();return;}
+      await beginCreation(value);
+    };
+    $('#home-send').onclick=send;
+    $('#home-add').onclick=()=>input.focus();
+    input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send();}};
+    $$('.workspace-home-ref [data-home-example]').forEach(button=>{
+      button.onclick=()=>{input.value=button.dataset.homeExample||'';input.focus();};
+    });
+    return;
+  }
+
+  const root=ensureShell();
+  root.innerHTML=`<div class="public-home-ref">
+    <header class="public-home-ref-nav">
+      <div class="public-brand-ref"><span class="public-mark-ref" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg></span>ProjectX</div>
+      <div class="public-nav-ref-links">
+        <a href="#build">Build</a><a href="#examples">Examples</a><a href="#how">How it works</a>
+      </div>
+      <div class="public-nav-ref-actions">
+        <button id="public-signin" class="public-login-ref">Sign in</button>
+        <button id="public-signup" class="public-create-ref">Create account</button>
+      </div>
+    </header>
+    <main>
+      <section class="public-hero-ref" id="build">
+        <div class="kicker">PROJECTX</div>
+        <h1>What will you build?</h1>
+        <p>Describe an idea, goal, problem, business, game, website, research task, or anything else you want to make real.</p>
+        <div class="public-composer-ref">
+          <textarea id="public-input" placeholder="Tell ProjectX what you want to build or accomplish…"></textarea>
+          <div class="public-composer-footer-ref">
+            <button id="public-focus" type="button" aria-label="Focus prompt">+</button>
+            <span>Start with the outcome. ProjectX figures out the kind of work.</span>
+            <button id="public-send" type="button" aria-label="Start building">→</button>
+          </div>
+        </div>
+        <div class="public-types-ref">
+          <button data-public-example="Build a website for my business">▣<span>Website</span></button>
+          <button data-public-example="Build a mobile app for my idea">▯<span>Mobile</span></button>
+          <button data-public-example="Design a product experience">◈<span>Design</span></button>
+          <button data-public-example="Create slides for my project">▤<span>Slides</span></button>
+          <button data-public-example="Build an interactive game">▷<span>Game</span></button>
+          <button data-public-example="Research a problem and give me an evidence-backed plan">⌕<span>Research</span></button>
+        </div>
+      </section>
+      <section class="public-examples-ref" id="examples">
+        <div class="public-examples-title">Try an example <button id="public-example-refresh" type="button">↻</button></div>
+        <div class="public-example-row">
+          <button class="public-example-chip" data-public-example="Build an inventory dashboard for a small business">Inventory dashboard</button>
+          <button class="public-example-chip" data-public-example="Create a study planner for my subjects and deadlines">Study planner</button>
+          <button class="public-example-chip" data-public-example="Build a small browser game with progression">Game prototype</button>
+          <button class="public-example-chip" data-public-example="Create a launch plan for my new product">Product launch plan</button>
+        </div>
+      </section>
+      <section class="public-how-ref" id="how">
+        <span>UNDERSTAND → PLAN → BUILD → VERIFY</span>
+        <p>One ProjectX workspace can adapt across software, creative work, research, business, and real-world projects.</p>
+      </section>
+    </main>
+  </div>`;
+  $('#public-signin').onclick=()=>authModal();
+  $('#public-signup').onclick=()=>authModal();
+  const input=$('#public-input');
+  const send=async()=>{const value=input.value.trim();if(!value){input.focus();return;}await beginCreation(value);};
+  $('#public-send').onclick=send;
+  $('#public-focus').onclick=()=>input.focus();
+  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send();}};
+  $$('.public-home-ref [data-public-example]').forEach(button=>{
+    button.onclick=()=>{input.value=button.dataset.publicExample||'';input.focus();};
+  });
+  $('#public-example-refresh').onclick=()=>{
+    const choices=[
+      ['Inventory planner','Build an inventory planner for a small business'],
+      ['Research brief','Research a topic and create an evidence-backed brief'],
+      ['Event plan','Plan a student event from idea to execution'],
+      ['Game concept','Create a small game with a clear gameplay loop']
+    ];
+    $$('.public-example-chip').forEach((button,i)=>{button.textContent=choices[i][0];button.dataset.publicExample=choices[i][1];});
+  };
 }
+
 async function beginCreation(text){const intent=String(text||'').trim();if(!intent)return;if(!session&&!localGuestKey())return aiRequiredModal('ProjectX needs an AI connection. You can use a free-tier Gemini key in this browser, or sign in and use a server-side provider connection.');const history=[{role:'user',text:intent}],meta={answers:[],brain:null};renderInterview(history,meta);await continueInterview(history,meta.answers,meta);}
 function renderInterview(history,meta){
   shell(`<div class="interview poll-interview">
@@ -1312,68 +1256,7 @@ function bindSettings(which){
   });
   if(which==='billing'&&session)loadUsagePanel();$('#open-billing')?.addEventListener('click',()=>{location.href='./billing.html';});
   $('#execution-mode')?.addEventListener('change',e=>{settingsState.executionMode=e.target.value;persistSettings();});$('#toggle-autosave')?.addEventListener('click',()=>{settingsState.autoSave=!settingsState.autoSave;persistSettings();renderSettings(which)});$('#toggle-confirm')?.addEventListener('click',()=>{settingsState.confirmDelete=!settingsState.confirmDelete;persistSettings();renderSettings(which)});$('#language')?.addEventListener('change',e=>{settingsState.language=e.target.value;persistSettings()});$('#timezone')?.addEventListener('change',e=>{settingsState.timezone=e.target.value;persistSettings()});$('#default-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$('#ai-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$$('[data-agent]').forEach(button=>button.onclick=()=>{const id=button.dataset.agent;settingsState.agents[id]=!settingsState.agents[id];persistSettings();renderSettings('agents')});$$('[data-notification]').forEach(button=>button.onclick=()=>{const id=button.dataset.notification;settingsState.notifications[id]=!settingsState.notifications[id];persistSettings();renderSettings('notifications')});$('#security-signin')?.addEventListener('click',authModal);$('#security-signout')?.addEventListener('click',()=>signOut().then(()=>settingsPage('security')));$('#export-state')?.addEventListener('click',()=>downloadText('projectx-state.json',JSON.stringify(state,null,2),'application/json'));$('#clear-state')?.addEventListener('click',()=>{if(settingsState.confirmDelete&&!confirm('Clear local project cache? Cloud projects remain in your account.'))return;state={version:6,projects:[],active:null};persistLocal();home();});}
-function authModal(initialMode='signup'){
-  closeModal();
-  const modal=document.createElement('div');
-  modal.className='modal-bg auth-ref-bg';
-  modal.innerHTML=`<div class="auth-ref-modal">
-    <button class="auth-ref-close" id="auth-cancel" aria-label="Close">×</button>
-    <div class="auth-ref-mark"><span class="public-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg></span></div>
-    <div class="kicker">PROJECTX ACCOUNT</div>
-    <h2 id="auth-title">${initialMode==='signup'?'Create your ProjectX account':'Welcome back'}</h2>
-    <p class="sub" id="auth-subtitle">${initialMode==='signup'?'Create an account to keep projects, workspaces, and progress synced.':'Sign in to continue to your ProjectX workspace.'}</p>
-    <div class="auth-ref-socials">
-      <button id="auth-google" type="button"><span>G</span>Continue with Google</button>
-      <button id="auth-github" type="button"><span>⌁</span>Continue with GitHub</button>
-    </div>
-    <div class="auth-ref-divider"><span>or continue with email</span></div>
-    <div id="auth-name-grid" class="auth-ref-name-grid" hidden>
-      <input id="auth-first" class="input" placeholder="First name">
-      <input id="auth-last" class="input" placeholder="Last name">
-    </div>
-    <input id="auth-email" class="input full" type="email" autocomplete="email" placeholder="you@example.com">
-    <input id="auth-password" class="input full" type="password" autocomplete="${initialMode==='signup'?'new-password':'current-password'}" placeholder="Password" style="margin-top:8px">
-    <div id="auth-status" class="auth-ref-status"></div>
-    <button class="auth-ref-submit" id="auth-submit">${initialMode==='signup'?'Create account':'Sign in'}</button>
-    <div class="auth-ref-switch" id="auth-switch"></div>
-    <p class="auth-ref-note">ProjectX does not require phone verification to use your workspace.</p>
-  </div>`;
-  document.body.appendChild(modal);
-  currentModal=modal;
-  let mode=initialMode==='signup'?'signup':'signin';
-
-  const syncMode=()=>{
-    const signup=mode==='signup';
-    $('#auth-title').textContent=signup?'Create your ProjectX account':'Welcome back';
-    $('#auth-subtitle').textContent=signup?'Create an account to keep projects, workspaces, and progress synced.':'Sign in to continue to your ProjectX workspace.';
-    $('#auth-submit').textContent=signup?'Create account':'Sign in';
-    $('#auth-password').autocomplete=signup?'new-password':'current-password';
-    $('#auth-switch').innerHTML=signup?'Already have an account? <button type="button" id="auth-to-signin">Log in</button>':'New to ProjectX? <button type="button" id="auth-to-signup">Create account</button>';
-    $('#auth-to-signin')?.addEventListener('click',()=>{mode='signin';syncMode();});
-    $('#auth-to-signup')?.addEventListener('click',()=>{mode='signup';syncMode();});
-  };
-
-  syncMode();
-  $('#auth-cancel').onclick=closeModal;
-  const runSocial=async provider=>{try{await socialAuth(provider);}catch(error){$('#auth-status').textContent=error.message||'Could not start sign-in.';}};
-  $('#auth-google').onclick=()=>runSocial('google');
-  $('#auth-github').onclick=()=>runSocial('github');
-
-  $('#auth-submit').onclick=async()=>{
-    const email=$('#auth-email').value.trim(),password=$('#auth-password').value;
-    if(!email||!/^S+@S+.S+$/.test(email)){ $('#auth-status').textContent='Enter a valid email address.';return; }
-    if(mode==='signup'&&password.length<8){$('#auth-status').textContent='Use at least 8 characters for your password.';return;}
-    if(mode==='signin'&&!password){$('#auth-status').textContent='Enter your password.';return;}
-    const button=$('#auth-submit');button.disabled=true;$('#auth-status').textContent=mode==='signup'?'Creating your account…':'Signing you in…';
-    try{
-      const data=await authAction(mode,email,password);
-      if(mode==='signup'&&!data.session){$('#auth-status').textContent='Account created. Check your email to confirm your address, then sign in.';return;}
-      closeModal();await syncRemoteProjects();notify('Account connected.','success');
-    }catch(error){$('#auth-status').textContent=error.message||'Authentication failed.';}
-    finally{button.disabled=false;}
-  };
-}
-
+function authModal(){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">PROJECT X ACCOUNT</div><h2>Use secure project storage</h2><p class="sub">Sign in to sync projects and store AI credentials in the encrypted server-side vault.</p><div style="display:flex;gap:7px;margin:12px 0"><button class="ghost" id="auth-signin-mode">Sign in</button><button class="ghost" id="auth-signup-mode">Create account</button></div><input id="auth-email" class="input full" type="email" placeholder="Email"><input id="auth-password" class="input full" type="password" placeholder="Password" style="margin-top:7px"><div id="auth-status" class="sub" style="margin-top:8px"></div><div class="actions"><button class="ghost" id="auth-cancel">Cancel</button><button class="primary" id="auth-submit">Continue</button></div></div>`;document.body.appendChild(modal);currentModal=modal;let mode='signin';const setMode=m=>{mode=m;$('#auth-signin-mode').classList.toggle('active',m==='signin');$('#auth-signup-mode').classList.toggle('active',m==='signup');};$('#auth-signin-mode').onclick=()=>setMode('signin');$('#auth-signup-mode').onclick=()=>setMode('signup');$('#auth-cancel').onclick=closeModal;$('#auth-submit').onclick=async()=>{const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<6){$('#auth-status').textContent='Enter an email and a password with at least 6 characters.';return;}const button=$('#auth-submit');button.disabled=true;try{await authAction(mode,email,password);closeModal();await syncRemoteProjects();settingsPage('ai');notify('Secure account connected.','success');}catch(error){$('#auth-status').textContent=error.message;}finally{button.disabled=false;}};}
 function closeModal(){currentModal?.remove();currentModal=null;}
 function aiRequiredModal(message){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">AI CONNECTION REQUIRED</div><h2>Connect your AI</h2><p class="sub">${esc(message)}</p><p class="sub" style="margin-top:10px"><a href="${GEMINI_KEY_URL}" target="_blank" rel="noopener noreferrer">Create a free-tier Gemini API key</a> in Google AI Studio, then paste it into Settings → AI.</p><div class="actions"><button class="ghost" id="ai-close">Cancel</button><button class="primary" id="ai-settings">Open Settings</button></div></div>`;document.body.appendChild(modal);currentModal=modal;$('#ai-close').onclick=closeModal;$('#ai-settings').onclick=()=>{closeModal();settingsPage('ai');};}
 function navigate(route){if(route==='home')home();else if(route==='projects')projectsPage();else if(route==='analytics')analyticsPage();else if(route==='assistant')assistantPage();else if(route==='settings')settingsPage('general');}
