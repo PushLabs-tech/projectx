@@ -5,6 +5,7 @@ import {
   mergeSpec,
   validateSpec,
   applyProjectMutation,
+  restoreProjectSnapshot,
   sanitizePath,
   assemblePreviewHtml,
   serializeForPersistence,
@@ -244,11 +245,112 @@ async function continueInterview(history, answers, meta={}){
   }
 }
 function saveProject(project,initial=false){if(initial)snapshot(project,'Initial project');const i=state.projects.findIndex(p=>p.id===project.id);if(i>=0)state.projects[i]=project;else state.projects.unshift(project);state.active=project.id;persistLocal();}
-function snapshot(project,label){project.versions=Array.isArray(project.versions)?project.versions:[];project.versions.push({version:project.specVersion,label,at:now(),spec:JSON.parse(JSON.stringify(project.spec)),files:JSON.parse(JSON.stringify(project.files||{})),artifacts:JSON.parse(JSON.stringify(project.artifacts||{}))});if(project.versions.length>20)project.versions.splice(0,project.versions.length-20);}
+function snapshot(project,label){project.versions=Array.isArray(project.versions)?project.versions:[];project.versions.push({version:project.specVersion,label,at:now(),title:project.title,type:project.type,spec:JSON.parse(JSON.stringify(project.spec)),files:JSON.parse(JSON.stringify(project.files||{})),artifacts:JSON.parse(JSON.stringify(project.artifacts||{}))});if(project.versions.length>20)project.versions.splice(0,project.versions.length-20);}
 async function syncRemoteProjects(){await refreshSession();if(!session)return;try{const result=await edge('listProjects');for(const remoteRaw of result.projects||[]){const remote=migrateProject(remoteRaw);const local=state.projects.find(p=>p.id===remote.id);if(!local||new Date(remote.updatedAt)>new Date(local.updatedAt||0)){const i=state.projects.findIndex(p=>p.id===remote.id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);}}persistLocal();}catch(e){notify(`Cloud sync unavailable: ${e.message}`,'error');}}
 async function syncRemoteProject(project){if(!session||!settingsState.autoSave)return;try{const result=await edge('persistProject',{project:serializeForPersistence(project)});project.sync={remoteId:result.projectId||project.id,mode:'cloud',lastSyncedAt:now()};persistLocal();}catch(e){project.sync={remoteId:null,mode:'local',lastSyncedAt:project.sync?.lastSyncedAt||null,error:e.message};persistLocal();}}
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{}}}
-function renderProject(project){const group=project.understanding?.group;const groupLabel=group==='REAL_WORLD'?'REAL-WORLD':group==='NON_REAL_WORLD'?'NON-REAL-WORLD':'PROJECT';const category=project.category||project.understanding?.category||project.type||'PROJECT';const summary=String(project.understanding?.summary||project.intent||'').trim();shell(`<div class="project"><div class="kicker">${groupLabel} · ${esc(category)}</div><h1 class="project-title">${esc(project.title)}</h1><div class="project-context"><span class="context-group">${groupLabel}</span><span>${esc(summary||'ProjectX is working from the current project brain.')}</span></div><div class="sections">${project.sections.map(s=>`<button class="tab ${project.selectedSection===s.id?'active':''}" data-section="${esc(s.id)}">${esc(s.name)}</button>`).join('')}</div><div id="project-body" class="body"></div></div>`,'projects');$$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);}
+function renderProject(project){
+  const group=project.understanding?.group;const groupLabel=group==='REAL_WORLD'?'REAL-WORLD':group==='NON_REAL_WORLD'?'NON-REAL-WORLD':'PROJECT';
+  const category=project.category||project.understanding?.category||project.type||'PROJECT';const summary=String(project.understanding?.summary||project.intent||'').trim();
+  const tools=[['brain','Brain'],['architecture','Architecture'],['simulation','Outcome'],['improve','Make it Great'],['transform','Transform'],['versions','Versions'],['resources','Resources'],['security','Security'],['delivery','Delivery']];
+  shell('<div class="project"><div class="kicker">'+groupLabel+' · '+esc(category)+'</div><h1 class="project-title">'+esc(project.title)+'</h1><div class="project-context"><span class="context-group">'+groupLabel+'</span><span>'+esc(summary||'ProjectX is working from the current project brain.')+'</span></div><div class="project-tools">'+tools.map(t=>'<button class="tool-btn" data-project-tool="'+esc(t[0])+'">'+esc(t[1])+'</button>').join('')+'</div><div class="sections">'+project.sections.map(s=>'<button class="tab '+(project.selectedSection===s.id?'active':'')+'" data-section="'+esc(s.id)+'">'+esc(s.name)+'</button>').join('')+'</div><div id="project-body" class="body"></div></div>','projects');
+  $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
+  $$('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>renderProjectTool(project,button.dataset.projectTool));
+  renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
+}
+async function renderProjectTool(project,tool){
+  const map={brain:renderBrain,architecture:renderArchitecture,simulation:renderSimulation,improve:renderMakeGreat,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery};
+  return (map[tool]||renderBrain)(project);
+}
+function toolShell(kicker,title,description,body){
+  const root=$('#project-body');if(!root)return;
+  root.innerHTML='<div class="box"><div class="kicker">'+esc(kicker)+'</div><h2 style="margin:4px 0 6px">'+esc(title)+'</h2><div class="sub">'+esc(description)+'</div><div style="margin-top:16px">'+body+'</div></div>';
+}
+function brainList(title,items){
+  const values=(items||[]).filter(Boolean);
+  return '<div class="brain-group"><b>'+esc(title)+'</b>'+(values.length?values.map(x=>'<div class="brain-row">'+esc(x)+'</div>').join(''):'<div class="sub">Nothing recorded yet.</div>')+'</div>';
+}
+function renderBrain(project){
+  const u=project.understanding||{},s=project.spec||{};
+  const rows=[
+    u.group?'Classification: '+(u.group==='REAL_WORLD'?'REAL-WORLD':'NON-REAL-WORLD'):'',
+    u.category?'Category: '+u.category:'',
+    u.summary?'Summary: '+u.summary:'',
+    Number(u.confidence)?'Confidence: '+Math.round(Number(u.confidence)*100)+'%':''
+  ];
+  const html=brainList('Understanding',rows)+brainList('Requirements',s.requirements)+brainList('Constraints',s.constraints)+brainList('Decisions',s.decisions)+brainList('Deliverables',s.deliverables)+brainList('Success criteria',s.successCriteria)+brainList('Dependencies',s.dependencies)+brainList('Known resources',s.resources);
+  toolShell('PROJECT BRAIN','Canonical project state','Read-only view of what ProjectX currently knows. Use Project Chat to change it.',html);
+}
+function renderArchitecture(project){
+  const sections=buildDependencyMap(project.sections||[]);
+  const cards=sections.map(s=>'<div class="architecture-node"><b>'+esc(s.name)+'</b><div class="sub">'+esc(s.kind)+' · '+esc(s.agent||'planner')+'</div>'+(s.dependsOn?.length?'<div class="sub" style="margin-top:5px">Depends on: '+esc(s.dependsOn.map(id=>(sections.find(x=>x.id===id)||{}).name||id).join(', '))+'</div>':'')+'</div>').join('');
+  toolShell('PROJECT INTELLIGENCE','Live Architecture','Dependency view generated from the current project sections and specialist capabilities.','<div class="architecture-grid">'+(cards||'<div class="placeholder">No architecture nodes yet.</div>')+'</div>');
+}
+function simulationState(project){
+  const validation=validateSpec(project.spec,project.type),sections=(project.sections||[]).filter(s=>s.id!=='chat');
+  const output=project.artifacts?.output,outputCurrent=output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
+  const tests=project.tests?.specVersion===project.specVersion&&project.tests?.status==='passed';
+  const evidence=(project.research?.findings||[]).length>0;
+  return [
+    {name:'Project specification',pass:validation.valid,detail:validation.valid?'Required project information is present.':'Missing: '+(validation.missing.join(', ')||validation.contradictions.join(' ')||'clarification needed')},
+    {name:'Relevant workspace',pass:sections.length>=2,detail:sections.length>=2?sections.length+' project-specific sections.':'Fewer than two project-specific sections exist.'},
+    {name:'Current output',pass:outputCurrent,detail:outputCurrent?'A current deliverable exists.':'No current output has been generated.'},
+    {name:'Verification',pass:tests,detail:tests?'The current output passed saved tests.':'The current output has not passed a current test run.'}
+  ].concat(project.sections?.some(s=>s.kind==='research')?[{name:'Research evidence',pass:evidence,detail:evidence?'Source-backed findings exist.':'Research section exists but has no saved findings.'}]:[]);
+}
+function renderSimulation(project){
+  const checks=simulationState(project),passed=checks.filter(x=>x.pass).length;
+  toolShell('OUTCOME SIMULATION','Outcome readiness','A deterministic readiness simulation based on the current project state — not a promise about real-world results.','<div class="simulation-score"><b>'+passed+'/'+checks.length+' checks ready</b></div><div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'READY':'NOT READY')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div>');
+}
+async function renderMakeGreat(project){
+  toolShell('PROJECT IMPROVEMENT','Make it Great','ProjectX inspects the current project brain and proposes only additive improvements.','<div id="great-content"><div class="sub">Analyzing the current project…</div></div>');
+  try{
+    const data=await aiJson('plan',{project,history:[],message:'Audit this project for useful missing details, acceptance criteria, dependencies, and workspace improvements. Return JSON with summary, safeAdditions and workspaceSections. Only additive, evidence-free improvements.',system:'Return JSON only: {"summary":string,"safeAdditions":[string],"workspaceSections":[{"name":string,"purpose":string,"kind":string,"agent":string,"capabilities":[string]}]}. Never invent factual research.'},4200);
+    const adds=Array.isArray(data?.safeAdditions)?data.safeAdditions.map(x=>String(x||'').trim()).filter(Boolean).slice(0,12):[];
+    const sections=Array.isArray(data?.workspaceSections)?data.workspaceSections.slice(0,8):[];
+    $('#great-content').innerHTML='<div class="sub">'+esc(data?.summary||'No improvements identified.')+'</div>'+(adds.length?'<div class="brain-group"><b>Safe additions</b>'+adds.map(x=>'<div class="brain-row">'+esc(x)+'</div>').join('')+'</div>':'')+(sections.length?'<div class="brain-group"><b>Workspace improvements</b>'+sections.map(x=>'<div class="brain-row"><b>'+esc(x.name)+'</b><div class="sub">'+esc(x.purpose)+'</div></div>').join('')+'</div>':'')+'<div class="actions"><button class="primary" id="apply-great" '+(adds.length||sections.length?'':'disabled')+'>Apply safe improvements</button></div>';
+    $('#apply-great').onclick=()=>{snapshot(project,'Before Make it Great');const mutation=applyProjectMutation(project,{specPatch:{requirements:{add:adds}},workspaceSections:sections});if(mutation.changed){project.status='changed';saveProject(project);syncRemoteProject(project);notify('Safe improvements applied.','success');}renderMakeGreat(project);};
+  }catch(error){$('#great-content').innerHTML='<div class="sub">Analysis failed: '+esc(error.message)+'</div>';}
+}
+async function renderTransform(project){
+  const targets=[['Website','Website'],['App','Web app'],['API','API'],['Agent','AI agent'],['Automation','Automation'],['Business','Business system'],['Research','Research project'],['Other','Custom creation']];
+  toolShell('TRANSFORM','Transform project','Change the project blueprint for a new creation target while preserving the original intent.','<div class="row"><select class="select" id="transform-target">'+targets.map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('')+'</select><button class="primary" id="transform-run">Transform</button></div><div id="transform-result" style="margin-top:12px"></div>');
+  $('#transform-run').onclick=async()=>{
+    const button=$('#transform-run'),target=$('#transform-target').value;button.disabled=true;$('#transform-result').innerHTML='<div class="sub">Building transformed blueprint…</div>';
+    try{
+      const data=await aiJson('plan',{project,history:[],message:'Transform this project into '+target+' while preserving the core goal. Return projectType, title, summary, additive specPatch, and workspaceSections. Do not claim deployed/native implementation.',system:'Return JSON only: {"projectType":string,"title":string,"summary":string,"specPatch":{},"workspaceSections":[]}. Only additive transformations.'},5000);
+      const nextType=String(data?.projectType||target),sections=Array.isArray(data?.workspaceSections)?data.workspaceSections.slice(0,8):[];
+      snapshot(project,'Before transform to '+target);
+      const mutation=applyProjectMutation(project,{projectType:nextType,projectTitle:String(data?.title||project.title),specPatch:data?.specPatch||{},workspaceSections:sections});
+      if(!mutation.changed)throw new Error('The transformed blueprint produced no changes.');
+      project.understanding={...(project.understanding||{}),summary:String(data?.summary||project.understanding?.summary||''),category:target};
+      project.status='changed';saveProject(project);await syncRemoteProject(project);
+      $('#transform-result').innerHTML='<div class="sub">Transformed to <b>'+esc(project.type)+'</b>. The original version is saved in Versions.</div>';
+    }catch(error){$('#transform-result').innerHTML='<div class="sub">Transform failed: '+esc(error.message)+'</div>';}
+    finally{button.disabled=false;}
+  };
+}
+function renderVersions(project){
+  const versions=(project.versions||[]).slice().reverse();
+  toolShell('VERSIONS','Project history','Restore an earlier project state while preserving the current state as a snapshot.',versions.length?versions.map((v,i)=>'<div class="version-row"><div><b>v'+esc(v.version||'?')+' · '+esc(v.label||'Snapshot')+'</b><div class="sub">'+esc(v.at||'')+'</div></div><button class="ghost" data-restore="'+i+'">Restore</button></div>').join(''):'<div class="placeholder">No snapshots yet.</div>');
+  $('[data-restore]','#project-body').forEach(btn=>btn.onclick=async()=>{const v=versions[Number(btn.dataset.restore)];if(!v)return;if(!confirm('Restore snapshot v'+(v.version||'?')+'? The current state will be saved first.'))return;snapshot(project,'Before restore');const result=restoreProjectSnapshot(project,v);if(result.changed){saveProject(project);await syncRemoteProject(project);notify('Previous project state restored.','success');renderProjectTool(project,'versions');}});
+}
+function renderResources(project){
+  const resources=Array.isArray(project.spec?.resources)?project.spec.resources:[];
+  toolShell('RESOURCES','Project resources','Keep useful URLs and notes attached to the project brain.','<form id="resource-form" class="form"><input id="resource-value" placeholder="Paste a URL or a useful note" maxlength="600" required><button class="primary">Add resource</button></form><div id="resource-list" style="margin-top:12px">'+(resources.map(r=>'<div class="brain-row">'+esc(r)+'</div>').join('')||'<div class="placeholder">No resources attached yet.</div>')+'</div>');
+  $('#resource-form').onsubmit=e=>{e.preventDefault();const value=$('#resource-value').value.trim();if(!value)return;const mutation=applyProjectMutation(project,{specPatch:{resources:{add:[value]}}});if(mutation.changed){saveProject(project);syncRemoteProject(project);}renderResources(project);};
+}
+function renderProjectSecurity(project){
+  const files=project.files||{},text=Object.entries(files).map(([p,v])=>'FILE '+p+'\n'+v).join('\n');
+  const checks=[
+    {name:'No shell execution APIs',pass:!(/(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i.test(text)),detail:'Generated project files are scanned for direct command execution APIs.'},
+    {name:'No eval constructors',pass:!(/\b(?:eval|new Function)\s*\(/i.test(text)),detail:'Generated files are scanned for eval/new Function.'},
+    {name:'No javascript URLs',pass:!(/javascript\s*:/i.test(text)),detail:'Generated files are scanned for javascript: URLs.'},
+    {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.'}
+  ];
+  toolShell('SECURITY','Project security checks','Fast local checks on generated files. This does not replace a full security review.','<div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'PASS':'FAIL')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div>');
+}
+
 async function renderSection(project,section){
   const body=$('#project-body');
   if(!body||!section)return;
