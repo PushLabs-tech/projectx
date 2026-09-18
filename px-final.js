@@ -310,48 +310,80 @@ function renderDiscoveryPoll(poll,meta,history){
   if(!decision||/\?\s*$/.test(decision)||options.length!==4||options.some(v=>/\?\s*$/.test(v))){
     root.innerHTML='<div class="poll-card"><div class="poll-title">The AI could not generate a contextual poll.</div><div class="sub" style="margin-top:6px">Nothing generic was substituted. Generate a fresh decision from the current project context.</div><div class="actions"><button type="button" class="ghost" id="poll-retry">Regenerate poll</button></div></div>';
     $('#poll-retry')?.addEventListener('click',async()=>{
-      const button=$('#poll-retry'),status=$('#interview-status');
-      button.disabled=true;
+      const button=$('#poll-retry');
+      if(button)button.disabled=true;
       if(status)status.textContent='Generating a new contextual poll…';
-      try{await continueInterview(history,meta.answers||[],meta);}
-      catch(error){if(status)status.textContent='Could not regenerate the poll: '+String(error?.message||error);button.disabled=false;}
+      try{await regenerateDiscoveryPoll(history,meta);}
+      catch(error){if(status)status.textContent='Could not regenerate the poll: '+String(error?.message||error);if(button)button.disabled=false;}
     });
     return;
   }
-  options.push('Describe in your own words');
+
+  const renderedOptions=[...options,'Describe in your own words'];
   root.innerHTML=`<div class="poll-card">
     <div class="poll-head">
       <div class="poll-eyebrow">PROJECT DECISION</div>
       <div class="poll-title">${esc(decision)}</div>
     </div>
-    <div class="poll-options">
-      ${options.map((option,i)=>`<button type="button" class="poll-option" data-poll-index="${i}"><span class="poll-radio"></span><span>${esc(option)}</span></button>`).join('')}
+    <div class="poll-options" role="radiogroup" aria-label="${esc(decision)}">
+      ${renderedOptions.map((option,i)=>`<button type="button" class="poll-option" data-poll-index="${i}" aria-pressed="false"><span class="poll-radio" aria-hidden="true"></span><span>${esc(option)}</span></button>`).join('')}
+    </div>
+    <div class="poll-actions actions">
+      <button type="button" class="ghost" id="poll-regenerate">Regenerate</button>
     </div>
     <div id="poll-custom" class="poll-custom" hidden>
       <textarea id="poll-custom-input" placeholder="Describe it in your own words..." maxlength="1200"></textarea>
       <button type="button" class="primary" id="poll-custom-send">Continue</button>
     </div>
   </div>`;
-  root.querySelectorAll('[data-poll-index]').forEach(btn=>btn.onclick=()=>{
-    const index=Number(btn.dataset.pollIndex||0);
-    if(index===4){
-      root.querySelectorAll('.poll-option').forEach(x=>x.classList.remove('selected'));
-      btn.classList.add('selected');
-      $('#poll-custom')?.removeAttribute('hidden');
-      $('#poll-custom-input')?.focus();
+
+  root.addEventListener('click', async function onPollClick(event){
+    const button=event.target.closest?.('[data-poll-index]');
+    if(button && root.contains(button)){
+      const index=Number(button.dataset.pollIndex||0);
+      root.querySelectorAll('[data-poll-index]').forEach(x=>{
+        x.classList.remove('selected');
+        x.setAttribute('aria-pressed','false');
+      });
+      button.classList.add('selected');
+      button.setAttribute('aria-pressed','true');
+      if(index===4){
+        $('#poll-custom')?.removeAttribute('hidden');
+        $('#poll-custom-input')?.focus();
+        return;
+      }
+      await submitDiscoveryChoice(renderedOptions[index],history,meta);
       return;
     }
-    submitDiscoveryChoice(options[index],history,meta);
-  });
-  $('#poll-custom-send')?.addEventListener('click',()=>{
-    const value=String($('#poll-custom-input')?.value||'').trim();
-    if(value)submitDiscoveryChoice(value,history,meta);
-  });
+    if(event.target.closest?.('#poll-regenerate')){
+      const btn=$('#poll-regenerate');
+      if(btn)btn.disabled=true;
+      if(status)status.textContent='Generating a new contextual poll…';
+      try{await regenerateDiscoveryPoll(history,meta);}
+      catch(error){if(status)status.textContent='Could not regenerate the poll: '+String(error?.message||error);if(btn)btn.disabled=false;}
+    }
+    if(event.target.closest?.('#poll-custom-send')){
+      const value=String($('#poll-custom-input')?.value||'').trim();
+      if(value)await submitDiscoveryChoice(value,history,meta);
+    }
+  },{once:true});
+
   $('#poll-custom-input')?.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&e.key==='Enter')$('#poll-custom-send')?.click();
   });
 }
 
+async function regenerateDiscoveryPoll(history,meta={}){
+  const latest=String(history?.[history.length-1]?.text||meta?.initialIntent||'').trim();
+  if(!latest)throw new Error('No current project context is available.');
+  const instruction=latest+'\n\n[PROJECTX ACTION: Regenerate the current discovery poll. Keep the project context and intent unchanged, but generate a fresh set of four concrete candidate options for the single most important missing detail. Do not finish the project and do not change the underlying project understanding.]';
+  meta.regeneratingPoll=true;
+  try{
+    await continueInterview(history,Array.isArray(meta.answers)?meta.answers:[],{...meta,messageOverride:instruction});
+  }finally{
+    meta.regeneratingPoll=false;
+  }
+}
 async function submitDiscoveryChoice(value,history,meta){
   const text=String(value||'').trim();
   if(!text)return;
