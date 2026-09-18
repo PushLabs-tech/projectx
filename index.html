@@ -6,20 +6,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <meta name="description" content="ProjectX — turn an idea, goal, or problem into something real.">
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=31.0.0">
-  <link rel="stylesheet" href="styles.css?v=31.0.0">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=32.0.0">
+  <link rel="stylesheet" href="styles.css?v=32.0.0">
 </head>
 <body>
   <div id="authRoot" hidden></div>
   <div id="appRoot" hidden></div>
   <div id="modal" hidden></div>
   <div id="toast" aria-live="polite"></div>
-  <script src="./config.js?v=31.0.0"></script>
+  <script src="./config.js?v=32.0.0"></script>
   <script>
     (() => {
       const KEY = 'projectx_settings_v6';
       const PRIMARY = 'gemini-3.5-flash-lite';
-      const FALLBACK = 'gemini-3.6-flash';
+      const FALLBACK = 'gemini-3.5-flash';
       const SUPPORTED = new Set([PRIMARY, FALLBACK]);
       const LEGACY = /^(gemini-2\.5-flash|gemini-2\.0-flash)/;
       const migrate = value => {
@@ -46,6 +46,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="./px-final.js?v=31.0.0"></script>
+  <script type="module" src="./px-final.js?v=32.0.0"></script>
 </body>
 </html>
