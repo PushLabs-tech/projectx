@@ -367,7 +367,7 @@ async function renderOptimize(project){
   };
 }
 async function renderTransform(project){
-  const targets=[['Website','Website'],['App','Web app'],['API','API'],['Agent','AI agent'],['Automation','Automation'],['Business','Business system'],['Research','Research project'],['Other','Custom creation']];
+  const targets=[['Website','Website'],['App','Web app'],['Mobile','Mobile app'],['Dashboard','Dashboard'],['API','API'],['Agent','AI agent'],['Automation','Automation'],['Business system','Business system'],['Internal tool','Internal tool'],['Data','Data application'],['Document','Document'],['Presentation','Presentation'],['Research','Research project'],['Creative project','Creative project'],['Other','Custom creation']];
   toolShell('TRANSFORM','Transform project','Change the project blueprint for a new creation target while preserving the original intent.','<div class="row"><select class="select" id="transform-target">'+targets.map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('')+'</select><button class="primary" id="transform-run">Transform</button></div><div id="transform-result" style="margin-top:12px"></div>');
   $('#transform-run').onclick=async()=>{
     const button=$('#transform-run'),target=$('#transform-target').value;button.disabled=true;$('#transform-result').innerHTML='<div class="sub">Building transformed blueprint…</div>';
