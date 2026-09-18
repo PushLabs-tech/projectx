@@ -4434,3 +4434,6 @@ a {
 .px-section:hover{background:var(--surface-subtle);color:var(--ink)}
 .px-section.active{color:var(--ink);border-bottom-color:var(--ink)}
 @media(max-width:720px){.px-project-header{padding:20px 16px 6px}.px-project-title{font-size:25px}.px-adaptive-sections{width:calc(100% - 20px);justify-content:flex-start}.px-section{padding:8px 10px;font-size:11px}}
+
+/* ProjectX discovery classification is internal; never expose routing labels. */
+#px-app .understanding-group,#px-app .context-group{display:none!important}
