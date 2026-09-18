@@ -442,8 +442,39 @@ async function renderTests(project){
     }finally{button.disabled=false;}
   };
 }
-async function runTests(project){const results=[],files=project.files||{},html=files['index.html']||files['src/index.html']||'';results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'});results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'});const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'));results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});results.push(await browserRuntimeCheck(files));return results;}
-function browserRuntimeCheck(files){return new Promise(resolve=>{const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.style.cssText='position:fixed;left:-99999px;width:800px;height:600px;opacity:0';document.body.appendChild(frame);let settled=false;const finish=result=>{if(settled)return;settled=true;window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove();resolve(result);};const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.'});};window.addEventListener('message',onMessage);const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.'}),2200);frame.srcdoc=assemblePreviewHtml(files);});}
+async function runTests(project){
+  const results=[],files=project.files||{},software=projectArtifactKind(project.type)==='software';
+  if(software){
+    const html=files['index.html']||files['src/index.html']||'';
+    results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'});
+    results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'});
+    const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'));
+    results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});
+    results.push(await browserRuntimeCheck(files));
+    return results;
+  }
+  const docEntries=Object.entries(files).filter(([p])=>/\.(md|txt|csv|json)$/i.test(p));
+  const text=docEntries.map(([,v])=>String(v)).join('\\n').trim();
+  results.push({name:'Deliverable exists',pass:docEntries.length>0,detail:docEntries.length?'A document deliverable file exists.':'No Markdown/text/CSV/JSON deliverable was generated.'});
+  results.push({name:'Deliverable has substance',pass:text.length>40,detail:text.length>40?'The deliverable contains substantive content.':'The deliverable is too short to be useful.'});
+  const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(text);
+  results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});
+  return results;
+}
+function browserRuntimeCheck(files){
+  return new Promise(resolve=>{
+    const frame=document.createElement('iframe');
+    frame.setAttribute('sandbox','allow-scripts');
+    frame.style.cssText='position:fixed;left:-99999px;width:800px;height:600px;opacity:0';
+    document.body.appendChild(frame);
+    let settled=false;
+    const finish=result=>{if(settled)return;settled=true;window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove();resolve(result);};
+    const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.'});};
+    window.addEventListener('message',onMessage);
+    const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.'}),2200);
+    frame.srcdoc=assemblePreviewHtml(files);
+  });
+}
 function renderDelivery(project){
   const body=$('#project-body');
   const software=projectArtifactKind(project.type)==='software';
