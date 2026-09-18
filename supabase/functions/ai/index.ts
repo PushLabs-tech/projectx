@@ -12,6 +12,8 @@ const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "g
 const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "persistProject", "listProjects", "getProject", "deleteProject"]);
 const MAX_BODY_BYTES = 180000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
+const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
+const MODEL_CACHE_TTL = 5 * 60 * 1000;
 
 const limitText = (v: unknown, n: number) => String(v ?? "").slice(0, n);
 const boundedJson = (v: unknown, n: number) => limitText(JSON.stringify(v ?? {}), n);
@@ -30,6 +32,23 @@ async function requireUser(req: Request) {
   return user;
 }
 
+async function modelsForCredentials(creds: Credential[], task = "chat"): Promise<any[]> {
+  const all: any[] = [];
+  for (const c of creds) {
+    const cacheKey = [c.provider, c.baseUrl || "", task].join("|");
+    const cached = MODEL_CACHE.get(cacheKey);
+    if (cached && Date.now() - cached.at < MODEL_CACHE_TTL) {
+      all.push(...cached.models.map(m => ({ ...m, credential: c })));
+      continue;
+    }
+    try {
+      const models = await providerListModels(c, task);
+      MODEL_CACHE.set(cacheKey, { at: Date.now(), models });
+      all.push(...models.map((m: any) => ({ ...m, credential: c })));
+    } catch {}
+  }
+  return all;
+}
 async function credentialsFor(uid: string): Promise<Credential[]> {
   const { data, error } = await admin.from("ai_provider_credentials").select("provider,label,api_key_ciphertext,provider_key_ciphertext,base_url").eq("user_id", uid).eq("enabled", true);
   if (error) throw error;
@@ -222,10 +241,7 @@ async function chat(user: any, body: any) {
   if (!creds.length) throw new Error("Connect an AI provider in Settings before chatting.");
   const mode = String(body.mode || "discuss").toLowerCase();
   const project = await authoritativeProjectForChat(user, body.project || {});
-  const all: any[] = [];
-  for (const c of creds) {
-    try { all.push(...(await providerListModels(c, "chat")).map((m: any) => ({ ...m, credential: c }))); } catch {}
-  }
+  const all = await modelsForCredentials(creds, "chat");
   if (!all.length) throw new Error("No compatible AI models are reachable");
   const candidates = deterministicCandidates(all, mode === "understand" || mode === "artifact" ? "build" : mode, String(body.model || "auto"));
   if (!candidates.length) throw new Error("No compatible model is available for this task");
@@ -281,6 +297,7 @@ Deno.serve(async req => {
     }
     if (action === "deleteCredential") {
       const provider = String(body.provider || ""); if (!PROVIDERS.has(provider) || provider === "auto") throw new Error("Unsupported provider");
+      MODEL_CACHE.clear();
       const { error } = await admin.from("ai_provider_credentials").delete().eq("user_id", user.id).eq("provider", provider); if (error) throw error; return json({ ok: true });
     }
     if (action === "testCredential" || action === "saveCredential") {
@@ -290,13 +307,14 @@ Deno.serve(async req => {
       if (provider === "auto") credential.provider = detectProvider(apiKey, credential.baseUrl);
       const models = await providerListModels(credential, "chat"); if (!models.length) throw new Error("Connection succeeded but no compatible chat models were returned");
       if (action === "testCredential") return json({ ok: true, provider: credential.provider, models: models.slice(0, 250) });
+      MODEL_CACHE.clear();
       const { error } = await admin.from("ai_provider_credentials").upsert({ user_id: user.id, provider: credential.provider, label: String(body.label || "Personal key").slice(0, 80), api_key_ciphertext: await encryptSecret(apiKey), provider_key_ciphertext: credential.providerKey ? await encryptSecret(credential.providerKey) : null, base_url: credential.baseUrl || null, key_hint: `••••${apiKey.slice(-4)}`, enabled: true, updated_at: new Date().toISOString() }, { onConflict: "user_id,provider" });
       if (error) throw error; return json({ ok: true, provider: credential.provider, models: models.length });
     }
     if (action === "listModels") {
-      const creds = await credentialsFor(user.id); const all: any[] = [];
-      for (const c of creds) { try { all.push(...await providerListModels(c, String(body.task || "chat"))); } catch {} }
-      return json({ ok: true, models: [...new Map(all.map(m => [`${m.provider}:${m.id}`, m])).values()].slice(0, 250) });
+      const creds = await credentialsFor(user.id);
+      const all = await modelsForCredentials(creds, String(body.task || "chat"));
+      return json({ ok: true, models: [...new Map(all.map(m => [String(m.provider) + ":" + String(m.id), m])).values()].slice(0, 250) });
     }
     if (action === "chat") return json(await chat(user, body));
     throw new Error(`Unknown action: ${action}`);
