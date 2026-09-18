@@ -45,6 +45,28 @@ function errorStatus(error: unknown) {
 }
 
 
+function isPrivateHost(hostname: string) {
+  const host = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  if (!host || host === "localhost" || host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") return true;
+  if (host.includes(":")) {
+    return host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:");
+  }
+  const parts = host.split(".");
+  if (parts.length !== 4 || !parts.every(x => /^\d+$/.test(x))) return false;
+  const [a,b] = parts.map(Number);
+  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+}
+function assertSafeBaseUrl(raw: string) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  let parsed: URL;
+  try { parsed = new URL(value); } catch { throw new Error("Base URL must be a valid HTTPS URL."); }
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || isPrivateHost(parsed.hostname)) throw new Error("Base URL must use a public HTTPS host.");
+  parsed.hash = "";
+  parsed.search = "";
+  return parsed.toString().replace(/\/$/, "");
+}
+
 async function requireUser(req: Request) {
   const auth = req.headers.get("Authorization");
   if (!auth) throw new Error("Missing session");
@@ -79,7 +101,7 @@ async function credentialsFor(uid: string): Promise<Credential[]> {
     label: r.label,
     apiKey: await decryptSecret(r.api_key_ciphertext),
     providerKey: r.provider_key_ciphertext ? await decryptSecret(r.provider_key_ciphertext) : undefined,
-    baseUrl: r.base_url || undefined
+    baseUrl: assertSafeBaseUrl(r.base_url || "") || undefined
   })));
 }
 
@@ -435,7 +457,7 @@ Deno.serve(async req => {
     if (action === "testCredential" || action === "saveCredential") {
       let provider = String(body.provider || "auto"); if (!PROVIDERS.has(provider)) throw new Error("Unsupported provider");
       const apiKey = String(body.apiKey || "").trim(); if (!apiKey || apiKey.length > 10000) throw new Error("Invalid API key");
-      const credential: any = { provider: provider as ProviderId, apiKey, providerKey: String(body.providerKey || "").trim() || undefined, baseUrl: String(body.baseUrl || "").trim() || undefined };
+      const credential: any = { provider: provider as ProviderId, apiKey, providerKey: String(body.providerKey || "").trim() || undefined, baseUrl: assertSafeBaseUrl(String(body.baseUrl || "").trim()) || undefined };
       if (provider === "auto") credential.provider = detectProvider(apiKey, credential.baseUrl);
       const models = await providerListModels(credential, "chat"); if (!models.length) throw new Error("Connection succeeded but no compatible chat models were returned");
       if (action === "testCredential") return json({ ok: true, provider: credential.provider, models: models.slice(0, 250) });
