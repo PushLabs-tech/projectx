@@ -11,6 +11,7 @@ import {
   serializeForPersistence,
   buildDependencyMap,
   projectArtifactKind,
+  normalizeProjectType,
 } from './projectx-core.js';
 
 const STORE = 'projectx_runtime_v7';
