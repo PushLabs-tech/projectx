@@ -45,6 +45,7 @@ let supa = null;
 let session = null;
 let currentModal = null;
 let runtimeTestCleanup = null;
+let projectRealtimeChannel = null;
 
 function persistLocal() { write(STORE, state); }
 function persistSettings() { write(LOCAL_SETTINGS, settingsState); }
@@ -84,7 +85,7 @@ async function authAction(action, email, password) {
   return data;
 }
 
-async function signOut() { try { await ensureSupabase()?.auth.signOut(); } catch {} session = null; }
+async function signOut() { try { projectRealtimeChannel&&await ensureSupabase()?.removeChannel(projectRealtimeChannel); } catch {} projectRealtimeChannel=null; try { await ensureSupabase()?.auth.signOut(); } catch {} session = null; }
 
 async function edge(action, payload = {}) {
   const client = ensureSupabase();
@@ -274,7 +275,26 @@ function saveProject(project,initial=false){if(initial)snapshot(project,'Initial
 function snapshot(project,label){project.versions=Array.isArray(project.versions)?project.versions:[];project.versions.push({version:project.specVersion,label,at:now(),title:project.title,type:project.type,understanding:JSON.parse(JSON.stringify(project.understanding||{})),sections:JSON.parse(JSON.stringify(project.sections||[])),spec:JSON.parse(JSON.stringify(project.spec)),files:JSON.parse(JSON.stringify(project.files||{})),artifacts:JSON.parse(JSON.stringify(project.artifacts||{})),research:JSON.parse(JSON.stringify(project.research||{}))});if(project.versions.length>20)project.versions.splice(0,project.versions.length-20);}
 async function syncRemoteProjects(){await refreshSession();if(!session)return;try{const result=await edge('listProjects');for(const remoteRaw of result.projects||[]){const remote=migrateProject(remoteRaw);const local=state.projects.find(p=>p.id===remote.id);if(!local||new Date(remote.updatedAt)>new Date(local.updatedAt||0)){const i=state.projects.findIndex(p=>p.id===remote.id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);}}persistLocal();}catch(e){notify(`Cloud sync unavailable: ${e.message}`,'error');}}
 async function syncRemoteProject(project){if(!session||!settingsState.autoSave)return;try{const result=await edge('persistProject',{project:serializeForPersistence(project)});project.sync={remoteId:result.projectId||project.id,mode:'cloud',lastSyncedAt:now(),baseUpdatedAt:result.updatedAt||now()};persistLocal();}catch(e){project.sync={remoteId:project.sync?.remoteId||project.id,mode:'local',lastSyncedAt:project.sync?.lastSyncedAt||null,baseUpdatedAt:project.sync?.baseUpdatedAt||null,error:e.message};persistLocal();}}
-async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{}}}
+async function subscribeProjectRealtime(projectId){
+  if(!session||!ensureSupabase()||!projectId)return;
+  try{if(projectRealtimeChannel)await supa.removeChannel(projectRealtimeChannel);}catch{}
+  projectRealtimeChannel=supa.channel('projectx-project-'+projectId)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'projects',filter:'id=eq.'+projectId},async payload=>{
+      const current=activeProject(),remoteUpdated=String(payload?.new?.updated_at||'');
+      if(!current||current.id!==projectId||!remoteUpdated)return;
+      if(new Date(remoteUpdated).getTime()<=new Date(current.updatedAt||0).getTime())return;
+      try{
+        const result=await edge('getProject',{projectId});
+        if(result.project){
+          const remote=migrateProject(result.project);
+          const i=state.projects.findIndex(p=>p.id===projectId);
+          if(i>=0)state.projects[i]=remote;else state.projects.push(remote);
+          state.active=projectId;persistLocal();renderProject(remote);notify('Project updated from another session.','info');
+        }
+      }catch{}
+    }).subscribe();
+}
+async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{} await subscribeProjectRealtime(id);}}
 function renderProject(project){
   const group=project.understanding?.group;const groupLabel=group==='REAL_WORLD'?'REAL-WORLD':group==='NON_REAL_WORLD'?'NON-REAL-WORLD':'PROJECT';
   const category=project.category||project.understanding?.category||project.type||'PROJECT';const summary=String(project.understanding?.summary||project.intent||'').trim();
