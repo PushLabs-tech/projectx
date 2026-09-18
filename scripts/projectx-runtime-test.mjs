@@ -24,7 +24,7 @@ for (const type of ['Document','Presentation','Data','Dashboard','Internal tool'
   const p=createProject({title:type,type,spec:{goal:'Create '+type.toLowerCase()+' output',deliverables:['Finished '+type.toLowerCase()]}});
   assert.equal(p.type,type);
 }
-assert.equal(validateSpec({goal:'Create a dashboard',deliverables:['Dashboard']},'Dashboard').valid,true);
+assert.equal(validateSpec({goal:'Create a dashboard',deliverables:['Dashboard'],platform:'Web'},'Dashboard').valid,true);
 assert.equal(validateSpec({goal:'Write a report',deliverables:['Report']},'Document').valid,true);
 assert.equal(sanitizePath('../secret.txt'), null);
 assert.equal(sanitizePath('/absolute/path'), 'absolute/path');
