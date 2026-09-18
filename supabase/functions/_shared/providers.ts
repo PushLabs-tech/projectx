@@ -67,11 +67,11 @@ export function detectProvider(
   const key = apiKey.trim().toLowerCase();
   const url = baseUrl.trim().toLowerCase();
 
-  if (/^AIza/.test(apiKey.trim())) return "google";
+  if (/^AIza/i.test(apiKey.trim())) return "google";
+  if (/^AQ\./i.test(apiKey.trim())) return "google";
   if (key.startsWith("nvapi-")) return "nvidia";
   if (key.startsWith("sk-ant-")) return "anthropic";
   if (key.startsWith("sk-or-")) return "openrouter";
-  if (key.startsWith("aq.")) return "bytez";
 
   if (url.includes("bytz") || url.includes("bytez")) {
     return "bytez";
@@ -235,7 +235,7 @@ export async function listModels(
       await fetch(url, {
         headers: {
           Authorization:
-            `Key ${credential.apiKey}`
+            credential.apiKey
         },
         signal:
           AbortSignal.timeout(20_000)
@@ -437,7 +437,7 @@ export async function chat(
     const headers:
       Record<string, string> = {
       Authorization:
-        `Key ${credential.apiKey}`,
+        credential.apiKey,
       "Content-Type":
         "application/json"
     };
