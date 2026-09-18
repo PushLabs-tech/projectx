@@ -302,8 +302,9 @@ function renderBrain(project){
 }
 function renderArchitecture(project){
   const sections=buildDependencyMap(project.sections||[]);
-  const cards=sections.map(s=>'<div class="architecture-node"><b>'+esc(s.name)+'</b><div class="sub">'+esc(s.kind)+' · '+esc(s.agent||'planner')+'</div>'+(s.dependsOn?.length?'<div class="sub" style="margin-top:5px">Depends on: '+esc(s.dependsOn.map(id=>(sections.find(x=>x.id===id)||{}).name||id).join(', '))+'</div>':'')+'</div>').join('');
-  toolShell('PROJECT INTELLIGENCE','Live Architecture','Dependency view generated from the current project sections and specialist capabilities.','<div class="architecture-grid">'+(cards||'<div class="placeholder">No architecture nodes yet.</div>')+'</div>');
+  const cards=sections.map(s=>'<div class="architecture-node"><b>'+esc(s.name)+'</b><div class="sub">'+esc(s.kind)+' · '+esc(s.agent||'planner')+'</div>'+(s.capabilities?.length?'<div class="sub" style="margin-top:5px">Capabilities: '+esc(s.capabilities.join(', '))+'</div>':'')+(s.dependsOn?.length?'<div class="sub" style="margin-top:5px">Depends on: '+esc(s.dependsOn.map(id=>(sections.find(x=>x.id===id)||{}).name||id).join(', '))+'</div>':'')+'</div>').join('');
+  const agents=(project.agents||[]).map(a=>'<div class="architecture-node"><b>'+esc(a.name||a.key||a.id)+'</b><div class="sub">'+esc(a.purpose||'Project specialist')+'</div>'+(a.tools?.length?'<div class="sub" style="margin-top:5px">Tools: '+esc(a.tools.join(', '))+'</div>':'')+'</div>').join('');
+  toolShell('PROJECT INTELLIGENCE','Live Architecture','Dependency view generated from the current project sections and assembled specialists.','<h3 style="margin:0 0 8px">Workspace graph</h3><div class="architecture-grid">'+(cards||'<div class="placeholder">No architecture nodes yet.</div>')+'</div><h3 style="margin:18px 0 8px">Specialists</h3><div class="architecture-grid">'+(agents||'<div class="placeholder">No project-specific specialists recorded yet.</div>')+'</div>');
 }
 function simulationState(project){
   const validation=validateSpec(project.spec,project.type),sections=(project.sections||[]).filter(s=>s.id!=='chat');
