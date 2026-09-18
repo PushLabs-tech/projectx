@@ -42,6 +42,8 @@ assert.match(preview, /dataset\.ready/);
 assert.match(preview, /PROJECTX_RUNTIME_ERROR/);
 
 assert.match(runtime, /canonical project/i);
+assert.match(runtime, /REAL_WORLD\\|NON_REAL_WORLD/);
+assert.match(runtime, /interview-understanding/);
 assert.match(runtime, /specVersion/);
 assert.match(runtime, /Build with AI/);
 assert.match(runtime, /Open Settings/);
