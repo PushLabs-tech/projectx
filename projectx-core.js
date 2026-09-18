@@ -20,6 +20,19 @@ const SECTION_KIND_BY_NAME = {
 };
 const DEFAULT_AGENT_BY_KIND = {conversation:'interviewer',planning:'planner',research:'researcher',workspace:'planner',code:'builder',output:'builder',test:'tester',publish:'publisher'};
 const arr = value => Array.isArray(value) ? value.map(v=>String(v ?? '').trim()).filter(Boolean) : [];
+export function normalizeResource(value) {
+  if (typeof value === 'string') return value.trim().slice(0,20000);
+  const raw=value&&typeof value==='object'?value:{};
+  const name=String(raw.name||raw.title||raw.url||'Resource').trim().slice(0,180);
+  const type=String(raw.type||'note').trim().slice(0,60);
+  const url=String(raw.url||'').trim().slice(0,2000);
+  const content=String(raw.content||'').slice(0,20000);
+  const size=Number(raw.size||content.length||0);
+  return {id:safeId(raw.id||name),name,type,url,content,size};
+}
+export function normalizeResources(values=[]) {
+  return Array.isArray(values) ? values.map(normalizeResource).filter(v => typeof v==='string' ? Boolean(v) : Boolean(v?.name||v?.url||v?.content)).slice(0,100) : [];
+}
 
 export const safeId = value => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80) || `section-${Math.random().toString(36).slice(2,8)}`;
 export const sanitizePath = value => {
@@ -64,8 +77,13 @@ export function emptySpec() {
 export function mergeSpec(base = emptySpec(), patch = {}) {
   const next = {...emptySpec(),...(base || {})};
   for (const field of ['goal','platform','visualDirection','currentState']) if (typeof patch[field] === 'string' && patch[field].trim()) next[field] = patch[field].trim();
-  for (const field of ARRAY_FIELDS) if (Array.isArray(patch[field])) next[field] = [...new Set(arr(patch[field]))];
+  for (const field of ARRAY_FIELDS) {
+    if (!(field in patch)) continue;
+    if (field === 'resources') { next.resources = normalizeResources(patch.resources); continue; }
+    if (Array.isArray(patch[field])) next[field] = [...new Set(arr(patch[field]))];
+  }
   if (patch.game && typeof patch.game === 'object') next.game = {...next.game,...patch.game};
+  next.resources = normalizeResources(next.resources);
   return next;
 }
 export function mergeSpecDelta(base = emptySpec(), patch = {}) {
@@ -73,6 +91,22 @@ export function mergeSpecDelta(base = emptySpec(), patch = {}) {
   for (const field of ['goal','platform','visualDirection','currentState']) if (typeof patch[field] === 'string') next[field] = patch[field].trim();
   for (const field of ARRAY_FIELDS) {
     if (!(field in patch)) continue;
+    if (field === 'resources') {
+      const value=patch.resources;
+      if (value === null) { next.resources=[]; continue; }
+      const incoming=Array.isArray(value)?value:[];
+      const current=normalizeResources(next.resources);
+      const byId=new Map(current.map(v=>[typeof v==='string'?v:('id' in v?v.id:v.name),v]));
+      if (Array.isArray(value)) value.forEach(v=>{const n=normalizeResource(v);const k=typeof n==='string'?n:n.id;if(k)byId.set(k,n);});
+      else if (value && typeof value==='object') {
+        const replacement=Array.isArray(value.replace)?value.replace:Array.isArray(value.set)?value.set:null;
+        if(replacement) next.resources=normalizeResources(replacement);
+        if(Array.isArray(value.add)) value.add.forEach(v=>{const n=normalizeResource(v);const k=typeof n==='string'?n:n.id;if(k)byId.set(k,n);});
+        if(Array.isArray(value.remove)){const remove=new Set(value.remove.map(v=>String(typeof v==='object'?(v.id||v.name):v)));for(const k of [...byId.keys()])if(remove.has(String(k)))byId.delete(k);}
+      }
+      if(incoming.length||Array.isArray(value)) next.resources=[...byId.values()].slice(-100);
+      continue;
+    }
     const value = patch[field];
     if (value === null) { next[field] = []; continue; }
     if (Array.isArray(value)) { next[field] = [...new Set([...next[field],...arr(value)])]; continue; }
@@ -88,7 +122,6 @@ export function mergeSpecDelta(base = emptySpec(), patch = {}) {
   if (patch.game && typeof patch.game === 'object') next.game = {...next.game,...patch.game};
   return next;
 }
-
 export function detectSpecContradictions(spec = {}, projectType = 'Other') {
   const constraints = arr(spec.constraints).join(' '), requirements = arr(spec.requirements).join(' '), all = [constraints,requirements,arr(spec.assets).join(' '),String(spec.visualDirection||''),...arr(spec.decisions)].join(' ').toLowerCase();
   const has = (rx,text) => rx.test(String(text).toLowerCase());
