@@ -170,7 +170,9 @@ async function persistProject(user: any, p: any) {
     workspaceId = existing.workspace_id;
     const incomingVersion = Number(p?.specVersion || 1);
     const currentVersion = Number(existing.spec_version || 1);
+    const baseUpdatedAt = String(p?.sync?.baseUpdatedAt || "");
     if (incomingVersion < currentVersion) throw new Error(`Project is newer on the server (version ${currentVersion}); reload before saving version ${incomingVersion}.`);
+    if (baseUpdatedAt && baseUpdatedAt !== String(existing.updated_at || "")) throw new Error("Project changed on the server; reload before saving your local changes.");
   } else {
     const { data: w, error: we } = await admin.from("workspaces").insert({ owner_id: user.id, name: limitText(p?.title || "ProjectX Workspace", 120) }).select("id").single();
     if (we) throw we;
@@ -233,7 +235,7 @@ async function persistProject(user: any, p: any) {
     if (ve) throw ve;
   }
   await admin.from("audit_logs").insert({ user_id: user.id, action: "project.persist", metadata: { project_id: saved.id, spec_version: Number(p?.specVersion || 1) } });
-  return { ok: true, projectId: saved.id, workspaceId: saved.workspace_id };
+  return { ok: true, projectId: saved.id, workspaceId: saved.workspace_id, updatedAt: saved.updated_at };
 }
 
 async function getProject(user: any, projectId: string) {
