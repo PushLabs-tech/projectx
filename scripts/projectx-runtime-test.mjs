@@ -20,6 +20,12 @@ const game = createProject({
 
 assert.equal(game.sections[0].name, 'Chat');
 assert.equal(validateSpec(game.spec, game.type).valid, true);
+for (const type of ['Document','Presentation','Data','Dashboard','Internal tool','Business system','Creative project']) {
+  const p=createProject({title:type,type,spec:{goal:'Create '+type.toLowerCase()+' output',deliverables:['Finished '+type.toLowerCase()]}});
+  assert.equal(p.type,type);
+}
+assert.equal(validateSpec({goal:'Create a dashboard',deliverables:['Dashboard']},'Dashboard').valid,true);
+assert.equal(validateSpec({goal:'Write a report',deliverables:['Report']},'Document').valid,true);
 assert.equal(sanitizePath('../secret.txt'), null);
 assert.equal(sanitizePath('/absolute/path'), 'absolute/path');
 assert.equal(normalizeSections([{ name: 'Custom Mechanics', purpose: 'Project-specific mechanics.' }], 'Game')[1].name, 'Custom Mechanics');
