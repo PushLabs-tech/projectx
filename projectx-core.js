@@ -144,9 +144,13 @@ export function invalidateArtifacts(project) {
 export function applyProjectMutation(project, mutation = {}) {
   project.files = project.files || {};
   project.agents = normalizeAgents(project.agents || [], project.type);
-  const before = JSON.stringify({spec:project.spec,sections:project.sections,files:project.files,agents:project.agents,research:project.research || {}});
+  const before = JSON.stringify({title:project.title,type:project.type,spec:project.spec,sections:project.sections,files:project.files,agents:project.agents,research:project.research || {}});
   const beforeSpec = JSON.stringify(project.spec || {});
+  const beforeType = project.type;
+  const beforeTitle = project.title;
   let researchChanged = false;
+  if (typeof mutation.projectType === 'string' && mutation.projectType.trim()) project.type = normalizeProjectType(mutation.projectType);
+  if (typeof mutation.projectTitle === 'string' && mutation.projectTitle.trim()) project.title = mutation.projectTitle.trim().slice(0,120);
   if (mutation.specPatch && typeof mutation.specPatch === 'object') project.spec = mergeSpecDelta(project.spec,mutation.specPatch);
   if (Array.isArray(mutation.workspaceSections) && mutation.workspaceSections.length) {
     const next = buildDependencyMap(normalizeSections(mutation.workspaceSections,project.type));
@@ -180,8 +184,8 @@ export function applyProjectMutation(project, mutation = {}) {
     project.research = research;
   }
   project.resources = Array.isArray(project.spec?.resources) ? [...project.spec.resources] : [];
-  const after = JSON.stringify({spec:project.spec,sections:project.sections,files:project.files,agents:project.agents,research:project.research || {}});
-  const changed = before !== after, specChanged = beforeSpec !== JSON.stringify(project.spec || {});
+  const after = JSON.stringify({title:project.title,type:project.type,spec:project.spec,sections:project.sections,files:project.files,agents:project.agents,research:project.research || {}});
+  const changed = before !== after, specChanged = beforeSpec !== JSON.stringify(project.spec || {}), typeChanged = beforeType !== project.type, titleChanged = beforeTitle !== project.title;
   if (changed) {
     project.specVersion = Number(project.specVersion || 1) + 1;
     project.updatedAt = new Date().toISOString();
@@ -192,7 +196,28 @@ export function applyProjectMutation(project, mutation = {}) {
     project.executionState = {...(project.executionState || {}),status:'dirty',lastMutationId:globalThis.crypto?.randomUUID?.() || `mutation-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,staleFromVersion:project.specVersion};
     project.versions = Array.isArray(project.versions) ? project.versions : [];
   }
-  return {changed,specChanged,researchChanged};
+  return {changed,specChanged,typeChanged,titleChanged,researchChanged};
+}
+export function restoreProjectSnapshot(project, snapshot = {}) {
+  if (!project || !snapshot || typeof snapshot !== 'object') return {changed:false};
+  const nextSpec = mergeSpec(emptySpec(), snapshot.spec || {});
+  const nextFiles = snapshot.files && typeof snapshot.files === 'object' ? Object.fromEntries(Object.entries(snapshot.files).filter(([p,v]) => sanitizePath(p) && typeof v === 'string')) : {};
+  const nextType = normalizeProjectType(snapshot.type || project.type);
+  const nextTitle = String(snapshot.title || project.title || 'Untitled project').trim().slice(0,120);
+  const changed = JSON.stringify(project.spec) !== JSON.stringify(nextSpec) || JSON.stringify(project.files || {}) !== JSON.stringify(nextFiles) || project.type !== nextType || project.title !== nextTitle;
+  if (!changed) return {changed:false};
+  project.spec = nextSpec;
+  project.files = nextFiles;
+  project.type = nextType;
+  project.title = nextTitle;
+  project.specVersion = Number(project.specVersion || 1) + 1;
+  project.updatedAt = new Date().toISOString();
+  invalidateArtifacts(project);
+  project.sectionContent = {};
+  project.tests = {status:'stale',specVersion:project.specVersion,results:[],updatedAt:null};
+  project.research = {...(project.research || {status:'ready',queries:[],sources:[],findings:[]}),status:'stale'};
+  project.executionState = {...(project.executionState || {}),status:'dirty',lastMutationId:globalThis.crypto?.randomUUID?.() || `restore-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,staleFromVersion:project.specVersion};
+  return {changed:true};
 }
 export function applySpecChange(project,patch = {}) { return applyProjectMutation(project,{specPatch:patch}); }
 
