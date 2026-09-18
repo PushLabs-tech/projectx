@@ -193,7 +193,7 @@ async function aiJson(mode, payload, max = 3500) {
         confidence:0.4,
         missing: seed.users?.length ? (seed.requirements?.length ? ['deliverables'] : ['requirements']) : ['users'],
         ambiguities:[],
-        classification:{group:'PROJECT',label:'internal',reason:'internal'},
+        classification:{group:/\b(game|website|web site|app|application|dashboard|api|software|tool|simulation|digital|virtual|fictional|story)\b/i.test(lower)?'NON_REAL_WORLD':'REAL_WORLD',label:'internal',reason:'internal'},
         category:seed.category || type,
         domainPack:{},
         project:{...seed,goal:String(seed.goal||text)},
