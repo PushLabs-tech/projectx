@@ -173,6 +173,28 @@ function effectiveMaxTokens(max){
   return max;
 }
 const AGENT_FOR_MODE = { understand:'interviewer', plan:'planner', artifact:'builder', discuss:'orchestrator' };
+async function repairDiscoveryPoll(payload, parsed){
+  const base=parsed&&typeof parsed==='object'?parsed:{};
+  const repairSystem=`You are ProjectX's discovery poll generator. Return JSON only. Preserve the project information in the supplied result. Add poll:{decision:string,options:[string,string,string,string]}. Generate exactly four concise options from the actual project context and the user's latest input. Options must be materially different and help choose one important missing project detail. Do not output a question. Do not include the fifth option; ProjectX adds it as the fixed "Describe in your own words" choice.`;
+  try{
+    const result=await directGemini(
+      [{role:'user',text:`CURRENT PROJECT RESULT:\n${JSON.stringify(base)}\n\nLATEST USER INPUT:\n${String(payload.message||'')}`}],
+      repairSystem,
+      true,
+      Math.min(2200,max)
+    );
+    const repaired=parseJson(result.text||'');
+    if(repaired&&repaired.project&&validDiscoveryPollLocal(repaired.poll)) return repaired;
+  }catch{}
+  return null;
+}
+
+function validDiscoveryPollLocal(value){
+  const decision=String(value?.decision||'').trim();
+  const options=Array.isArray(value?.options)?[...new Set(value.options.map(v=>String(v||'').trim()).filter(Boolean))].slice(0,4):[];
+  return Boolean(decision&&options.length===4);
+}
+
 async function aiJson(mode, payload, max = 3500) {
   max=effectiveMaxTokens(max);
   const agent=String(payload.agent || AGENT_FOR_MODE[mode] || 'orchestrator');
@@ -205,7 +227,13 @@ async function aiJson(mode, payload, max = 3500) {
     return null;
   }
   const result = await directGemini(payload.history || [{ role: 'user', text: payload.message || JSON.stringify(payload) }], payload.system || 'You are ProjectX.', true, max);
-  return parseJson(result.text);
+  const parsed=parseJson(result.text);
+  if(mode==='understand'){
+    if(parsed&&parsed.project&&validDiscoveryPollLocal(parsed.poll)) return parsed;
+    const repaired=await repairDiscoveryPoll(payload,parsed);
+    if(repaired) return repaired;
+  }
+  return parsed;
 }
 
 async function aiText(payload) {
