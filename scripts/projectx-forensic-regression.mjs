@@ -64,6 +64,13 @@ assert.match(runtime, /Project Chat/);
 assert.match(edge, /projectContext/);
 assert.doesNotMatch(runtime, /Game over.*Flappy|ctx\.arc\(bird\.x/);
 
+assert.doesNotMatch(runtime, /Keep it focused on the core outcome|Cover the main workflow end to end|Prioritize a polished experience|Leave room for future expansion/);
+assert.match(runtime, /Describe in your own words/);
+assert.match(runtime, /options\.length!==4/);
+assert.doesNotMatch(edge, /function discoveryFallbackPoll|Next project detail/);
+assert.match(edge, /normalizeDiscoveryResult/);
+
+
 assert.equal(fs.existsSync(new URL('../projectx-output.js', import.meta.url)), false, 'hardcoded universal output runtime must be absent');
 
 console.log('PASS: canonical core mutation/version invalidation');
