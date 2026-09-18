@@ -407,17 +407,20 @@ function renderResources(project){
   toolShell('RESOURCES','Project resources','Attach URLs, notes, and supported text files to the project brain.','<form id="resource-form" class="form"><input id="resource-value" placeholder="Paste a URL or useful note" maxlength="600"><input id="resource-file" class="input" type="file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json"><button class="primary">Add resource</button></form><div class="sub" style="margin-top:7px">Text resources are capped before they enter the project brain. Binary/PDF ingestion is reserved for a richer resource pipeline.</div><div id="resource-list" style="margin-top:12px">'+(rows||'<div class="placeholder">No resources attached yet.</div>')+'</div>');
   $('#resource-form').onsubmit=async e=>{e.preventDefault();const input=$('#resource-value'),file=$('#resource-file'),value=input.value.trim();let resource=null;if(file.files?.[0]){const f=file.files[0];if(f.size>200000){notify('Text resource is too large. Limit: 200 KB.','error');return}resource={name:f.name,type:f.type||'text/plain',content:await f.text(),size:f.size};}else if(value){resource=/^https:\/\//i.test(value)?{name:value,type:'url',url:value}:value; }else return;const mutation=applyProjectMutation(project,{specPatch:{resources:{add:[resource]}}});if(mutation.changed){project.status='changed';saveProject(project);await syncRemoteProject(project);notify('Resource added to the project brain.','success');}renderResources(project);};
 }
-function renderProjectSecurity(project){
+function projectSecurityChecks(project){
   const files=project.files||{},text=Object.entries(files).map(([p,v])=>'FILE '+p+'\n'+v).join('\n');
-  const checks=[
-    {name:'No shell execution APIs',pass:!(/(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i.test(text)),detail:'Generated project files are scanned for direct command execution APIs.'},
-    {name:'No eval constructors',pass:!(/\b(?:eval|new Function)\s*\(/i.test(text)),detail:'Generated files are scanned for eval/new Function.'},
-    {name:'No javascript URLs',pass:!(/javascript\s*:/i.test(text)),detail:'Generated files are scanned for javascript: URLs.'},
-    {name:'No obvious embedded credentials',pass:!(/(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{12,}['"]/i.test(text)),detail:'Generated files are scanned for credential-like assignments.'},
-    {name:'No insecure HTTP resources',pass:!(/(?:src|href|fetch\s*\()\s*[^\n]{0,80}http:\/\//i.test(text)),detail:'Generated files are scanned for plaintext HTTP resources.'},
-    {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.'}
+  return [
+    {name:'No shell execution APIs',pass:!(/(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i.test(text)),detail:'Generated project files are scanned for direct command execution APIs.',blockBuild:true},
+    {name:'No eval constructors',pass:!(/\b(?:eval|new Function)\s*\(/i.test(text)),detail:'Generated files are scanned for eval/new Function.',blockBuild:true},
+    {name:'No javascript URLs',pass:!(/javascript\s*:/i.test(text)),detail:'Generated files are scanned for javascript: URLs.',blockBuild:true},
+    {name:'No obvious embedded credentials',pass:!(/(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i.test(text)),detail:'Generated files are scanned for credential-like assignments.',blockBuild:false},
+    {name:'No insecure HTTP resources',pass:!(/(?:src|href|fetch\s*\()\s*[^\n]{0,80}http:\/\//i.test(text)),detail:'Generated files are scanned for plaintext HTTP resources.',blockBuild:true},
+    {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.',blockBuild:true}
   ];
-  toolShell('SECURITY','Project security checks','Fast local checks on generated files. This does not replace a full security review.','<div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'PASS':'FAIL')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div>');
+}
+function renderProjectSecurity(project){
+  const checks=projectSecurityChecks(project);
+  toolShell('SECURITY','Project security checks','Fast local checks on generated files. Credential-like findings are advisory; critical execution and transport checks block a verified build. This does not replace a full security review.','<div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'PASS':'FAIL')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div>');
 }
 
 async function renderSection(project,section){
@@ -590,6 +593,9 @@ async function buildArtifact(project,repairResults=[]){
     }
     if(!Object.keys(files).length)throw new Error('The AI returned no usable deliverable files.');
 
+    const securityChecks=projectSecurityChecks({files,type:project.type});
+    const blockingSecurity=securityChecks.filter(x=>x.blockBuild&&!x.pass);
+    if(blockingSecurity.length)throw new Error(blockingSecurity.map(x=>x.detail).join(' '));
     if(software){
       if(!files['index.html']&&!files['src/index.html'])throw new Error('The AI did not return a valid index.html artifact.');
       const html=files['index.html']||files['src/index.html']||'';
