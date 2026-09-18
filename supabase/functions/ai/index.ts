@@ -219,6 +219,27 @@ async function persistProject(user: any, p: any) {
   const { data: saved, error } = await admin.from("projects").upsert(row).select("id,workspace_id,updated_at").single();
   if (error) throw error;
 
+  const researchFindings = Array.isArray(p?.research?.findings) ? p.research.findings.slice(-100) : [];
+  const { error: rd } = await admin.from("research_findings").delete().eq("project_id", saved.id);
+  if (rd) throw rd;
+  if (researchFindings.length) {
+    const rows = researchFindings.map((f: any) => ({
+      project_id: saved.id,
+      query: limitText(f?.query || p?.research?.queries?.[p.research.queries.length - 1] || "Project research", 500),
+      finding: limitText(f?.finding, 1800),
+      source_title: limitText(f?.sourceTitle || f?.source_title || "", 180),
+      source_url: limitText(f?.sourceUrl || f?.source_url || "", 2000),
+      source_date: /^\d{4}-\d{2}-\d{2}$/.test(String(f?.sourceDate || f?.source_date || "")) ? String(f.sourceDate || f.source_date) : null,
+      confidence: Math.max(0, Math.min(1, Number(f?.confidence ?? 0))),
+      provider: limitText(f?.provider || "", 100),
+      raw: f?.raw && typeof f.raw === "object" ? f.raw : {}
+    })).filter((f: any) => f.finding);
+    if (rows.length) {
+      const { error: ri } = await admin.from("research_findings").insert(rows);
+      if (ri) throw ri;
+    }
+  }
+
   await admin.from("project_files").delete().eq("project_id", saved.id);
   const files = Object.entries(p?.files || {}).filter(([path, content]) => {
     const s = String(path); return !s.startsWith("/") && !s.includes("..") && !s.includes("\\") && typeof content === "string" && content.length <= 600000;
