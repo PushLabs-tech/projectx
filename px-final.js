@@ -522,14 +522,15 @@ async function renderOutput(project){
     }
   }else $('#output-area').innerHTML='<div class="placeholder">ProjectX will generate the deliverable from the current canonical specification.</div>';
 }
-async function buildArtifact(project){
+async function buildArtifact(project,repairResults=[]){
   if(!session&&!localGuestKey())return aiRequiredModal('Connect Gemini before ProjectX can build the real artifact.');
   const button=$('#build-output'),area=$('#output-area'),software=projectArtifactKind(project.type)==='software';
   if(!button||!area)return;
   button.disabled=true;
   area.innerHTML='<div class="sub">ProjectX is generating and validating the real deliverable…</div>';
   try{
-    const data=await aiJson('artifact',{project,message:software?'Generate the complete functional software artifact for this exact project. Return only files needed for this project.':'Generate the complete deliverable for this exact project. For a real-world objective, prefer a well-structured Markdown document unless another format is clearly required. Return only files needed for this deliverable.'},10000);
+    const repairContext=Array.isArray(repairResults)&&repairResults.length?' Repair the current artifact against these verified failures: '+repairResults.map(x=>x.name+': '+x.detail).join(' | ')+'. Preserve working behavior and fix the failures; do not introduce placeholders.':'';
+    const data=await aiJson('artifact',{project,message:software?'Generate the complete functional software artifact for this exact project. Return only files needed for this project.'+(repairContext||''):'Generate the complete deliverable for this exact project. For a real-world objective, prefer a well-structured Markdown document unless another format is clearly required. Return only files needed for this deliverable.'+(repairContext||'')},10000);
     const files={};
     for(const file of Array.isArray(data?.files)?data.files:[]){
       const path=sanitizePath(file.path);
@@ -591,7 +592,7 @@ async function renderTests(project){
   const drawResults=(results,status)=>{
     const passed=results.every(x=>x.pass);
     $('#test-results').innerHTML=`<div class="sub" style="margin-bottom:9px">Last run: ${status|| (passed?'passed':'failed')}.</div><div class="result-list">${results.map(result=>`<div class="result ${result.pass?'pass':'fail'}"><b>${result.pass?'PASS':'FAIL'} · ${esc(result.name)}</b><div class="sub">${esc(result.detail)}</div></div>`).join('')}</div>${passed?'':'<div class="actions" style="margin-top:12px"><button class="ghost" id="rebuild-from-tests">Rebuild with AI</button></div>'}`;
-    $('#rebuild-from-tests')?.addEventListener('click',()=>{renderOutput(project);buildArtifact(project);});
+    $('#rebuild-from-tests')?.addEventListener('click',()=>{const failures=(project.tests?.results||[]).filter(x=>!x.pass);renderOutput(project);buildArtifact(project,failures);});
   };
   body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">Tests</h2><div class="sub">Checks the actual generated output and browser runtime.</div></div><button class="primary" id="run-tests">Run tests</button></div><div id="test-results" style="margin-top:14px">${saved.length?'':'<div class="placeholder">Run the checks against the current artifact.</div>'}</div></div>`;
   if(saved.length)drawResults(saved,project.tests.status);
