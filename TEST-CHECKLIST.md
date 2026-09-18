@@ -12,6 +12,8 @@ This checklist reflects the current canonical runtime: `index.html` → `px-fina
 - [x] Evolving Project Brain.
 - [x] AI-generated project-specific workspace sections.
 - [x] Project-specific specialist agents.
+- [x] AI-derived reusable domain intelligence.
+- [x] Explicit canonical project plans.
 - [x] Canonical project mutations with version invalidation.
 - [x] Type-aware software vs document outputs.
 
@@ -42,6 +44,7 @@ This checklist reflects the current canonical runtime: `index.html` → `px-fina
 - [x] Expanded creation types and presentation artifacts.
 - [x] Project forks/alternative branches.
 - [x] Project search.
+- [x] Persistence schema versioning and local-project migration.
 
 ## 3. Research
 
