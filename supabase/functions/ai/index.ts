@@ -546,6 +546,7 @@ async function chat(user: any, body: any) {
             }
           } catch {}
           continue;
+        }
         if (parsed) return { ok: true, result: parsed, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
         return { ok: true, text: result.text, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
       }
