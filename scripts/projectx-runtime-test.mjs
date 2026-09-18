@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, normalizeResources, projectArtifactKind, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
+import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, normalizeResources, projectArtifactKind, serializeForPersistence, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -29,7 +29,7 @@ assert.equal(validateSpec({goal:'Write a report',deliverables:['Report']},'Docum
 assert.equal(sanitizePath('../secret.txt'), null);
 assert.equal(sanitizePath('/absolute/path'), 'absolute/path');
 assert.equal(normalizeSections([{ name: 'Custom Mechanics', purpose: 'Project-specific mechanics.' }], 'Game')[1].name, 'Custom Mechanics');
-assert.equal((await import('../projectx-core.js')).serializeForPersistence(game).schemaVersion,4);
+assert.equal(serializeForPersistence(game).schemaVersion,4);
 
 const before = game.specVersion;
 applySpecChange(game, { features: { add: ['Pause menu'] } });
