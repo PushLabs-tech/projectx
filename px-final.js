@@ -491,9 +491,14 @@ function renderProjectChat(project,prefill=''){
         renderOutput(project);
         await buildArtifact(project);
         if(settingsState.executionMode==='Autonomous'){
-          const results=await runTests(project);
-          const status=results.every(x=>x.pass)?'verified':'needs-fix';
-          project.tests={status:results.every(x=>x.pass)?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};
+          let results=await runTests(project);
+          for(let cycle=0;cycle<2&&!results.every(x=>x.pass);cycle++){
+            const failures=results.filter(x=>!x.pass);
+            await buildArtifact(project,failures);
+            results=await runTests(project);
+          }
+          const passed=results.every(x=>x.pass),status=passed?'verified':'needs-fix';
+          project.tests={status:passed?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};
           project.status=status;saveProject(project);await syncRemoteProject(project);
         }
         return;
