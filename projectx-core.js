@@ -211,6 +211,9 @@ export function restoreProjectSnapshot(project, snapshot = {}) {
   project.files = nextFiles;
   project.type = nextType;
   project.title = nextTitle;
+  if (Array.isArray(snapshot.sections) && snapshot.sections.length) project.sections = buildDependencyMap(normalizeSections(snapshot.sections, nextType));
+  if (snapshot.understanding && typeof snapshot.understanding === 'object') project.understanding = JSON.parse(JSON.stringify(snapshot.understanding));
+  if (snapshot.research && typeof snapshot.research === 'object') project.research = JSON.parse(JSON.stringify(snapshot.research));
   project.specVersion = Number(project.specVersion || 1) + 1;
   project.updatedAt = new Date().toISOString();
   invalidateArtifacts(project);
