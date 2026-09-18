@@ -1,7 +1,7 @@
 export const CORE_VERSION = 3;
 
-const PROJECT_TYPES = ['Game','Website','App','Mobile','Business','Research','Agent','Automation','API','Other'];
-const SOFTWARE_TYPES = new Set(['Game','Website','App','Mobile','API','Agent','Automation']);
+const PROJECT_TYPES = ['Game','Website','App','Mobile','Business','Business system','Research','Document','Presentation','Data','Dashboard','Internal tool','Agent','Automation','API','Creative project','Other'];
+const SOFTWARE_TYPES = new Set(['Game','Website','App','Mobile','API','Agent','Automation','Business system','Data','Dashboard','Internal tool']);
 const ARRAY_FIELDS = ['users','requirements','constraints','features','decisions','dependencies','resources','assets','deliverables','acceptanceCriteria','successCriteria','openQuestions','technology'];
 const SECTION_CAPABILITIES = {
   conversation:['conversation.write'],
@@ -106,7 +106,7 @@ export function validateSpec(spec = {}, projectType = 'Other') {
   const s = mergeSpec(emptySpec(),spec), missing = [];
   if (s.goal.length < 12) missing.push('goal');
   if (!s.deliverables.length) missing.push('deliverables');
-  const software = /^(Game|Website|App|Mobile|API|Agent|Automation)$/i.test(projectType);
+  const software = projectArtifactKind(projectType) === 'software';
   if (software && !s.requirements.length) missing.push('requirements');
   if (software && !s.platform) missing.push('platform');
   if (/^Game$/i.test(projectType) && !s.game.loop) missing.push('game.loop');
