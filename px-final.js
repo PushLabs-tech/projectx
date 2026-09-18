@@ -18,8 +18,17 @@ const STORE = 'projectx_runtime_v7';
 const LOCAL_KEY = 'projectx_guest_gemini_key';
 const LOCAL_STATUS = 'projectx_guest_gemini_status';
 const LOCAL_SETTINGS = 'projectx_settings_v6';
-const MODELS = ['gemini-3.5-flash-lite', 'gemini-3.5-flash'];
+const GEMINI_KEY_URL = 'https://aistudio.google.com/app/apikey';
+const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 const MAX_HISTORY = 80;
+const GEMINI_MODEL_MIGRATIONS = new Map([
+  ['gemini-2.0-flash', 'gemini-3.8-flash'],
+  ['gemini-2.0-flash-lite', 'gemini-3.5-flash-lite'],
+  ['gemini-2.5-flash', 'gemini-3.8-flash'],
+  ['gemini-2.5-flash-lite', 'gemini-3.5-flash-lite'],
+  ['gemini-3-flash-preview', 'gemini-3.8-flash'],
+  ['gemini-3.1-flash-lite-preview', 'gemini-3.5-flash-lite']
+]);
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -42,11 +51,14 @@ if (!Array.isArray(state.projects)) state = { version: 7, projects: [], active: 
 else state.projects = state.projects.map(p => { try { return migrateProject(p); } catch { return p; } });
 state.version = 7;
 let settingsState = { ...DEFAULT_SETTINGS, ...read(LOCAL_SETTINGS, {}) };
-if (/^(gemini-2\\.5-flash|gemini-2\\.0-flash)/i.test(String(settingsState.model||''))) settingsState.model=MODELS[0];
-if (settingsState.agentModels && typeof settingsState.agentModels==='object') {
-  const migratedAgentModels={};
-  for (const [id,model] of Object.entries(settingsState.agentModels)) migratedAgentModels[id]=/^(gemini-2\\.5-flash|gemini-2\\.0-flash)/i.test(String(model||''))?MODELS[0]:model;
-  settingsState.agentModels=migratedAgentModels;
+settingsState.model = GEMINI_MODEL_MIGRATIONS.get(String(settingsState.model || '').trim().toLowerCase()) || settingsState.model;
+if (settingsState.agentModels && typeof settingsState.agentModels === 'object') {
+  const migratedAgentModels = {};
+  for (const [id, model] of Object.entries(settingsState.agentModels)) {
+    const normalized = String(model || '').trim();
+    migratedAgentModels[id] = GEMINI_MODEL_MIGRATIONS.get(normalized.toLowerCase()) || normalized;
+  }
+  settingsState.agentModels = migratedAgentModels;
 }
 persistSettings();
 let supa = null;
@@ -1030,7 +1042,7 @@ async function renderAiSettings(body){
     '<div id="provider-status" class="sub" style="margin-top:8px"></div></div>'+
     '<div class="box" style="margin-top:10px"><b>Connected providers</b><div id="connected-providers" style="margin-top:8px"></div></div>'+
     '<div class="box" style="margin-top:10px"><div class="row"><b>Default model</b><select id="ai-model" class="select"></select></div><div class="sub">ProjectX uses deterministic fallbacks when a selected model is unavailable.</div></div>'+
-    '<div class="box" style="margin-top:10px"><b>Guest Gemini</b><div class="sub">For quick local use without an account. The key is kept in session storage and is not synced.</div><div class="row"><input id="guest-gemini-key" class="input full" type="password" placeholder="Paste Gemini API key"><button id="save-gemini" class="ghost">Save guest key</button></div></div>';
+    '<div class="box" style="margin-top:10px"><b>Guest Gemini</b><div class="sub">Use a free-tier Gemini API key for local browser use. Keys stay in this browser session and are not synced. <a href="'+GEMINI_KEY_URL+'" target="_blank" rel="noopener noreferrer">Create a Gemini key in Google AI Studio</a>.</div><div class="row"><input id="guest-gemini-key" class="input full" type="password" placeholder="Paste Gemini API key"><button id="save-gemini" class="ghost">Save guest key</button></div></div>';
   const status=$('#provider-status');
   const renderConnected=()=>{
     $('#connected-providers').innerHTML=server.length?server.map(x=>'<div class="row"><div><b>'+esc(x.label||x.provider)+'</b><div class="sub">'+esc(x.provider)+' · '+esc(x.keyHint||'masked')+'</div></div><button class="ghost" data-delete-provider="'+esc(x.provider)+'">Remove</button></div>').join(''):'<div class="placeholder">No server-side providers connected.</div>';
@@ -1100,7 +1112,7 @@ function bindSettings(which){
   $('#execution-mode')?.addEventListener('change',e=>{settingsState.executionMode=e.target.value;persistSettings();});$('#toggle-autosave')?.addEventListener('click',()=>{settingsState.autoSave=!settingsState.autoSave;persistSettings();renderSettings(which)});$('#toggle-confirm')?.addEventListener('click',()=>{settingsState.confirmDelete=!settingsState.confirmDelete;persistSettings();renderSettings(which)});$('#language')?.addEventListener('change',e=>{settingsState.language=e.target.value;persistSettings()});$('#timezone')?.addEventListener('change',e=>{settingsState.timezone=e.target.value;persistSettings()});$('#default-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$('#ai-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$$('[data-agent]').forEach(button=>button.onclick=()=>{const id=button.dataset.agent;settingsState.agents[id]=!settingsState.agents[id];persistSettings();renderSettings('agents')});$$('[data-notification]').forEach(button=>button.onclick=()=>{const id=button.dataset.notification;settingsState.notifications[id]=!settingsState.notifications[id];persistSettings();renderSettings('notifications')});$('#security-signin')?.addEventListener('click',authModal);$('#security-signout')?.addEventListener('click',()=>signOut().then(()=>settingsPage('security')));$('#export-state')?.addEventListener('click',()=>downloadText('projectx-state.json',JSON.stringify(state,null,2),'application/json'));$('#clear-state')?.addEventListener('click',()=>{if(settingsState.confirmDelete&&!confirm('Clear local project cache? Cloud projects remain in your account.'))return;state={version:6,projects:[],active:null};persistLocal();home();});}
 function authModal(){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">PROJECT X ACCOUNT</div><h2>Use secure project storage</h2><p class="sub">Sign in to sync projects and store AI credentials in the encrypted server-side vault.</p><div style="display:flex;gap:7px;margin:12px 0"><button class="ghost" id="auth-signin-mode">Sign in</button><button class="ghost" id="auth-signup-mode">Create account</button></div><input id="auth-email" class="input full" type="email" placeholder="Email"><input id="auth-password" class="input full" type="password" placeholder="Password" style="margin-top:7px"><div id="auth-status" class="sub" style="margin-top:8px"></div><div class="actions"><button class="ghost" id="auth-cancel">Cancel</button><button class="primary" id="auth-submit">Continue</button></div></div>`;document.body.appendChild(modal);currentModal=modal;let mode='signin';const setMode=m=>{mode=m;$('#auth-signin-mode').classList.toggle('active',m==='signin');$('#auth-signup-mode').classList.toggle('active',m==='signup');};$('#auth-signin-mode').onclick=()=>setMode('signin');$('#auth-signup-mode').onclick=()=>setMode('signup');$('#auth-cancel').onclick=closeModal;$('#auth-submit').onclick=async()=>{const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<6){$('#auth-status').textContent='Enter an email and a password with at least 6 characters.';return;}const button=$('#auth-submit');button.disabled=true;try{await authAction(mode,email,password);closeModal();await syncRemoteProjects();settingsPage('ai');notify('Secure account connected.','success');}catch(error){$('#auth-status').textContent=error.message;}finally{button.disabled=false;}};}
 function closeModal(){currentModal?.remove();currentModal=null;}
-function aiRequiredModal(message){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">AI CONNECTION REQUIRED</div><h2>Connect your AI</h2><p class="sub">${esc(message)}</p><div class="actions"><button class="ghost" id="ai-close">Cancel</button><button class="primary" id="ai-settings">Open Settings</button></div></div>`;document.body.appendChild(modal);currentModal=modal;$('#ai-close').onclick=closeModal;$('#ai-settings').onclick=()=>{closeModal();settingsPage('ai');};}
+function aiRequiredModal(message){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">AI CONNECTION REQUIRED</div><h2>Connect your AI</h2><p class="sub">${esc(message)}</p><p class="sub" style="margin-top:10px"><a href="${GEMINI_KEY_URL}" target="_blank" rel="noopener noreferrer">Create a free-tier Gemini API key</a> in Google AI Studio, then paste it into Settings → AI.</p><div class="actions"><button class="ghost" id="ai-close">Cancel</button><button class="primary" id="ai-settings">Open Settings</button></div></div>`;document.body.appendChild(modal);currentModal=modal;$('#ai-close').onclick=closeModal;$('#ai-settings').onclick=()=>{closeModal();settingsPage('ai');};}
 function navigate(route){if(route==='home')home();else if(route==='projects')projectsPage();else if(route==='analytics')analyticsPage();else if(route==='assistant')assistantPage();else if(route==='settings')settingsPage('general');}
 window.addEventListener('beforeunload',()=>runtimeTestCleanup?.());
 async function boot(){installCss();installOptionalAnalytics();await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();const wantsSignin=location.hash==='#signin'||new URLSearchParams(location.search).get('auth')==='signin';if(wantsSignin){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>authModal(),0);}}
