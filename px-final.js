@@ -270,10 +270,8 @@ function renderInterview(history,meta){
   shell(`<div class="interview poll-interview">
     <div class="kicker">PROJECT X · DISCOVERY</div>
     <h1 class="hero-title" style="font-size:46px">Let’s shape it.</h1>
-    <p class="sub">Choose the option that fits best. ProjectX adapts the next poll to what you select.</p>
-    <div id="interview-understanding" class="understanding" aria-live="polite"></div>
+    <p class="sub">Choose one option. The next poll adapts to your choice.</p>
     <div id="interview-poll" class="discovery-poll" aria-live="polite"></div>
-    <div id="interview-status" class="sub poll-status">Thinking…</div>
   </div>`,'home');
   meta.initialIntent=String(history?.[0]?.text||'').trim();
 }function drawConversation(history,selector){const el=$(selector);if(!el)return;el.innerHTML=history.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');el.scrollTop=el.scrollHeight;}
@@ -336,7 +334,7 @@ async function submitDiscoveryChoice(value,history,meta){
   if(!text)return;
   $('#interview-poll .poll-option').forEach(x=>x.disabled=true);
   $('#poll-custom-send')?.setAttribute('disabled','disabled');
-  $('#interview-status')&&($('#interview-status').textContent='Updating the project brief…');
+
   history.push({role:'user',text});
   meta.answers=Array.isArray(meta.answers)?meta.answers:[];
   meta.answers.push(text);
@@ -386,7 +384,7 @@ async function continueInterview(history, answers, meta={}){
     const summary=String(data.summary||discoveryUnderstanding.summary||'').trim();
     meta.brain={project:mergedProject,workspace:workspaceCandidate,understanding:{confidence:Number(data?.confidence||0),missing:Array.isArray(data?.missing)?data.missing:[],ambiguities:Array.isArray(data?.ambiguities)?data.ambiguities:[],group,category,summary,domainPack:data.domainPack||discoveryUnderstanding.domainPack||{}}};
 
-    renderInterviewUnderstanding({...data,project:mergedProject,category,summary});
+
     const type=normalizeProjectType(mergedProject.type||data.project.type||'Other');
     const safeCategory=category.slice(0,120);
     const spec=mergeSpec({},mergedProject);
@@ -400,7 +398,7 @@ async function continueInterview(history, answers, meta={}){
     if(!done){
       const poll=(data?.poll&&Array.isArray(data.poll.options))?data.poll:discoveryFallbackPoll(data,quality,missing,mergedProject);
       renderDiscoveryPoll(poll,meta,history);
-      $('#interview-status')&&($('#interview-status').textContent=String(Math.round(confidence*100))+'% understood · choose what fits best');
+
       return;
     }
     const project=createProject({title:mergedProject.title||data.project.title,type,intent:mergedProject.goal||history[0].text,spec,sections:workspace,conversation:history,agents:Array.isArray(mergedProject.agents)?mergedProject.agents:[],plan:Array.isArray(mergedProject.plan)?mergedProject.plan:[]});
