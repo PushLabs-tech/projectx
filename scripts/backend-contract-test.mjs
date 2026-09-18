@@ -9,6 +9,8 @@ const schema = read('supabase/schema.sql');
 
 assert.match(ai, /corsHeaders/);
 assert.match(cors, /Access-Control-Allow-Origin/);
+assert.match(cors, /https:\/\/pushlabs-tech\.github\.io/);
+assert.doesNotMatch(cors, /https:\/\/pushlabs-tech\.github\.io\/projectx/);
 assert.match(ai, /Authorization/);
 assert.match(ai, /persistProject/);
 assert.match(ai, /429/);
