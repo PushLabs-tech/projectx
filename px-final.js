@@ -326,7 +326,7 @@ async function renderMakeGreat(project){
     const adds=Array.isArray(data?.safeAdditions)?data.safeAdditions.map(x=>String(x||'').trim()).filter(Boolean).slice(0,12):[];
     const sections=Array.isArray(data?.workspaceSections)?data.workspaceSections.slice(0,8):[];
     $('#great-content').innerHTML='<div class="sub">'+esc(data?.summary||'No improvements identified.')+'</div>'+(adds.length?'<div class="brain-group"><b>Safe additions</b>'+adds.map(x=>'<div class="brain-row">'+esc(x)+'</div>').join('')+'</div>':'')+(sections.length?'<div class="brain-group"><b>Workspace improvements</b>'+sections.map(x=>'<div class="brain-row"><b>'+esc(x.name)+'</b><div class="sub">'+esc(x.purpose)+'</div></div>').join('')+'</div>':'')+'<div class="actions"><button class="primary" id="apply-great" '+(adds.length||sections.length?'':'disabled')+'>Apply safe improvements</button></div>';
-    $('#apply-great').onclick=()=>{snapshot(project,'Before Make it Great');const mutation=applyProjectMutation(project,{specPatch:{requirements:{add:adds}},workspaceSections:sections});if(mutation.changed){project.status='changed';saveProject(project);syncRemoteProject(project);notify('Safe improvements applied.','success');}renderMakeGreat(project);};
+    $('#apply-great').onclick=()=>{snapshot(project,'Before Make it Great');const existing=(project.sections||[]).filter(s=>s.id!=='chat');const mergedSections=[...existing];const seen=new Set(existing.map(s=>s.id));for(const section of sections){const id=String(section?.id||section?.name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-');if(id&&!seen.has(id)){mergedSections.push(section);seen.add(id);}}const mutation=applyProjectMutation(project,{specPatch:adds.length?{requirements:{add:adds}}:{},workspaceSections:mergedSections});if(mutation.changed){project.status='changed';saveProject(project);syncRemoteProject(project);notify('Safe improvements applied.','success');}else notify('No new improvements needed.','info');renderMakeGreat(project);};
   }catch(error){$('#great-content').innerHTML='<div class="sub">Analysis failed: '+esc(error.message)+'</div>';}
 }
 async function renderOptimize(project){
@@ -641,24 +641,20 @@ function mountArtifact(project){
 function renderFiles(project){
   const paths=Object.keys(project.files||{}).sort(),first=paths[0]||null,body=$('#project-body');
   body.innerHTML='<div class="box"><div class="files"><div class="file-list">'+(paths.map((path,i)=>'<button class="'+(i===0?'active':'')+'" data-file="'+esc(path)+'">'+esc(path)+'</button>').join('')||'<div class="sub">No generated files yet.</div>')+'</div><div style="padding-left:14px"><div class="row"><b id="file-name">'+esc(first||'No file selected')+'</b><div class="actions">'+(first?'<button class="ghost" id="save-file">Save</button><button class="download" id="download-file">Download</button>':'')+'</div></div><textarea id="file-code-editor" class="code-editor" spellcheck="false">'+esc(first?project.files[first]:'Build the project to create real files.')+'</textarea></div></div></div>';
-  const selectFile=path=>{
-    $$('[data-file]',body).forEach(x=>x.classList.toggle('active',x.dataset.file===path));
-    $('#file-name').textContent=path;$('#file-code-editor').value=project.files[path]||'';
-    $('#download-file')?.addEventListener('click',()=>downloadText(path,project.files[path]));
-  };
+  let currentPath=first;
+  const selectFile=path=>{$$('[data-file]',body).forEach(x=>x.classList.toggle('active',x.dataset.file===path));currentPath=path;$('#file-name').textContent=path;$('#file-code-editor').value=project.files[path]||'';};
   $$('[data-file]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.file));
   $('#save-file')?.addEventListener('click',async()=>{
-    const path=$('#file-name').textContent,content=$('#file-code-editor').value;
-    if(!path||!Object.hasOwn(project.files,path))return;
-    if(project.files[path]===content)return notify('No file changes to save.','info');
+    if(!currentPath||!Object.hasOwn(project.files,currentPath))return;
+    const content=$('#file-code-editor').value;
+    if(project.files[currentPath]===content)return notify('No file changes to save.','info');
     snapshot(project,'Before file edit');
-    const mutation=applyProjectMutation(project,{fileOperations:[{op:'write',path,content}]});
+    const mutation=applyProjectMutation(project,{fileOperations:[{op:'write',path:currentPath,content}]});
     if(!mutation.changed)return;
     project.status='needs-build';saveProject(project);await syncRemoteProject(project);notify('File saved. Generated output is now stale until rebuilt and verified.','success');
   });
-  if(first)$('#download-file')?.addEventListener('click',()=>downloadText(first,project.files[first]));
+  $('#download-file')?.addEventListener('click',()=>currentPath&&downloadText(currentPath,project.files[currentPath]));
 }
-
 function downloadText(name,content,type='text/plain'){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name.split('/').pop();a.click();setTimeout(()=>URL.revokeObjectURL(url),500);}
 async function renderTests(project){
   const body=$('#project-body');
