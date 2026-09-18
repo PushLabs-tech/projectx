@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
+import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -59,7 +59,7 @@ assert.equal(transformed.type,'API');
 assert.equal(transformed.title,'Transformed API');
 const restoreSource = {title:'Restore me',type:'Research',spec:{goal:'Research something',deliverables:['Brief']},files:{'brief.md':'source version'}};
 const restoreTarget = createProject({title:'Changed',type:'Website',spec:{goal:'Build a site',deliverables:['Site']},files:{'index.html':'changed'}});
-const restored = (await import('../projectx-core.js')).restoreProjectSnapshot(restoreTarget,restoreSource);
+const restored = restoreProjectSnapshot(restoreTarget,restoreSource);
 assert.equal(restored.changed,true);
 assert.equal(restoreTarget.type,'Research');
 assert.equal(restoreTarget.title,'Restore me');
@@ -86,6 +86,11 @@ assert.match(runtime, /renderTransform/);
 assert.match(runtime, /renderVersions/);
 assert.match(runtime, /renderResources/);
 assert.match(runtime, /renderProjectSecurity/);
+assert.match(runtime, /renderDelivery/);
+assert.match(runtime, /restoreProjectSnapshot/);
+assert.match(runtime, /provider-id/);
+assert.match(runtime, /save-provider/);
+assert.match(runtime, /listModels/);
 assert.match(runtime, /classification:data\.classification/);
 assert.match(runtime, /specVersion/);
 assert.match(runtime, /Build with AI/);
