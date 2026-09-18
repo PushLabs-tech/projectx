@@ -22,6 +22,28 @@ const retryMs = (e: unknown) => {
   const m = (e instanceof Error ? e.message : String(e)).match(/retry(?:-after|Delay)?[^0-9]*(\d+(?:\.\d+)?)s/i);
   return m ? Math.min(120000, Math.max(15000, Number(m[1]) * 1000)) : 45000;
 };
+function publicError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/missing session|invalid session/i.test(message)) return "Your session is no longer valid. Please sign in again.";
+  if (/not authorized|forbidden/i.test(message)) return "You do not have permission to access this project.";
+  if (/project not found/i.test(message)) return "That project could not be found.";
+  if (/request is too large/i.test(message)) return "That request is too large. Try sending less text.";
+  if (/rate limit reached/i.test(message)) return "ProjectX is rate-limited for a moment. Please wait and try again.";
+  if (/no compatible ai model|no compatible model|provider unavailable|no compatible ai models are reachable|connection succeeded but no compatible chat models/i.test(message)) return "No connected AI model is available for this request right now. Check your provider connection in Settings.";
+  return message.length > 320 ? message.slice(0, 320) + "…" : message;
+}
+function errorStatus(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/missing session|invalid session/i.test(message)) return 401;
+  if (/not authorized|forbidden/i.test(message)) return 403;
+  if (/project not found/i.test(message)) return 404;
+  if (/request is too large/i.test(message)) return 413;
+  if (/rate limit reached/i.test(message) || is429(error)) return 429;
+  if (/no compatible ai model|no compatible model|provider unavailable|no compatible ai models are reachable/i.test(message)) return 502;
+  if (/^Unsupported action$|^Unknown action:|^Invalid API key$|^Unsupported provider$/i.test(message)) return 400;
+  return 500;
+}
+
 
 async function requireUser(req: Request) {
   const auth = req.headers.get("Authorization");
@@ -319,6 +341,6 @@ Deno.serve(async req => {
     if (action === "chat") return json(await chat(user, body));
     throw new Error(`Unknown action: ${action}`);
   } catch (error) {
-    return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400);
+    return json({ ok: false, error: publicError(error) }, errorStatus(error));
   }
 });
