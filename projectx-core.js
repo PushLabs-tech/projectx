@@ -162,6 +162,7 @@ export function applyProjectMutation(project, mutation = {}) {
     if (op.op === 'write' && typeof op.content === 'string' && op.content.length <= 600000 && project.files[path] !== op.content) project.files[path] = op.content;
     if (op.op === 'delete' && Object.prototype.hasOwnProperty.call(project.files,path)) delete project.files[path];
   }
+  if (mutation.projectType || mutation.projectTitle) project.agents = normalizeAgents(project.agents || [], project.type);
   if (mutation.researchPatch && typeof mutation.researchPatch === 'object') {
     const research = project.research || {status:'ready',queries:[],sources:[],findings:[]};
     const patch = mutation.researchPatch;
