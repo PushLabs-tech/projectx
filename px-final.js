@@ -329,8 +329,24 @@ async function renderExplain(project){
 }
 function renderSimulation(project){
   const checks=simulationState(project),passed=checks.filter(x=>x.pass).length;
-  toolShell('OUTCOME SIMULATION','Outcome readiness','A deterministic readiness simulation based on the current project state — not a promise about real-world results.','<div class="simulation-score"><b>'+passed+'/'+checks.length+' checks ready</b></div><div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'READY':'NOT READY')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div>');
+  toolShell('OUTCOME SIMULATION','Outcome readiness','Deterministic readiness checks from the current project state — not a promise about real-world results.','<div class="simulation-score"><b>'+passed+'/'+checks.length+' checks ready</b></div><div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'READY':'NOT READY')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div><div class="actions" style="margin-top:12px"><button class="primary" id="run-full-verification">Run full verification</button></div><div id="verification-status" class="sub" style="margin-top:10px"></div>');
+  $('#run-full-verification').onclick=async()=>{
+    const button=$('#run-full-verification'),status=$('#verification-status');button.disabled=true;status.textContent='Preparing output…';
+    try{
+      const output=project.artifacts?.output,current=output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
+      if(!current){renderOutput(project);await buildArtifact(project);}
+      status.textContent='Running tests…';
+      const results=await runTests(project),testPass=results.every(x=>x.pass);
+      project.tests={status:testPass?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};
+      const security=projectSecurityChecks(project),blocking=security.filter(x=>x.blockBuild&&!x.pass);
+      project.status=testPass&&!blocking.length?'verified':'needs-fix';
+      saveProject(project);await syncRemoteProject(project);
+      status.textContent=testPass&&!blocking.length?'Full verification passed.':'Verification found issues; review Tests and Security.';
+      renderSimulation(project);
+    }catch(error){status.textContent='Verification failed: '+error.message;button.disabled=false;}
+  };
 }
+
 async function renderMakeGreat(project){
   toolShell('PROJECT IMPROVEMENT','Make it Great','ProjectX inspects the current project brain and proposes only additive improvements.','<div id="great-content"><div class="sub">Analyzing the current project…</div></div>');
   try{
