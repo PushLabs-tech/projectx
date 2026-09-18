@@ -299,6 +299,24 @@ function renderProjectChat(project,prefill=''){
       project.conversation=messages.slice(-MAX_HISTORY);
       saveProject(project);
       await syncRemoteProject(project);
+
+      const intent=String(data.intent||'answer').toLowerCase();
+      if(intent==='build'||data.needsBuild){
+        renderOutput(project);
+        await buildArtifact(project);
+        return;
+      }
+      if(intent==='test'){
+        renderTests(project);
+        const results=await runTests(project);
+        const resultsNode=$('#test-results');
+        if(resultsNode)resultsNode.innerHTML=`<div class="result-list">${results.map(result=>`<div class="result ${result.pass?'pass':'fail'}"><b>${result.pass?'PASS':'FAIL'} · ${esc(result.name)}</b><div class="sub">${esc(result.detail)}</div></div>`).join('')}</div>`;
+        project.tests={status:results.every(x=>x.pass)?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};
+        project.status=results.every(x=>x.pass)?'verified':'needs-fix';
+        saveProject(project);
+        await syncRemoteProject(project);
+        return;
+      }
       renderProject(project);
     }catch(error){
       messages.push({role:'assistant',text:`I couldn't complete that request: ${error.message}`});
