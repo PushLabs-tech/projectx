@@ -31,6 +31,7 @@ const now = () => new Date().toISOString();
 const DEFAULT_SETTINGS = {
   model: MODELS[0], responseStyle: 'balanced', executionMode: 'Mostly Automatic', autoSave: true, confirmDelete: true,
   theme: 'light', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], orchestrator: MODELS[0] },
   agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true },
   notifications: { build: true, test: true, deploy: true, credits: true, security: true }
 };
@@ -143,10 +144,13 @@ function effectiveMaxTokens(max){
   if(mode==='Powerful')return Math.min(Math.max(max,4200),12000);
   return max;
 }
+const AGENT_FOR_MODE = { understand:'interviewer', plan:'planner', artifact:'builder', discuss:'orchestrator' };
 async function aiJson(mode, payload, max = 3500) {
   max=effectiveMaxTokens(max);
+  const agent=String(payload.agent || AGENT_FOR_MODE[mode] || 'orchestrator');
+  const preferred=String(settingsState.agentModels?.[agent] || settingsState.model || MODELS[0]);
   if (session?.access_token) {
-    const result = await edge('chat', { mode, project: serializeForPersistence(payload.project || {}), message: payload.message || '', history: payload.history || [], model: settingsState.model });
+    const result = await edge('chat', { mode, agent, project: serializeForPersistence(payload.project || {}), message: payload.message || '', history: payload.history || [], model: preferred });
     if (result.result && typeof result.result === 'object') return result.result;
     return parseJson(result.text || '');
   }
@@ -571,7 +575,7 @@ async function renderGeneratedSection(project,section){
   try{
     const instruction={section:{name:section.name,purpose:section.purpose,kind:section.kind,capabilities:section.capabilities||[]},rule:'Work only on this section. Use the project brain as context, but do not restate the whole project or invent work.',task:`Produce the useful content a person would actually need inside the "${section.name}" section.`};
     const system='Return JSON only: {"summary":string,"blocks":[{"heading":string,"text":string}],"items":[{"title":string,"detail":string,"status":"proposed|ready|blocked|unknown"}],"nextActions":string[],"openQuestions":string[]}. Tailor every field to the exact section name and purpose. Do not create generic filler, repeat the same content across sections, or claim completed work without evidence.';
-    const data=await aiJson('plan',{project,history:[],message:JSON.stringify(instruction),system},3600);
+    const data=await aiJson('plan',{project,history:[],message:JSON.stringify(instruction),system,agent:section.agent||'planner'},3600);
     const content={specVersion:project.specVersion,summary:String(data?.summary||''),blocks:Array.isArray(data?.blocks)?data.blocks.filter(x=>x&&String(x.heading||x.text||'').trim()).slice(0,8).map(x=>({heading:String(x.heading||'').slice(0,100),text:String(x.text||'').slice(0,900)})):[],items:Array.isArray(data?.items)?data.items.slice(0,20):[],nextActions:Array.isArray(data?.nextActions)?data.nextActions.slice(0,10):[],openQuestions:Array.isArray(data?.openQuestions)?data.openQuestions.slice(0,10):[]};
     project.sectionContent={...(project.sectionContent||{}),[section.id]:content};
     saveProject(project);await syncRemoteProject(project);drawSectionContent(content);
@@ -778,7 +782,7 @@ const SETTINGS=[['general','General'],['ai','AI'],['agents','Agents'],['integrat
 function settingsPage(which='general'){shell(`<div class="panel"><div class="kicker">PROJECT X</div><h1 class="hero-title" style="font-size:44px">Settings</h1><div class="settings"><nav class="settings-nav">${SETTINGS.map(([id,name])=>`<button class="${id===which?'active':''}" data-setting="${id}">${name}</button>`).join('')}</nav><div id="settings-body"></div></div></div>`,'settings');$$('[data-setting]').forEach(button=>button.onclick=()=>settingsPage(button.dataset.setting));renderSettings(which);}
 async function renderSettings(which){const body=$('#settings-body');if(!body)return;const p=settingsState;if(which==='general')body.innerHTML=`<h2>General</h2><p class="sub">Core ProjectX preferences.</p><div class="box"><div class="row"><div><b>Working mode</b><div class="sub">Choose how much automation ProjectX should use. Provider details stay hidden from normal project work.</div></div><select class="select" id="execution-mode">${['Fast','Balanced','Powerful','Ask Me','Mostly Automatic','Autonomous'].map(m=>'<option '+(p.executionMode===m?'selected':'')+'>'+m+'</option>').join('')}</select></div><div class="row"><div><b>Auto-save</b><div class="sub">Save successful project changes automatically.</div></div><button class="ghost" id="toggle-autosave">${p.autoSave?'On':'Off'}</button></div><div class="row"><div><b>Confirm destructive actions</b></div><button class="ghost" id="toggle-confirm">${p.confirmDelete?'On':'Off'}</button></div><div class="row"><b>Language</b><select class="select" id="language"><option>English</option></select></div><div class="row"><b>Timezone</b><input class="input" id="timezone" value="${esc(p.timezone)}"></div></div>`;
 else if(which==='ai')return renderAiSettings(body);
-else if(which==='agents')body.innerHTML=`<h2>Agents</h2><p class="sub">Every enabled role uses the same canonical project brain.</p><div class="box">${Object.entries(p.agents).map(([id,on])=>`<div class="row"><div><b>${esc(id)}</b><div class="sub">${esc({interviewer:'Discovery and ambiguity reduction.',planner:'Plans from the project brain.',builder:'Creates real files and outputs.',tester:'Validates current artifacts.',researcher:'Structures evidence when research is relevant.'}[id]||'Project role.')}</div></div><button class="ghost" data-agent="${id}">${on?'Enabled':'Disabled'}</button></div>`).join('')}</div>`;
+else if(which==='agents')return renderAgentSettings(body);
 else if(which==='integrations')body.innerHTML=`<h2>Integrations</h2><div class="box"><div class="row"><div><b>Supabase</b><div class="sub">${ensureSupabase()?'Configured':'Not configured'}</div></div><span class="status ${ensureSupabase()?'ok':'warn'}">${ensureSupabase()?'READY':'PLACEHOLDER'}</span></div><div class="row"><div><b>GitHub</b><div class="sub">Repository automation requires OAuth integration.</div></div><span class="status warn">PLACEHOLDER</span></div></div>`;
 else if(which==='defaults')body.innerHTML=`<h2>Project Defaults</h2><div class="box"><div class="row"><b>Default model</b><select class="select" id="default-model">${MODELS.map(m=>`<option ${p.model===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="row"><b>Response style</b><select class="select" id="response-style"><option ${p.responseStyle==='concise'?'selected':''}>concise</option><option ${p.responseStyle==='balanced'?'selected':''}>balanced</option><option ${p.responseStyle==='detailed'?'selected':''}>detailed</option></select></div></div>`;
 else if(which==='appearance')body.innerHTML=`<h2>Appearance</h2><div class="box"><div class="row"><b>Theme</b><span class="sub">Light workspace is currently implemented.</span></div><div class="placeholder">Dark/system styling remains a placeholder and is not falsely marked active.</div></div>`;
@@ -788,6 +792,18 @@ else if(which==='git')body.innerHTML=`<h2>Git & Deployment</h2><div class="box">
 else if(which==='storage')body.innerHTML=`<h2>Storage</h2><div class="box"><div class="row"><b>Projects</b><span class="sub">${state.projects.length}</span></div><div class="row"><b>Generated files</b><span class="sub">${state.projects.reduce((count,project)=>count+Object.keys(project.files||{}).length,0)}</span></div></div>`;
 else if(which==='billing')body.innerHTML=`<h2>Billing & Usage</h2><div class="box"><div class="row"><div><b>Plan</b><div class="sub">Billing controls remain inactive until a payment merchant is connected.</div></div><span class="status warn">NOT CONNECTED</span></div><div class="grid" style="margin-top:10px"><div class="box"><b>30-day requests</b><div id="usage-total" class="hero-title" style="font-size:28px;margin:6px 0">—</div></div><div class="box"><b>30-day units</b><div id="usage-units" class="hero-title" style="font-size:28px;margin:6px 0">—</div></div><div class="box"><b>Top actions</b><div id="usage-actions" class="sub" style="margin-top:7px">Loading…</div></div></div><div class="box" style="margin-top:10px"><b>Recent AI usage</b><div id="usage-recent" style="margin-top:8px">Loading…</div></div></div>`;
 else body.innerHTML=`<h2>Advanced</h2><div class="box"><button class="ghost" id="export-state">Export local state</button><button class="ghost" id="clear-state" style="margin-left:7px">Clear local cache</button><div class="placeholder" style="margin-top:12px">Experimental options are intentionally inactive until implemented.</div></div>`;bindSettings(which);}
+async function renderAgentSettings(body){
+  const roles={interviewer:'Discovery and ambiguity reduction.',planner:'Plans from the project brain.',builder:'Creates real files and outputs.',tester:'Validates current artifacts.',researcher:'Structures source-backed evidence.',orchestrator:'Coordinates project actions and execution.'};
+  body.innerHTML=`<h2>Agents</h2><p class="sub">Choose specialist models and enable or disable roles. Connected-account model preferences apply to the matching ProjectX specialist.</p><div class="box" id="agent-settings"><div class="sub">Loading available models…</div></div>`;
+  let models=[];
+  if(session){try{models=(await edge('listModels',{task:'chat'})).models||[]}catch{}}
+  if(!models.length)models=[...new Set(MODELS)].map(id=>({id,name:id}));
+  const container=$('#agent-settings');
+  const optionList=(id)=>models.slice(0,250).map(m=>`<option value="${esc(m.id)}" ${String(settingsState.agentModels?.[id]||settingsState.model)===String(m.id)?'selected':''}>${esc(m.name||m.id)}${m.provider?' · '+esc(m.provider):''}</option>`).join('');
+  container.innerHTML=Object.entries(roles).map(([id,purpose])=>`<div class="row"><div><b>${esc(id)}</b><div class="sub">${esc(purpose)}</div></div><div class="actions"><select class="select" data-agent-model="${id}">${optionList(id)}</select><button class="ghost" data-agent-toggle="${id}">${settingsState.agents?.[id]?'Enabled':'Disabled'}</button></div></div>`).join('');
+  $('[data-agent-model]').forEach(select=>select.onchange=e=>{const id=select.dataset.agentModel;settingsState.agentModels={...(settingsState.agentModels||{}),[id]:e.target.value};persistSettings();notify(id+' model preference saved.','success');});
+  $('[data-agent-toggle]').forEach(btn=>btn.onclick=()=>{const id=btn.dataset.agentToggle;settingsState.agents={...settingsState.agents,[id]:!settingsState.agents[id]};persistSettings();renderAgentSettings(body);});
+}
 async function renderAiSettings(body){
   let server=[];
   if(session){try{server=(await edge('listCredentials')).providers||[]}catch{}}
