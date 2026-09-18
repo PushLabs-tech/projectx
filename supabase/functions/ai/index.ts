@@ -93,6 +93,17 @@ async function modelsForCredentials(creds: Credential[], task = "chat"): Promise
   }
   return all;
 }
+function resolveCredentialProvider(storedProvider: ProviderId, apiKey: string, baseUrl?: string): ProviderId {
+  const detectedProvider = detectProvider(apiKey, baseUrl);
+  const obviousProviders = new Set<ProviderId>(["bytez","nvidia","openrouter","anthropic","google"]);
+  if (storedProvider === "auto") return detectedProvider;
+  // Correct legacy/manual misclassification only when the credential itself
+  // clearly identifies a supported provider. Generic custom endpoints remain
+  // under the provider chosen by the user.
+  if (obviousProviders.has(detectedProvider) && detectedProvider !== storedProvider) return detectedProvider;
+  return storedProvider;
+}
+
 async function credentialsFor(uid: string): Promise<Credential[]> {
   const { data, error } = await admin.from("ai_provider_credentials").select("provider,label,api_key_ciphertext,provider_key_ciphertext,base_url").eq("user_id", uid).eq("enabled", true);
   if (error) throw error;
@@ -100,14 +111,7 @@ async function credentialsFor(uid: string): Promise<Credential[]> {
     const apiKey = await decryptSecret(r.api_key_ciphertext);
     const baseUrl = assertSafeBaseUrl(r.base_url || "") || undefined;
     const storedProvider = r.provider as ProviderId;
-    const detectedProvider = detectProvider(apiKey, baseUrl);
-    // Recover legacy/misclassified credentials when the key or endpoint
-    // clearly identifies another supported provider. Generic custom endpoints
-    // are left untouched because their keys are intentionally opaque.
-    const obviousProvider = new Set<ProviderId>(["bytez","nvidia","openrouter","anthropic","google"]);
-    const provider = storedProvider !== "auto" && obviousProvider.has(detectedProvider) && detectedProvider !== storedProvider
-      ? detectedProvider
-      : storedProvider === "auto" ? detectedProvider : storedProvider;
+    const provider = resolveCredentialProvider(storedProvider, apiKey, baseUrl);
     return {
       provider,
       label: r.label,
@@ -117,7 +121,6 @@ async function credentialsFor(uid: string): Promise<Credential[]> {
     };
   }));
 }
-
 function safeCredential(r: any) {
   return { provider: r.provider, label: r.label, keyHint: r.key_hint || "••••", baseUrl: r.base_url || null, updatedAt: r.updated_at };
 }
@@ -604,11 +607,16 @@ Deno.serve(async req => {
     if (action === "testCredential" || action === "saveCredential") {
       let provider = String(body.provider || "auto"); if (!PROVIDERS.has(provider)) throw new Error("Unsupported provider");
       const apiKey = String(body.apiKey || "").trim(); if (!apiKey || apiKey.length > 10000) throw new Error("Invalid API key");
-      const credential: any = { provider: provider as ProviderId, apiKey, providerKey: String(body.providerKey || "").trim() || undefined, baseUrl: assertSafeBaseUrl(String(body.baseUrl || "").trim()) || undefined };
-      if (provider === "auto") credential.provider = detectProvider(apiKey, credential.baseUrl);
+      const requestedProvider = provider as ProviderId;
+      const safeBaseUrl = assertSafeBaseUrl(String(body.baseUrl || "").trim()) || undefined;
+      const resolvedProvider = resolveCredentialProvider(requestedProvider, apiKey, safeBaseUrl);
+      const credential: any = { provider: resolvedProvider, apiKey, providerKey: String(body.providerKey || "").trim() || undefined, baseUrl: safeBaseUrl };
       const models = await providerListModels(credential, "chat"); if (!models.length) throw new Error("Connection succeeded but no compatible chat models were returned");
       if (action === "testCredential") return json({ ok: true, provider: credential.provider, models: models.slice(0, 250) });
       MODEL_CACHE.clear();
+      if (resolvedProvider !== requestedProvider && requestedProvider !== "auto") {
+        await admin.from("ai_provider_credentials").delete().eq("user_id", user.id).eq("provider", requestedProvider);
+      }
       const { error } = await admin.from("ai_provider_credentials").upsert({ user_id: user.id, provider: credential.provider, label: String(body.label || "Personal key").slice(0, 80), api_key_ciphertext: await encryptSecret(apiKey), provider_key_ciphertext: credential.providerKey ? await encryptSecret(credential.providerKey) : null, base_url: credential.baseUrl || null, key_hint: `••••${apiKey.slice(-4)}`, enabled: true, updated_at: new Date().toISOString() }, { onConflict: "user_id,provider" });
       if (error) throw error; return json({ ok: true, provider: credential.provider, models: models.length });
     }
