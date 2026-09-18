@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
+import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, normalizeResources, projectArtifactKind, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -26,7 +26,6 @@ for (const type of ['Document','Presentation','Data','Dashboard','Internal tool'
 }
 assert.equal(validateSpec({goal:'Create a dashboard',deliverables:['Dashboard']},'Dashboard').valid,true);
 assert.equal(validateSpec({goal:'Write a report',deliverables:['Report']},'Document').valid,true);
-assert.equal((await import('../projectx-core.js')).projectArtifactKind('Presentation'),'software');
 assert.equal(sanitizePath('../secret.txt'), null);
 assert.equal(sanitizePath('/absolute/path'), 'absolute/path');
 assert.equal(normalizeSections([{ name: 'Custom Mechanics', purpose: 'Project-specific mechanics.' }], 'Game')[1].name, 'Custom Mechanics');
@@ -58,6 +57,11 @@ assert.equal(researchMutation.researchChanged, true);
 assert.deepEqual(researchProject.research.queries, ['EV adoption']);
 assert.equal(researchProject.research.sources[0].url, 'https://example.com/report');
 assert.equal(researchProject.research.findings[0].confidence, 0.9);
+const resources = normalizeResources([{name:'notes.md',type:'text/markdown',content:'Project context',size:14},{name:'https://example.com',type:'url',url:'https://example.com'}]);
+assert.equal(resources.length,2);
+assert.equal(resources[0].name,'notes.md');
+assert.equal(resources[1].url,'https://example.com');
+assert.equal(projectArtifactKind('Presentation'),'software');
 
 const transformed = createProject({title:'Original',type:'Website',spec:{goal:'Build a useful website',deliverables:['Working website']}});
 const typeMutation = applyProjectMutation(transformed,{projectType:'API',projectTitle:'Transformed API'});
