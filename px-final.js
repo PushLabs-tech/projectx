@@ -259,12 +259,12 @@ async function renderSection(project,section){
     case 'code': return renderFiles(project);
     case 'test': return renderTests(project);
     case 'planning':
-    case 'research':
     case 'workspace':
     default: return renderGeneratedSection(project,section);
+    case 'research': return renderResearchSection(project,section);
   }
 }
-const projectAgentSystem=`You are ProjectX's project agent. The canonical project specification is the source of truth. Return JSON only: {"intent":"answer|change|build|test|research|publish","message":string,"changed":boolean,"specPatch":{},"workspaceSections":[],"fileOperations":[{"op":"write|delete","path":"safe/relative/path","content":"complete file content"}],"needsBuild":boolean}. Only set changed=true for real project changes. Never claim a file, artifact, build, test, research result, or deployment exists without returning the corresponding operation or verified result. For software/game changes prefer real file operations.`;
+const projectAgentSystem=`You are ProjectX's project agent. The canonical project specification is the source of truth. Return JSON only: {"intent":"answer|change|build|test|research|publish","message":string,"changed":boolean,"specPatch":{},"workspaceSections":[],"fileOperations":[{"op":"write|delete","path":"safe/relative/path","content":"complete file content"}],"researchQuery":string,"researchUrls":string[],"needsBuild":boolean}. For research, only return URLs explicitly supplied by the user; never invent sources. Never claim a file, artifact, build, test, research result, or deployment exists without returning the corresponding operation or verified result. For software/game changes prefer real file operations.`;
 function renderProjectChat(project,prefill=''){
   const body=$('#project-body');
   const messages=project.conversation.length?project.conversation.slice(-MAX_HISTORY):[{role:'assistant',text:'I have the canonical project state in context. What should we change or work on next?'}];
@@ -309,6 +309,17 @@ function renderProjectChat(project,prefill=''){
       await syncRemoteProject(project);
 
       const intent=String(data.intent||'answer').toLowerCase();
+      if(intent==='research'){
+        const query=String(data.researchQuery||'').trim();
+        const urls=Array.isArray(data.researchUrls)?data.researchUrls.map(x=>String(x||'').trim()).filter(Boolean).slice(0,5):[];
+        if(!session){aiRequiredModal('Sign in to use source-backed research.');renderProject(project);return;}
+        if(!query||!urls.length){messages.push({role:'assistant',text:'Send the research question together with one or more source URLs I should analyze.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);drawConversation(messages,'#project-log');return;}
+        const result=await edge('research',{projectId:project.id,query,urls});
+        const mutation=applyProjectMutation(project,{researchPatch:{query,addSources:result.sources||urls.map(url=>({url})),addFindings:result.findings||[]}});
+        if(mutation.changed){project.executionState={...(project.executionState||{}),lastAgent:'researcher'};saveProject(project);await syncRemoteProject(project);}
+        messages.push({role:'assistant',text:String(result.summary||'Research added to the project evidence store.')});
+        project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);drawConversation(messages,'#project-log');renderProject(project);return;
+      }
       if(intent==='build'||data.needsBuild){
         renderOutput(project);
         await buildArtifact(project);
@@ -334,6 +345,37 @@ function renderProjectChat(project,prefill=''){
   input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#project-form').requestSubmit();}};
 }
 function applyFileOperations(project,operations){project.files=project.files||{};for(const op of operations){const path=sanitizePath(op.path);if(!path)continue;if(op.op==='write'&&typeof op.content==='string'&&op.content.length<=600000)project.files[path]=op.content;if(op.op==='delete')delete project.files[path];}if(Object.keys(project.files).length)project.artifacts={...(project.artifacts||{}),manifest:{specVersion:project.specVersion,files:Object.keys(project.files)}};}
+async function renderResearchSection(project,section){
+  const body=$('#project-body');
+  const research=project.research||{status:'ready',queries:[],sources:[],findings:[]};
+  const findings=Array.isArray(research.findings)?research.findings.slice(-30).reverse():[];
+  body.innerHTML=`<div class="box"><div><h2 style="margin:0">${esc(section.name)}</h2><div class="sub">${esc(section.purpose)} Use sources you trust; ProjectX will extract evidence and label it with the source used.</div></div>
+    <form id="research-form" class="form" style="margin-top:14px">
+      <input id="research-query" placeholder="What do you need to find out?" required maxlength="500">
+      <textarea id="research-urls" placeholder="Source URLs — one per line (https://…)" rows="4" required></textarea>
+      <button class="primary" id="research-submit" type="submit">${session?'Research these sources':'Sign in to research'}</button>
+    </form>
+    <div id="research-status" style="margin-top:10px"></div>
+    <div style="margin-top:18px"><b>Evidence</b><div id="research-findings" style="margin-top:10px">${findings.length?findings.map(f=>`<div class="section-block"><b>${esc(f.sourceTitle||f.source_title||'Source')}</b><p>${esc(f.finding||'')}</p><div class="sub">${f.sourceUrl||f.source_url?`<a href="${esc(f.sourceUrl||f.source_url)}" target="_blank" rel="noopener noreferrer">${esc(f.sourceUrl||f.source_url)}</a>`:''} ${f.confidence!=null?` · Confidence ${Math.round(Number(f.confidence)*100)}%`:''}</div></div>`).join(''):'<div class="placeholder">No source-backed findings yet.</div>'}</div></div>
+  </div>`;
+  const form=$('#research-form'),submit=$('#research-submit'),status=$('#research-status');
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    if(!session){aiRequiredModal('Sign in to use source-backed research.');return;}
+    const query=$('#research-query').value.trim();
+    const urls=$('#research-urls').value.split(/\n|,/).map(x=>x.trim()).filter(Boolean).slice(0,5);
+    if(!query||!urls.length){status.innerHTML='<div class="sub">Add a research question and at least one HTTPS source URL.</div>';return;}
+    submit.disabled=true;status.innerHTML='<div class="sub">Reading sources and extracting evidence…</div>';
+    try{
+      const result=await edge('research',{projectId:project.id,query,urls});
+      const sourceList=Array.isArray(result?.sources)?result.sources:urls.map(url=>({url}));
+      const newFindings=Array.isArray(result?.findings)?result.findings:[];
+      const mutation=applyProjectMutation(project,{researchPatch:{query,addSources:sourceList,addFindings:newFindings}});
+      if(mutation.changed){project.executionState={...(project.executionState||{}),lastAgent:'researcher'};saveProject(project);await syncRemoteProject(project);}
+      renderResearchSection(project,section);
+    }catch(error){status.innerHTML=`<div class="sub">Research failed: ${esc(error.message)}</div>`;submit.disabled=false;}
+  };
+}
 async function renderGeneratedSection(project,section){
   const body=$('#project-body');
   body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${esc(section.name)}</h2><div class="sub">${esc(section.purpose)}</div></div><button class="ghost" id="section-refresh">${project.sectionContent?.[section.id]?.specVersion===project.specVersion?'Refresh':'Generate'}</button></div><div id="section-content" style="margin-top:14px"><div class="sub">Generating from project spec v${project.specVersion}…</div></div></div>`;
