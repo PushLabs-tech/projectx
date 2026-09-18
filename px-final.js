@@ -538,8 +538,9 @@ async function renderOutput(project){
   const current=output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
   const title=software?(project.type==='Game'?'Playtest':'Output'):'Deliverable';
   const description=current?'Current output generated from the project brain.':software?'No current artifact exists yet.':'No document deliverable exists yet.';
-  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button></div><div id="output-area" style="margin-top:14px"></div></div>`;
+  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><div class="actions"><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button>${software?'<button id="visual-edit" class="ghost">Visual edit</button>':''}</div></div><div id="output-area" style="margin-top:14px"></div></div>`;
   $('#build-output').onclick=()=>buildArtifact(project);
+  $('#visual-edit')?.addEventListener('click',()=>renderProjectChat(project,'Make a visual change: '));
   if(current){
     if(software)mountArtifact(project);
     else{
