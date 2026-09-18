@@ -28,31 +28,39 @@ This is the revised Builder package. It keeps the classic Builder UI language fr
 
 ## Architecture
 
-```text
-Browser
-  ├─ index.html / static legal + billing pages
-  ├─ app.js / site.js / billing.js
-  └─ Supabase publishable key only
-          │
-          ▼
-Supabase Auth + Edge Functions
-  ├─ /functions/v1/ai
-  │    ├─ authenticate user
-  │    ├─ decrypt provider credential only in memory
-  │    ├─ deterministic model routing
-  │    └─ audit AI usage
-  └─ /functions/v1/payments
-       ├─ authenticate checkout requests
-       ├─ create Razorpay subscriptions
-       └─ verify signed webhooks
-          │
-          ▼
-Postgres + RLS
-  ├─ projects / files / versions
-  ├─ encrypted AI credentials
-  ├─ audit/security logs
-  └─ billing subscriptions + payment event idempotency
+ProjectX now has one canonical browser runtime for the workspace. Older builder stacks remain in the repository only where compatibility, tests, or artifact templates still require them; they are not part of the production boot path.
+
+```mermaid
+flowchart TD
+  user((User)) --> app[index.html]
+  app --> px[px-final.js]
+  px --> core[projectx-core.js]
+  px --> auth[Supabase Auth]
+  px --> aiClient[AI client + workspace orchestration]
+  aiClient --> ai[Supabase AI Edge Function]
+  ai --> router[Model Router]
+  ai --> providers[Provider Adapters]
+  providers --> models[(AI Provider APIs)]
+  ai --> crypto[Credential Crypto]
+  ai --> db[(Project / Usage / Security DB)]
+
+  billing[billing.html + billing.js] --> pay[Payments Edge Function]
+  pay --> razor[Razorpay]
+  razor -->|webhooks| pay
+  pay --> billingDb[(Billing + Payment Events)]
+  pay --> db
 ```
+
+Canonical browser path:
+`index.html → px-final.js → projectx-core.js`
+
+Public billing path:
+`billing.html → billing.js → Supabase payments function → Razorpay`
+
+AI path:
+`px-final.js → Supabase AI function → router/providers/crypto → model provider APIs`
+
+The workspace keeps provider-specific complexity out of normal project work. Provider credentials are tested and stored through the authenticated server-side vault, previews run in sandboxed iframes, and generated changes are verified before being marked current.
 
 ## Local setup
 
