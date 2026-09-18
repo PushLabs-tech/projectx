@@ -558,7 +558,7 @@ async function renderOutput(project){
   const software=projectArtifactKind(project.type)==='software';
   const output=project.artifacts?.output;
   const current=output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
-  const title=software?(project.type==='Game'?'Playtest':'Output'):'Deliverable';
+  const title=software?(project.type==='Game'?'Playtest':project.type==='Presentation'?'Presentation':'Output'):'Deliverable';
   const description=current?'Current output generated from the project brain.':software?'No current artifact exists yet.':'No document deliverable exists yet.';
   body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><div class="actions"><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button>${software?'<button id="visual-edit" class="ghost">Visual edit</button>':''}</div></div><div id="output-area" style="margin-top:14px"></div></div>`;
   $('#build-output').onclick=()=>buildArtifact(project);
@@ -579,7 +579,8 @@ async function buildArtifact(project,repairResults=[]){
   area.innerHTML='<div class="sub">ProjectX is generating and validating the real deliverable…</div>';
   try{
     const repairContext=Array.isArray(repairResults)&&repairResults.length?' Repair the current artifact against these verified failures: '+repairResults.map(x=>x.name+': '+x.detail).join(' | ')+'. Preserve working behavior and fix the failures; do not introduce placeholders.':'';
-    const data=await aiJson('artifact',{project,message:software?'Generate the complete functional software artifact for this exact project. Return only files needed for this project.'+(repairContext||''):'Generate the complete deliverable for this exact project. For a real-world objective, prefer a well-structured Markdown document unless another format is clearly required. Return only files needed for this deliverable.'+(repairContext||'')},10000);
+    const artifactMessage=project.type==='Presentation'?'Generate a complete self-contained browser presentation for this exact project. Use index.html with slide navigation and keyboard controls, responsive typography, clear slide hierarchy, and no external dependencies. Return only files needed for the presentation.':software?'Generate the complete functional software artifact for this exact project. Return only files needed for this project.':'Generate the complete deliverable for this exact project. For a real-world objective, prefer a well-structured Markdown document unless another format is clearly required. Return only files needed for this deliverable.';
+    const data=await aiJson('artifact',{project,message:artifactMessage+(repairContext||'')},10000);
     const files={};
     for(const file of Array.isArray(data?.files)?data.files:[]){
       const path=sanitizePath(file.path);
@@ -593,6 +594,7 @@ async function buildArtifact(project,repairResults=[]){
       const structural=[
         {name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'},
         {name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'},
+        ...(project.type==='Presentation'?[{name:'Slide structure',pass:/slide|section/i.test(Object.values(files).join('\n')),detail:/slide|section/i.test(Object.values(files).join('\n'))?'Presentation structure detected.':'No slide or section structure detected.'}]:[]),
         {name:'No obvious placeholder markers',pass:!(/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'))),detail:/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'))?'Placeholder marker found.':'No obvious placeholder marker found.'}
       ];
       if(!structural.every(x=>x.pass))throw new Error(structural.filter(x=>!x.pass).map(x=>x.detail).join(' '));
@@ -718,7 +720,7 @@ function renderDelivery(project){
   const body=$('#project-body');
   const software=projectArtifactKind(project.type)==='software';
   const first=Object.keys(project.files||{}).find(p=>software?/\.html?$/i.test(p):/\.(md|txt|csv|json)$/i.test(p))||Object.keys(project.files||{})[0];
-  const kindLabel=software?'playable':'document';
+  const kindLabel=software?(project.type==='Presentation'?'presentation':'playable'):'document';
   body.innerHTML='<div class="box"><h2 style="margin:0">Delivery</h2><p class="sub">Package the current project without claiming an external deployment.</p><div class="grid"><div class="box"><b>Download output</b><div class="sub">Save the current '+kindLabel+' artifact.</div><button class="download" id="download-output" style="margin-top:9px">Download</button></div><div class="box"><b>Export project</b><div class="sub">Save the canonical project brain and files.</div><button class="download" id="export-project" style="margin-top:9px">Export JSON</button></div><div class="box"><b>Deployment</b><div class="placeholder">Deployment integrations are intentionally inactive until a real account-level provider connection exists.</div></div></div></div>';
   $('#download-output').onclick=()=>{
     if(!first)return;
