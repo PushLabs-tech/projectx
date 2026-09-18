@@ -35,6 +35,11 @@ applySpecChange(game, { features: { add: ['Pause menu'] } });
 assert.equal(game.specVersion, before + 1);
 assert.deepEqual(game.spec.features, ['Pause menu']);
 assert.equal(game.tests.status, 'stale');
+const planBefore=game.specVersion;
+const planMutation=applyProjectMutation(game,{plan:[{title:'Build playable loop',steps:['Implement loop','Run tests'],status:'proposed'}]});
+assert.equal(planMutation.changed,true);
+assert.equal(game.specVersion,planBefore+1);
+assert.equal(game.plan[0].title,'Build playable loop');
 
 const beforeRemove = game.specVersion;
 applySpecChange(game, { features: { remove: ['Pause menu'] } });
