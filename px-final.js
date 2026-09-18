@@ -395,7 +395,27 @@ function downloadText(name,content,type='text/plain'){const url=URL.createObject
 async function renderTests(project){
   const body=$('#project-body');
   const saved=project.tests?.specVersion===project.specVersion&&Array.isArray(project.tests?.results)?project.tests.results:[];
-  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">Tests</h2><div class="sub">Checks the actual generated output and browser runtime.</div></div><button class="primary" id="run-tests">Run tests</button></div><div id="test-results" style="margin-top:14px">${saved.length?`<div class="sub" style="margin-bottom:9px">Last run: ${project.tests.status==='passed'?'passed':'failed'}.</div><div class="result-list">${saved.map(result=>`<div class="result ${result.pass?'pass':'fail'}"><b>${result.pass?'PASS':'FAIL'} · ${esc(result.name)}</b><div class="sub">${esc(result.detail)}</div></div>`).join('')}</div>`:'<div class="placeholder">Run the checks against the current artifact.</div>'}</div></div>`;$('#run-tests').onclick=async()=>{const button=$('#run-tests');button.disabled=true;try{const results=await runTests(project);$('#test-results').innerHTML=`<div class="result-list">${results.map(result=>`<div class="result ${result.pass?'pass':'fail'}"><b>${result.pass?'PASS':'FAIL'} · ${esc(result.name)}</b><div class="sub">${esc(result.detail)}</div></div>`).join('')}</div>`;project.status=results.every(x=>x.pass)?'verified':'needs-fix';saveProject(project);await syncRemoteProject(project);}finally{button.disabled=false;}};}
+  const drawResults=(results,status)=>{
+    const passed=results.every(x=>x.pass);
+    $('#test-results').innerHTML=`<div class="sub" style="margin-bottom:9px">Last run: ${status|| (passed?'passed':'failed')}.</div><div class="result-list">${results.map(result=>`<div class="result ${result.pass?'pass':'fail'}"><b>${result.pass?'PASS':'FAIL'} · ${esc(result.name)}</b><div class="sub">${esc(result.detail)}</div></div>`).join('')}</div>${passed?'':'<div class="actions" style="margin-top:12px"><button class="ghost" id="rebuild-from-tests">Rebuild with AI</button></div>'}`;
+    $('#rebuild-from-tests')?.addEventListener('click',()=>{renderOutput(project);buildArtifact(project);});
+  };
+  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">Tests</h2><div class="sub">Checks the actual generated output and browser runtime.</div></div><button class="primary" id="run-tests">Run tests</button></div><div id="test-results" style="margin-top:14px">${saved.length?'':'<div class="placeholder">Run the checks against the current artifact.</div>'}</div></div>`;
+  if(saved.length)drawResults(saved,project.tests.status);
+  $('#run-tests').onclick=async()=>{
+    const button=$('#run-tests');button.disabled=true;
+    try{
+      const results=await runTests(project),status=results.every(x=>x.pass)?'passed':'failed';
+      drawResults(results,status);
+      project.tests={status,specVersion:project.specVersion,results,updatedAt:now()};
+      project.status=status==='passed'?'verified':'needs-fix';
+      saveProject(project);
+      await syncRemoteProject(project);
+    }catch(error){
+      $('#test-results').innerHTML=`<div class="placeholder">Tests failed to run: ${esc(error.message)}</div>`;
+    }finally{button.disabled=false;}
+  };
+}
 async function runTests(project){const results=[],files=project.files||{},html=files['index.html']||files['src/index.html']||'';results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'});results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'});const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\n'));
 results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});results.push(await browserRuntimeCheck(files));return results;}
 function browserRuntimeCheck(files){return new Promise(resolve=>{const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.style.cssText='position:fixed;left:-99999px;width:800px;height:600px;opacity:0';document.body.appendChild(frame);let settled=false;const finish=result=>{if(settled)return;settled=true;window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove();resolve(result);};const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.'});};window.addEventListener('message',onMessage);const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.'}),2200);frame.srcdoc=assemblePreviewHtml(files);});}
