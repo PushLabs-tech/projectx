@@ -193,8 +193,8 @@ function validDiscoveryPollLocal(value){
   const decision=String(value?.decision||'').trim();
   const raw=Array.isArray(value?.options)?value.options.map(v=>String(v||'').trim()).filter(Boolean):[];
   const options=[...new Set(raw)].filter(v=>v.toLowerCase()!=='describe in your own words');
-  if(!decision||/?`s*$/.test(decision)||options.length!==4)return false;
-  if(options.some(v=>/?`s*$/.test(v)||v.length>160))return false;
+  if(!decision||/\?\s*$/.test(decision)||options.length!==4)return false;
+  if(options.some(v=>/\?\s*$/.test(v)||v.length>160))return false;
   return true;
 }
 
@@ -297,7 +297,7 @@ function renderDiscoveryPoll(poll,meta,history){
   const decision=String(poll?.decision||'').trim();
   const aiOptions=Array.isArray(poll?.options)?poll.options.map(v=>String(v||'').trim()).filter(Boolean):[];
   const options=[...new Set(aiOptions)].filter(v=>v.toLowerCase()!=='describe in your own words').slice(0,4);
-  if(!decision||/?`s*$/.test(decision)||options.length!==4||options.some(v=>/?`s*$/.test(v))){
+  if(!decision||/\?\s*$/.test(decision)||options.length!==4||options.some(v=>/\?\s*$/.test(v))){
     root.innerHTML='<div class="poll-card"><div class="poll-title">The AI could not generate a contextual poll.</div></div>';
     return;
   }
