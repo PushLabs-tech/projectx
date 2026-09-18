@@ -9,7 +9,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUB
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
-const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "persistProject", "listProjects", "getProject", "deleteProject"]);
+const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject"]);
 const MAX_BODY_BYTES = 180000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
@@ -373,6 +373,22 @@ async function research(user: any, body: any) {
   throw new Error(`Research was unavailable. Tried: ${attempted.join(", ") || "none"}. ${last instanceof Error ? last.message : "Provider unavailable"}`);
 }
 
+async function usage(user: any) {
+  const since=new Date(Date.now()-30*24*60*60*1000).toISOString();
+  const { data, error } = await admin.from("ai_usage").select("action,provider,model,units,created_at").eq("user_id",user.id).gte("created_at",since).order("created_at",{ascending:false}).limit(500);
+  if(error)throw error;
+  const rows=data||[];
+  const units=rows.reduce((sum,r)=>sum+Number(r.units||0),0);
+  const byAction={};
+  for(const r of rows)byAction[r.action]=(byAction[r.action]||0)+Number(r.units||0);
+  return {ok:true,windowDays:30,totalRequests:rows.length,totalUnits:units,byAction,recent:rows.slice(0,20)};
+}
+async function securityEvents(user: any) {
+  const { data, error } = await admin.from("security_events").select("id,event_type,severity,metadata,created_at").eq("user_id",user.id).order("created_at",{ascending:false}).limit(50);
+  if(error)throw error;
+  return {ok:true,events:data||[]};
+}
+
 async function listProjects(user: any) {
   const { data, error } = await admin.from("projects").select("id,title,project_type,intention,project_spec,understanding,plan,workspace_config,spec_version,selected_section,status,settings,updated_at").eq("owner_id", user.id).order("updated_at", { ascending: false });
   if (error) throw error;
@@ -475,6 +491,8 @@ Deno.serve(async req => {
       if ((count || 0) >= 30) throw new Error("Rate limit reached. Please wait a minute and try again.");
       return json(await research(user, body));
     }
+    if (action === "usage") return json(await usage(user));
+    if (action === "securityEvents") return json(await securityEvents(user));
     if (action === "chat") return json(await chat(user, body));
     throw new Error(`Unknown action: ${action}`);
   } catch (error) {
