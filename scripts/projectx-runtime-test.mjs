@@ -55,6 +55,8 @@ assert.match(runtime, /getProject/);
 assert.match(runtime, /intent==='build'\|\|data.needsBuild/);
 assert.match(runtime, /intent==='test'/);
 assert.match(runtime, /project.tests=/);
+assert.match(runtime, /rebuild-from-tests/);
+assert.match(runtime, /status==='passed'\?'verified':'needs-fix'/);
 assert.match(runtime, /sessionStorage/);
 assert.match(runtime, /PROJECTX_RUNTIME_ERROR/);
 assert.doesNotMatch(runtime, /ctx\.arc\(bird\.x|Game over.*Flappy|Mode: \$\{kind\}/);
