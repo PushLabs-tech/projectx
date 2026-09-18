@@ -269,14 +269,14 @@ async function openProject(id){const project=state.projects.find(p=>p.id===id);i
 function renderProject(project){
   const group=project.understanding?.group;const groupLabel=group==='REAL_WORLD'?'REAL-WORLD':group==='NON_REAL_WORLD'?'NON-REAL-WORLD':'PROJECT';
   const category=project.category||project.understanding?.category||project.type||'PROJECT';const summary=String(project.understanding?.summary||project.intent||'').trim();
-  const tools=[['brain','Brain'],['architecture','Architecture'],['simulation','Outcome'],['improve','Make it Great'],['optimize','Optimize'],['transform','Transform'],['versions','Versions'],['resources','Resources'],['security','Security'],['delivery','Delivery']];
+  const tools=[['brain','Brain'],['architecture','Architecture'],['simulation','Outcome'],['explain','Why'],['improve','Make it Great'],['optimize','Optimize'],['transform','Transform'],['versions','Versions'],['resources','Resources'],['security','Security'],['delivery','Delivery']];
   shell('<div class="project"><div class="kicker">'+groupLabel+' · '+esc(category)+'</div><h1 class="project-title">'+esc(project.title)+'</h1><div class="project-context"><span class="context-group">'+groupLabel+'</span><span>'+esc(summary||'ProjectX is working from the current project brain.')+'</span></div><div class="project-tools">'+tools.map(t=>'<button class="tool-btn" data-project-tool="'+esc(t[0])+'">'+esc(t[1])+'</button>').join('')+'</div><div class="sections">'+project.sections.map(s=>'<button class="tab '+(project.selectedSection===s.id?'active':'')+'" data-section="'+esc(s.id)+'">'+esc(s.name)+'</button>').join('')+'</div><div id="project-body" class="body"></div></div>','projects');
   $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
   $$('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>renderProjectTool(project,button.dataset.projectTool));
   renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
 }
 async function renderProjectTool(project,tool){
-  const map={brain:renderBrain,architecture:renderArchitecture,simulation:renderSimulation,improve:renderMakeGreat,optimize:renderOptimize,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery};
+  const map={brain:renderBrain,architecture:renderArchitecture,simulation:renderSimulation,explain:renderExplain,improve:renderMakeGreat,optimize:renderOptimize,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery};
   return (map[tool]||renderBrain)(project);
 }
 function toolShell(kicker,title,description,body){
@@ -317,6 +317,14 @@ function simulationState(project){
     {name:'Current output',pass:outputCurrent,detail:outputCurrent?'A current deliverable exists.':'No current output has been generated.'},
     {name:'Verification',pass:tests,detail:tests?'The current output passed saved tests.':'The current output has not passed a current test run.'}
   ].concat(project.sections?.some(s=>s.kind==='research')?[{name:'Research evidence',pass:evidence,detail:evidence?'Source-backed findings exist.':'Research section exists but has no saved findings.'}]:[]);
+}
+async function renderExplain(project){
+  toolShell('EXPLAIN WHY','Project reasoning','A source-of-truth explanation of why ProjectX is in its current state. It does not invent hidden chain-of-thought.', '<div id="explain-content"><div class="sub">Analyzing the canonical project state…</div></div>');
+  try{
+    const data=await aiJson('plan',{project,history:[],message:'Explain the current project state for the user. Focus on: what is understood, what is still missing, what is blocking progress, why the current workspace sections fit the goal, and what the next concrete step should be. Do not reveal hidden chain-of-thought or private reasoning; provide concise evidence-based rationale from the visible project brain only.',system:'Return JSON only: {"summary":string,"understood":[string],"missing":[string],"blockers":[string],"nextStep":string}'},3200);
+    const section=(title,items)=>'<div class="brain-group"><b>'+esc(title)+'</b>'+((items||[]).filter(Boolean).map(x=>'<div class="brain-row">'+esc(x)+'</div>').join('')||'<div class="sub">None recorded.</div>')+'</div>';
+    $('#explain-content').innerHTML='<div class="sub">'+esc(data?.summary||'No explanation available.')+'</div>'+section('Understood',data?.understood)+section('Missing',data?.missing)+section('Blockers',data?.blockers)+'<div class="brain-group"><b>Next step</b><div class="brain-row">'+esc(data?.nextStep||'Use Project Chat to continue.')+'</div></div>';
+  }catch(error){$('#explain-content').innerHTML='<div class="sub">Explanation failed: '+esc(error.message)+'</div>';}
 }
 function renderSimulation(project){
   const checks=simulationState(project),passed=checks.filter(x=>x.pass).length;
