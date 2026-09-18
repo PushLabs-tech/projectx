@@ -14,6 +14,11 @@ assert.match(ai, /persistProject/);
 assert.match(ai, /429/);
 assert.match(ai, /providerListModels/);
 assert.match(ai, /project_id/);
+assert.match(ai, /research/);
+assert.match(ai, /research_findings/);
+assert.match(ai, /usage/);
+assert.match(ai, /securityEvents/);
+assert.match(ai, /assertSafeBaseUrl/);
 
 assert.match(payments, /payment_events/);
 assert.match(payments, /razorpay/i);
