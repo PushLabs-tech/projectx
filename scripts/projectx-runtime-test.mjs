@@ -29,6 +29,7 @@ assert.equal(validateSpec({goal:'Write a report',deliverables:['Report']},'Docum
 assert.equal(sanitizePath('../secret.txt'), null);
 assert.equal(sanitizePath('/absolute/path'), 'absolute/path');
 assert.equal(normalizeSections([{ name: 'Custom Mechanics', purpose: 'Project-specific mechanics.' }], 'Game')[1].name, 'Custom Mechanics');
+assert.equal((await import('../projectx-core.js')).serializeForPersistence(game).schemaVersion,4);
 
 const before = game.specVersion;
 applySpecChange(game, { features: { add: ['Pause menu'] } });
