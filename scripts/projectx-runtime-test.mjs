@@ -26,6 +26,7 @@ for (const type of ['Document','Presentation','Data','Dashboard','Internal tool'
 }
 assert.equal(validateSpec({goal:'Create a dashboard',deliverables:['Dashboard']},'Dashboard').valid,true);
 assert.equal(validateSpec({goal:'Write a report',deliverables:['Report']},'Document').valid,true);
+assert.equal((await import('../projectx-core.js')).projectArtifactKind('Presentation'),'software');
 assert.equal(sanitizePath('../secret.txt'), null);
 assert.equal(sanitizePath('/absolute/path'), 'absolute/path');
 assert.equal(normalizeSections([{ name: 'Custom Mechanics', purpose: 'Project-specific mechanics.' }], 'Game')[1].name, 'Custom Mechanics');
