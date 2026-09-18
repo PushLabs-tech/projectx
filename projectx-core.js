@@ -105,10 +105,10 @@ export function detectSpecContradictions(spec = {}, projectType = 'Other') {
 export function validateSpec(spec = {}, projectType = 'Other') {
   const s = mergeSpec(emptySpec(),spec), missing = [];
   if (s.goal.length < 12) missing.push('goal');
-  if (!s.users.length) missing.push('users');
-  if (!s.requirements.length) missing.push('requirements');
   if (!s.deliverables.length) missing.push('deliverables');
-  if (/^(Game|Website|App|Mobile|API|Agent|Automation)$/i.test(projectType) && !s.platform) missing.push('platform');
+  const software = /^(Game|Website|App|Mobile|API|Agent|Automation)$/i.test(projectType);
+  if (software && !s.requirements.length) missing.push('requirements');
+  if (software && !s.platform) missing.push('platform');
   if (/^Game$/i.test(projectType) && !s.game.loop) missing.push('game.loop');
   const contradictions = detectSpecContradictions(s,projectType), ambiguities = Array.isArray(s.openQuestions) ? s.openQuestions : [];
   return {valid:missing.length === 0 && contradictions.length === 0,missing:[...new Set(missing)],contradictions,ambiguities,needsClarification:contradictions.length>0 || ambiguities.length>0};
