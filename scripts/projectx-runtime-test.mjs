@@ -79,6 +79,7 @@ assert.match(runtime, /mergeDiscoveryProject/);
 assert.match(runtime, /understanding-known/);
 assert.match(runtime, /project-tools/);
 assert.match(runtime, /renderBrain/);
+assert.match(runtime, /Capture a decision/);
 assert.match(runtime, /renderArchitecture/);
 assert.match(runtime, /renderSimulation/);
 assert.match(runtime, /renderMakeGreat/);
