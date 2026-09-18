@@ -60,6 +60,8 @@ assert.match(runtime, /status==='passed'\?'verified':'needs-fix'/);
 assert.match(runtime, /projectArtifactKind/);
 assert.match(runtime, /Generate deliverable/);
 assert.match(runtime, /document-output/);
+assert.match(runtime, /Deliverable exists/);
+assert.match(runtime, /projectArtifactKind\(project\.type\)/);
 assert.match(runtime, /sessionStorage/);
 assert.match(runtime, /PROJECTX_RUNTIME_ERROR/);
 assert.doesNotMatch(runtime, /ctx\.arc\(bird\.x|Game over.*Flappy|Mode: \$\{kind\}/);
