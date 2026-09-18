@@ -12,7 +12,10 @@ This checklist reflects the current canonical runtime: `index.html` → `px-fina
 - [x] Evolving Project Brain.
 - [x] AI-generated project-specific workspace sections.
 - [x] Project-specific specialist agents.
+- [x] Per-specialist model preferences with deterministic fallback routing.
 - [x] AI-derived reusable domain intelligence.
+- [x] Discovery plan captured in the canonical project brain.
+- [x] Basic realtime project synchronization for shared cloud projects.
 - [x] Explicit canonical project plans.
 - [x] Canonical project mutations with version invalidation.
 - [x] Type-aware software vs document outputs.
@@ -34,6 +37,7 @@ This checklist reflects the current canonical runtime: `index.html` → `px-fina
 - [x] Project resource/URL capture.
 - [x] Structured text/CSV/JSON/Markdown resource ingestion.
 - [x] Selectively bounded resource context sent to AI.
+- [ ] Binary/PDF/DOCX/XLSX/audio/video resource parsing and selective retrieval.
 - [x] Decision capture in Project Brain.
 - [x] Make it Great additive improvement flow.
 - [x] Optimize flow for verified software projects.
@@ -107,7 +111,12 @@ This checklist reflects the current canonical runtime: `index.html` → `px-fina
 - [x] Billing page.
 - [x] Thank-you page.
 
-## 7. Still requires real external configuration
+## 7. Remaining work
+
+### Code-complete / verified
+The canonical runtime and current Supabase function have been updated and exercised by CI after recent changes. The remaining repository-level gaps are intentionally limited to richer binary-resource parsing and full team collaboration UX.
+
+### Real external configuration required before a commercial production launch
 
 These cannot be completed honestly from repository code alone:
 
@@ -119,7 +128,8 @@ These cannot be completed honestly from repository code alone:
 - [ ] Enable Supabase Auth leaked-password protection.
 - [ ] Real GitHub OAuth/repository integration, if repository automation is required.
 - [ ] Real deployment-provider integration, if one-click customer deployment is required.
-- [ ] Realtime collaboration infrastructure, if team collaboration is required.
+- [x] Basic realtime project-row synchronization.
+- [ ] Full team collaboration UX (member invitations, presence, conflict UI), if required.
 - [ ] Durable background workers, if long-running autonomous jobs are required.
 - [ ] Payment merchant credentials, plans, webhooks and end-to-end live/test verification before selling subscriptions.
 
