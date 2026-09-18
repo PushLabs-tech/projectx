@@ -96,13 +96,26 @@ async function modelsForCredentials(creds: Credential[], task = "chat"): Promise
 async function credentialsFor(uid: string): Promise<Credential[]> {
   const { data, error } = await admin.from("ai_provider_credentials").select("provider,label,api_key_ciphertext,provider_key_ciphertext,base_url").eq("user_id", uid).eq("enabled", true);
   if (error) throw error;
-  return await Promise.all((data || []).map(async r => ({
-    provider: r.provider as ProviderId,
-    label: r.label,
-    apiKey: await decryptSecret(r.api_key_ciphertext),
-    providerKey: r.provider_key_ciphertext ? await decryptSecret(r.provider_key_ciphertext) : undefined,
-    baseUrl: assertSafeBaseUrl(r.base_url || "") || undefined
-  })));
+  return await Promise.all((data || []).map(async r => {
+    const apiKey = await decryptSecret(r.api_key_ciphertext);
+    const baseUrl = assertSafeBaseUrl(r.base_url || "") || undefined;
+    const storedProvider = r.provider as ProviderId;
+    const detectedProvider = detectProvider(apiKey, baseUrl);
+    // Recover legacy/misclassified credentials when the key or endpoint
+    // clearly identifies another supported provider. Generic custom endpoints
+    // are left untouched because their keys are intentionally opaque.
+    const obviousProvider = new Set<ProviderId>(["bytez","nvidia","openrouter","anthropic","google"]);
+    const provider = storedProvider !== "auto" && obviousProvider.has(detectedProvider) && detectedProvider !== storedProvider
+      ? detectedProvider
+      : storedProvider === "auto" ? detectedProvider : storedProvider;
+    return {
+      provider,
+      label: r.label,
+      apiKey,
+      providerKey: r.provider_key_ciphertext ? await decryptSecret(r.provider_key_ciphertext) : undefined,
+      baseUrl
+    };
+  }));
 }
 
 function safeCredential(r: any) {
