@@ -337,7 +337,8 @@ function renderDiscoveryPoll(poll,meta,history){
     </div>
   </div>`;
 
-  root.addEventListener('click', async function onPollClick(event){
+  root.__pollHandler&&root.removeEventListener('click',root.__pollHandler);
+  const onPollClick=async function(event){
     const button=event.target.closest?.('[data-poll-index]');
     if(button && root.contains(button)){
       const index=Number(button.dataset.pollIndex||0);
@@ -366,7 +367,9 @@ function renderDiscoveryPoll(poll,meta,history){
       const value=String($('#poll-custom-input')?.value||'').trim();
       if(value)await submitDiscoveryChoice(value,history,meta);
     }
-  },{once:true});
+  };
+  root.__pollHandler=onPollClick;
+  root.addEventListener('click',onPollClick);
 
   $('#poll-custom-input')?.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&e.key==='Enter')$('#poll-custom-send')?.click();
@@ -421,7 +424,7 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
   try{
     const discoveryProject=meta.brain?.project||{};
     const discoveryUnderstanding=meta.brain?.understanding||{};
-    const data=await aiJson('understand',{project:{...discoveryProject,understanding:discoveryUnderstanding},history,message:history[history.length-1]?.text||'',system:interviewSystem},3600);
+    const data=await aiJson('understand',{project:{...discoveryProject,understanding:discoveryUnderstanding},history,message:payload.messageOverride||history[history.length-1]?.text||'',system:interviewSystem},3600);
     if(!data||!data.project)throw new Error('The AI returned no usable project-understanding result.');
     const group=String(data.classification?.group||discoveryUnderstanding.group||'').trim().toUpperCase();
     if(group!=='REAL_WORLD'&&group!=='NON_REAL_WORLD')throw new Error('The AI did not return a valid REAL_WORLD/NON_REAL_WORLD classification.');
