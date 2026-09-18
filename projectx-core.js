@@ -94,17 +94,16 @@ export function mergeSpecDelta(base = emptySpec(), patch = {}) {
     if (field === 'resources') {
       const value=patch.resources;
       if (value === null) { next.resources=[]; continue; }
-      const incoming=Array.isArray(value)?value:[];
       const current=normalizeResources(next.resources);
       const byId=new Map(current.map(v=>[typeof v==='string'?v:('id' in v?v.id:v.name),v]));
       if (Array.isArray(value)) value.forEach(v=>{const n=normalizeResource(v);const k=typeof n==='string'?n:n.id;if(k)byId.set(k,n);});
       else if (value && typeof value==='object') {
         const replacement=Array.isArray(value.replace)?value.replace:Array.isArray(value.set)?value.set:null;
-        if(replacement) next.resources=normalizeResources(replacement);
+        if(replacement){byId.clear();replacement.forEach(v=>{const n=normalizeResource(v);const k=typeof n==='string'?n:n.id;if(k)byId.set(k,n);});}
         if(Array.isArray(value.add)) value.add.forEach(v=>{const n=normalizeResource(v);const k=typeof n==='string'?n:n.id;if(k)byId.set(k,n);});
         if(Array.isArray(value.remove)){const remove=new Set(value.remove.map(v=>String(typeof v==='object'?(v.id||v.name):v)));for(const k of [...byId.keys()])if(remove.has(String(k)))byId.delete(k);}
       }
-      if(incoming.length||Array.isArray(value)) next.resources=[...byId.values()].slice(-100);
+      next.resources=[...byId.values()].slice(-100);
       continue;
     }
     const value = patch[field];
