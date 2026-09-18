@@ -9,6 +9,7 @@ import {
   assemblePreviewHtml,
   serializeForPersistence,
   buildDependencyMap,
+  projectArtifactKind,
 } from './projectx-core.js';
 
 const STORE = 'projectx_runtime_v6';
@@ -344,59 +345,66 @@ async function renderGeneratedSection(project,section){
 function drawSectionContent(data){
   $('#section-content').innerHTML=`<div class="sub">${esc(data.summary)}</div>${(data.blocks||[]).map(block=>`<div class="section-block"><b>${esc(block.heading||'')}</b><p>${esc(block.text||'')}</p></div>`).join('')}${(data.items||[]).map(item=>`<div class="item"><b>${esc(item.title||'Item')}</b><p>${esc(item.detail||'')} <span class="status ${item.status==='ready'?'ok':item.status==='blocked'?'bad':'warn'}">${esc(item.status||'unknown')}</span></p></div>`).join('')}<div class="grid">${data.nextActions?.length?`<div class="box"><b>Next actions</b>${data.nextActions.map(x=>`<div class="sub">• ${esc(x)}</div>`).join('')}</div>`:''}${data.openQuestions?.length?`<div class="box"><b>Open questions</b>${data.openQuestions.map(x=>`<div class="sub">• ${esc(x)}</div>`).join('')}</div>`:''}</div>`;
 }
-async function renderOutput(project){const body=$('#project-body'),current=project.artifacts?.output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${project.type==='Game'?'Playtest':'Output'}</h2><div class="sub">${current?'Live output from the current project artifact.':'No current artifact exists yet.'}</div></div><button id="build-output" class="primary">${current?'Rebuild with AI':'Build with AI'}</button></div><div id="output-area" style="margin-top:14px"></div></div>`;$('#build-output').onclick=()=>buildArtifact(project);if(current)mountArtifact(project);else $('#output-area').innerHTML='<div class="placeholder">ProjectX will build the real output from the current specification. There is no fixed demo here.</div>';}
-async function buildArtifact(project){
+async function renderOutput(project){
+  const body=$('#project-body');
+  const software=projectArtifactKind(project.type)==='software';
+  const output=project.artifacts?.output;
+  const current=output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
+  const title=software?(project.type==='Game'?'Playtest':'Output'):'Deliverable';
+  const description=current?'Current output generated from the project brain.':software?'No current artifact exists yet.':'No document deliverable exists yet.';
+  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button></div><div id="output-area" style="margin-top:14px"async function buildArtifact(project){
   if(!session&&!localGuestKey())return aiRequiredModal('Connect Gemini before ProjectX can build the real artifact.');
-  const button=$('#build-output'),area=$('#output-area');
+  const button=$('#build-output'),area=$('#output-area'),software=projectArtifactKind(project.type)==='software';
   button.disabled=true;
-  area.innerHTML='<div class="sub">ProjectX is generating and validating the real artifact…</div>';
+  area.innerHTML='<div class="sub">ProjectX is generating and validating the real deliverable…</div>';
   try{
-    const data=await aiJson('artifact',{project,message:'Generate the complete functional project artifact from the canonical spec. Return only files needed for this exact project.'},10000);
+    const data=await aiJson('artifact',{project,message:software?'Generate the complete functional software artifact for this exact project. Return only files needed for this project.':'Generate the complete deliverable for this exact project. For a real-world objective, prefer a well-structured Markdown document unless another format is clearly required. Return only files needed for this deliverable.'},10000);
     const files={};
     for(const file of Array.isArray(data?.files)?data.files:[]){
       const path=sanitizePath(file.path);
       if(path&&typeof file.content==='string'&&file.content.length<=600000)files[path]=file.content;
     }
-    if(!files['index.html']&&!files['src/index.html'])throw new Error('The AI did not return a valid index.html artifact.');
+    if(!Object.keys(files).length)throw new Error('The AI returned no usable deliverable files.');
 
-    const html=files['index.html']||files['src/index.html']||'';
-    const structural=[
-      {name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'},
-      {name:'HTML structure',pass:/<html[\\s>]/i.test(html)&&/<body[\\s>]/i.test(html),detail:/<html[\\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'},
-      {name:'No obvious placeholder markers',pass:!(/\\b(TODO|FIXME|coming soon)\\b/i.test(Object.values(files).join('\\n'))),detail:/\\b(TODO|FIXME|coming soon)\\b/i.test(Object.values(files).join('\\n'))?'Placeholder marker found.':'No obvious placeholder marker found.'}
-    ];
-    if(!structural.every(x=>x.pass))throw new Error(structural.filter(x=>!x.pass).map(x=>x.detail).join(' '));
-    const runtime=await browserRuntimeCheck(files);
-    if(!runtime.pass)throw new Error(runtime.detail||'The generated artifact reported a browser runtime error.');
+    if(software){
+      if(!files['index.html']&&!files['src/index.html'])throw new Error('The AI did not return a valid index.html artifact.');
+      const html=files['index.html']||files['src/index.html']||'';
+      const structural=[
+        {name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'},
+        {name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'},
+        {name:'No obvious placeholder markers',pass:!(/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\n'))),detail:/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\n'))?'Placeholder marker found.':'No obvious placeholder marker found.'}
+      ];
+      if(!structural.every(x=>x.pass))throw new Error(structural.filter(x=>!x.pass).map(x=>x.detail).join(' '));
+      const runtime=await browserRuntimeCheck(files);
+      if(!runtime.pass)throw new Error(runtime.detail||'The generated artifact reported a browser runtime error.');
+      project.tests={status:'passed',specVersion:project.specVersion,results:[...structural,runtime],updatedAt:now()};
+      project.artifacts={...(project.artifacts||{}),output:{specVersion:project.specVersion,entry:data.entry||'index.html',summary:String(data.summary||''),tests:[...structural,runtime],updatedAt:now()}};
+    }else{
+      const docPaths=Object.keys(files).filter(p=>/\.(md|txt|csv|json)$/i.test(p));
+      if(!docPaths.length)throw new Error('The AI did not return a usable document deliverable.');
+      const text=docPaths.map(p=>String(files[p])).join('\n');
+      const checks=[
+        {name:'Document exists',pass:text.trim().length>40,detail:text.trim().length>40?'Document content is present.':'Document content is too short.'},
+        {name:'No obvious placeholder markers',pass:!(/\b(TODO|FIXME|coming soon)\b/i.test(text)),detail:/\b(TODO|FIXME|coming soon)\b/i.test(text)?'Placeholder marker found.':'No obvious placeholder marker found.'}
+      ];
+      if(!checks.every(x=>x.pass))throw new Error(checks.filter(x=>!x.pass).map(x=>x.detail).join(' '));
+      project.tests={status:'passed',specVersion:project.specVersion,results:checks,updatedAt:now()};
+      project.artifacts={...(project.artifacts||{}),output:{specVersion:project.specVersion,entry:docPaths[0],summary:String(data.summary||''),tests:checks,updatedAt:now()}};
+    }
 
     snapshot(project,'Before rebuild');
     project.files=files;
-    project.artifacts={...(project.artifacts||{}),output:{
-      specVersion:project.specVersion,
-      entry:data.entry||'index.html',
-      summary:String(data.summary||''),
-      tests:[...structural,runtime].slice(0,20),
-      updatedAt:now()
-    }};
-    project.tests={status:'passed',specVersion:project.specVersion,results:[...structural,runtime],updatedAt:now()};
     project.status='built';
     saveProject(project);
     await syncRemoteProject(project);
     renderOutput(project);
-    mountArtifact(project);
-    notify('Real project output generated and runtime-checked from the current canonical spec.','success');
+    if(software)mountArtifact(project);
+    notify('Deliverable generated and validated from the current canonical project spec.','success');
   }catch(error){
-    area.innerHTML=`<div class="placeholder">Build failed: ${esc(error.message)}. Your previous artifact was kept.</div>`;
+    area.innerHTML=`<div class="placeholder">Generation failed: ${esc(error.message)}. Your previous deliverable was kept.</div>`;
   }finally{button.disabled=false;}
 }
-function mountArtifact(project){const area=$('#output-area');if(!area)return;area.innerHTML='<div class="artifact"><iframe id="project-frame" sandbox="allow-scripts" title="Project output"></iframe></div>';const frame=$('#project-frame');frame.srcdoc=assemblePreviewHtml(project.files||{});runtimeTestCleanup?.();const onMessage=e=>{if(e.data?.type==='PROJECTX_RUNTIME_ERROR')notify(`Project runtime error: ${e.data.message}`,'error');};window.addEventListener('message',onMessage);runtimeTestCleanup=()=>window.removeEventListener('message',onMessage);}
-function renderFiles(project){const paths=Object.keys(project.files||{}).sort(),first=paths[0]||null;const body=$('#project-body');body.innerHTML=`<div class="box"><div class="files"><div class="file-list">${paths.map((path,i)=>`<button class="${i===0?'active':''}" data-file="${esc(path)}">${esc(path)}</button>`).join('')||'<div class="sub">No generated files yet.</div>'}</div><div style="padding-left:14px"><div class="row"><b id="file-name">${esc(first||'No file selected')}</b>${first?'<button class="download" id="download-file">Download</button>':''}</div><pre id="file-code" class="code">${esc(first?project.files[first]:'Build the project to create real files.')}</pre></div></div></div>`;$$('[data-file]',body).forEach(button=>button.onclick=()=>{$$('[data-file]',body).forEach(x=>x.classList.remove('active'));button.classList.add('active');const path=button.dataset.file;$('#file-name').textContent=path;$('#file-code').textContent=project.files[path];});$('#download-file')?.addEventListener('click',()=>downloadText(first,project.files[first]));}
-function downloadText(name,content,type='text/plain'){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name.split('/').pop();a.click();setTimeout(()=>URL.revokeObjectURL(url),500);}
-async function renderTests(project){
-  const body=$('#project-body');
-  const saved=project.tests?.specVersion===project.specVersion&&Array.isArray(project.tests?.results)?project.tests.results:[];
-  const drawResults=(results,status)=>{
-    const passed=results.every(x=>x.pass);
+y(x=>x.pass);
     $('#test-results').innerHTML=`<div class="sub" style="margin-bottom:9px">Last run: ${status|| (passed?'passed':'failed')}.</div><div class="result-list">${results.map(result=>`<div class="result ${result.pass?'pass':'fail'}"><b>${result.pass?'PASS':'FAIL'} · ${esc(result.name)}</b><div class="sub">${esc(result.detail)}</div></div>`).join('')}</div>${passed?'':'<div class="actions" style="margin-top:12px"><button class="ghost" id="rebuild-from-tests">Rebuild with AI</button></div>'}`;
     $('#rebuild-from-tests')?.addEventListener('click',()=>{renderOutput(project);buildArtifact(project);});
   };
