@@ -93,6 +93,7 @@ assert.match(runtime, /renderBrain/);
 assert.match(runtime, /Capture a decision/);
 assert.match(runtime, /renderArchitecture/);
 assert.match(runtime, /renderSimulation/);
+assert.match(runtime, /run-full-verification/);
 assert.match(runtime, /renderExplain/);
 assert.match(runtime, /renderMakeGreat/);
 assert.match(runtime, /renderOptimize/);
