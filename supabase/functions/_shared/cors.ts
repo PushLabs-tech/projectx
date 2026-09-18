@@ -1,4 +1,6 @@
-const allowedOrigin = (Deno.env.get('APP_ORIGIN') || 'https://pushlabs-tech.github.io/projectx').trim().replace(/\/$/, '');
+// CORS Origin is an origin, not a URL path. GitHub Pages serves ProjectX at /projectx/
+// but the browser Origin header is only https://pushlabs-tech.github.io.
+const allowedOrigin = (Deno.env.get('APP_ORIGIN') || 'https://pushlabs-tech.github.io').trim().replace(/\/$/, '');
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': allowedOrigin || 'null',
