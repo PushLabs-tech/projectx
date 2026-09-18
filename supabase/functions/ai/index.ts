@@ -229,6 +229,26 @@ async function persistProject(user: any, p: any) {
     if (me) throw me;
   }
 
+  if (Array.isArray(p?.research?.findings) && p.research.findings.length) {
+    const { error: rd } = await admin.from("research_findings").delete().eq("project_id", saved.id);
+    if (rd) throw rd;
+    const researchRows = p.research.findings.slice(-100).map((f: any) => ({
+      project_id: saved.id,
+      query: limitText(f.query || p.research?.queries?.slice(-1)?.[0] || "", 500),
+      finding: limitText(f.finding || "", 1800),
+      source_title: limitText(f.sourceTitle || f.source_title || "", 180),
+      source_url: limitText(f.sourceUrl || f.source_url || "", 2000),
+      source_date: /^\d{4}-\d{2}-\d{2}$/.test(String(f.sourceDate || f.source_date || "")) ? String(f.sourceDate || f.source_date) : null,
+      confidence: Math.max(0, Math.min(1, Number(f.confidence ?? 0))),
+      provider: limitText(f.provider || "", 80),
+      raw: f.raw && typeof f.raw === "object" ? f.raw : {}
+    })).filter((f: any) => f.finding);
+    if (researchRows.length) {
+      const { error: ri } = await admin.from("research_findings").insert(researchRows);
+      if (ri) throw ri;
+    }
+  }
+
   if (Array.isArray(p?.versions) && p.versions.length) {
     await admin.from("project_versions").delete().eq("project_id", saved.id);
     const { error: ve } = await admin.from("project_versions").insert(p.versions.slice(-20).map((v: any) => ({ project_id: saved.id, version_number: Number(v.version || 1), label: limitText(v.label || `Version ${v.version}`, 120), snapshot: v, created_by: user.id })));
