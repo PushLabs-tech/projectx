@@ -160,8 +160,23 @@ export function applyProjectMutation(project, mutation = {}) {
   }
   if (mutation.researchPatch && typeof mutation.researchPatch === 'object') {
     const research = project.research || {status:'ready',queries:[],sources:[],findings:[]};
-    const addFindings = Array.isArray(mutation.researchPatch.addFindings) ? mutation.researchPatch.addFindings : [];
+    const patch = mutation.researchPatch;
+    const query = String(patch.query || '').trim().slice(0,500);
+    if (query && !research.queries.includes(query)) { research.queries = [...research.queries,query].slice(-50); researchChanged = true; }
+    const addSources = Array.isArray(patch.addSources) ? patch.addSources : [];
+    if (addSources.length) {
+      const current = Array.isArray(research.sources) ? research.sources : [];
+      const seen = new Set(current.map(s => String(s?.url || s?.source_url || '')));
+      research.sources = [...current,...addSources.filter(s => {
+        const url = String(s?.url || s?.source_url || '').trim();
+        if (!url || seen.has(url)) return false;
+        seen.add(url); return true;
+      })].slice(-100);
+      researchChanged = true;
+    }
+    const addFindings = Array.isArray(patch.addFindings) ? patch.addFindings : [];
     if (addFindings.length) { research.findings = [...(research.findings || []),...addFindings].slice(-100); researchChanged = true; }
+    research.status = researchChanged ? 'ready' : (research.status || 'ready');
     project.research = research;
   }
   project.resources = Array.isArray(project.spec?.resources) ? [...project.spec.resources] : [];
