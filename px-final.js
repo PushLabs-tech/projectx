@@ -13,7 +13,7 @@ import {
   projectArtifactKind,
 } from './projectx-core.js';
 
-const STORE = 'projectx_runtime_v6';
+const STORE = 'projectx_runtime_v7';
 const LOCAL_KEY = 'projectx_guest_gemini_key';
 const LOCAL_STATUS = 'projectx_guest_gemini_status';
 const LOCAL_SETTINGS = 'projectx_settings_v6';
@@ -35,8 +35,10 @@ const DEFAULT_SETTINGS = {
   notifications: { build: true, test: true, deploy: true, credits: true, security: true }
 };
 
-let state = read(STORE, { version: 6, projects: [], active: null });
-if (!Array.isArray(state.projects)) state = { version: 6, projects: [], active: null };
+let state = read(STORE, { version: 7, projects: [], active: null });
+if (!Array.isArray(state.projects)) state = { version: 7, projects: [], active: null };
+else state.projects = state.projects.map(p => { try { return migrateProject(p); } catch { return p; } });
+state.version = 7;
 let settingsState = { ...DEFAULT_SETTINGS, ...read(LOCAL_SETTINGS, {}) };
 let supa = null;
 let session = null;
