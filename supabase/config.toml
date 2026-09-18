@@ -1,5 +1,7 @@
 [functions.ai]
-verify_jwt = true
+# Authentication is verified inside the function with the Supabase Auth user JWT.
+# Disable the legacy platform JWT gate so asymmetric/auth-key sessions are handled consistently.
+verify_jwt = false
 
 # This function serves authenticated checkout requests and signed Razorpay webhooks.
 # It performs its own JWT and webhook-signature validation.
