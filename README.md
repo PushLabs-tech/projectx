@@ -1,12 +1,11 @@
-# Builder — Universal Creation Engine
+# ProjectX — Universal Creation Engine
 
 This is the revised Builder package. It keeps the classic Builder UI language from the current PushLabs-tech/projectx interface while preserving the newer agent/model functionality.
 
 ## What is included
 
-- Classic dark sidebar + paper workspace UI
-- Original navigation: Home, Projects, Activity, Research, Integrations, Agents, Recent, Usage, Account, Sign out
-- New Settings control center without replacing the old navigation
+- Clean canonical project workspace UI
+- Home, Projects and Settings navigation with project-specific workspace tools
 - Discuss, Plan, Build, Visual and Research agents
 - Per-agent model selection in chat
 - Auto model routing with deterministic candidates and fallbacks
@@ -119,9 +118,9 @@ Never commit `.env` or real secrets.
 
 ## AI provider setup
 
-Use **Settings → Manage → Providers** after signing in. A key is sent over HTTPS to the authenticated Edge Function. The function validates the provider, discovers models, encrypts the credential, and stores only masked metadata for the UI.
+Use **Settings → AI** after signing in. A key is sent over HTTPS to the authenticated Edge Function. The function validates the provider, discovers models, encrypts the credential, and stores only masked metadata for the UI.
 
-Then use **Settings → Agent models** to select Auto or a specific model per agent. In an agent chat, the model selector is also available in the chat header.
+Use the default-model selector in **Settings → AI**. ProjectX keeps provider/model details out of the normal project workflow.
 
 See `SETUP-AI.md` for the complete provider setup and routing behavior.
 
@@ -139,7 +138,7 @@ GitHub Pages does not let a repository define arbitrary HTTP response headers. I
 
 ## Security model
 
-- No provider secret is intentionally placed in browser storage.
+- Signed-in provider credentials are encrypted and stored server-side; guest Gemini BYOK is intentionally kept only in sessionStorage and never synced.
 - Provider credentials are encrypted before persistence.
 - Credential table is backend-only.
 - AI and payment functions require authenticated users for user operations.
@@ -156,7 +155,7 @@ GitHub Pages does not let a repository define arbitrary HTTP response headers. I
 ```bash
 npm run check
 npm run security:scan
-npm run check:app
+npm run check
 ```
 
 CI also runs `npm audit --audit-level=high`.
@@ -183,7 +182,7 @@ AI providers are intentionally abstracted from the normal workflow. Advanced AI 
 The current ZIP is a frontend/workspace foundation. Features that require production infrastructure (durable workflow workers, browser sandboxes, multi-tenant cloud persistence, realtime collaboration, full deployment orchestration, live payment verification, and complete document/mobile/game runtimes) need backend implementation before being treated as production-complete.
 
 
-## V13 release
-V13 adds adaptive specialist assembly, project-brain and live architecture surfaces, deterministic outcome simulation, Make it Great, transformation shortcuts, a premium Editorial Workbench UI, cinematic pointer/micro-interactions, responsive states, and reduced-motion support.
+## Current release
+The canonical runtime includes adaptive specialist assembly, Project Brain, Live Architecture, Outcome readiness, Explain Why, Make it Great, Optimize, Transform, version compare/restore/fork, source-backed research, resource ingestion, responsive preview, safe file editing, provider model discovery, approval gates, usage/security views, and consent-gated analytics.
 
 Before publishing: configure Supabase/domain/provider credentials, deploy backend functions/migrations, verify auth redirects, and run `npm run check && npm run security:scan`.
