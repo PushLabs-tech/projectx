@@ -415,9 +415,14 @@ function home(){
     </main>
   </div>`;
   $('#public-signin').onclick=()=>authModal();
-  $('#public-signup').onclick=()=>authModal();
+  $('#public-signup').onclick=()=>{authModal();setTimeout(()=>{const b=$('#auth-signup-mode');if(b)b.click();},0);};
   const input=$('#public-input');
-  const send=async()=>{const value=input.value.trim();if(!value){input.focus();return;}await beginCreation(value);};
+  const send=async()=>{
+    const value=input.value.trim();
+    if(!value){input.focus();return;}
+    if(!session){authModal();setTimeout(()=>{const b=$('#auth-signup-mode');if(b)b.click();},0);return;}
+    await beginCreation(value);
+  };
   $('#public-send').onclick=send;
   $('#public-focus').onclick=()=>input.focus();
   input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send();}};
