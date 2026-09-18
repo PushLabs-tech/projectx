@@ -1,4 +1,4 @@
-const allowedOrigin = (Deno.env.get('APP_ORIGIN') || '').trim().replace(/\/$/, '');
+const allowedOrigin = (Deno.env.get('APP_ORIGIN') || 'https://pushlabs-tech.github.io/projectx').trim().replace(/\/$/, '');
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': allowedOrigin || 'null',
