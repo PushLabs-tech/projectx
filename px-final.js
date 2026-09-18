@@ -136,8 +136,12 @@ async function directGemini(messages, system, jsonMode = false, maxOutputTokens 
         if (attempt) await sleep(1200);
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 20000);
-        const body = { systemInstruction: { parts: [{ text: system }] }, contents: messages.slice(-MAX_HISTORY).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.text ?? '').slice(0, 12000) }] })), generationConfig: { temperature: settingsState.responseStyle === 'concise' ? 0.15 : 0.25, maxOutputTokens } };
-        if (jsonMode) body.generationConfig.responseMimeType = 'application/json';
+        const isGemini38 = /^gemini-3\\.8-flash$/i.test(String(model).trim());
+        const generationConfig = { maxOutputTokens };
+        // Gemini 3.8 uses thinking-level controls instead of legacy sampling params.
+        if (!isGemini38) generationConfig.temperature = settingsState.responseStyle === 'concise' ? 0.15 : 0.25;
+        if (jsonMode) generationConfig.responseMimeType = 'application/json';
+        const body = { systemInstruction: { parts: [{ text: system }] }, contents: messages.slice(-MAX_HISTORY).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.text ?? '').slice(0, 12000) }] })), generationConfig };
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: controller.signal });
         clearTimeout(timer);
         if (res.ok) {
