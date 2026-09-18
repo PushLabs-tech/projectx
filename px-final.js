@@ -252,14 +252,14 @@ async function openProject(id){const project=state.projects.find(p=>p.id===id);i
 function renderProject(project){
   const group=project.understanding?.group;const groupLabel=group==='REAL_WORLD'?'REAL-WORLD':group==='NON_REAL_WORLD'?'NON-REAL-WORLD':'PROJECT';
   const category=project.category||project.understanding?.category||project.type||'PROJECT';const summary=String(project.understanding?.summary||project.intent||'').trim();
-  const tools=[['brain','Brain'],['architecture','Architecture'],['simulation','Outcome'],['improve','Make it Great'],['transform','Transform'],['versions','Versions'],['resources','Resources'],['security','Security'],['delivery','Delivery']];
+  const tools=[['brain','Brain'],['architecture','Architecture'],['simulation','Outcome'],['improve','Make it Great'],['optimize','Optimize'],['transform','Transform'],['versions','Versions'],['resources','Resources'],['security','Security'],['delivery','Delivery']];
   shell('<div class="project"><div class="kicker">'+groupLabel+' · '+esc(category)+'</div><h1 class="project-title">'+esc(project.title)+'</h1><div class="project-context"><span class="context-group">'+groupLabel+'</span><span>'+esc(summary||'ProjectX is working from the current project brain.')+'</span></div><div class="project-tools">'+tools.map(t=>'<button class="tool-btn" data-project-tool="'+esc(t[0])+'">'+esc(t[1])+'</button>').join('')+'</div><div class="sections">'+project.sections.map(s=>'<button class="tab '+(project.selectedSection===s.id?'active':'')+'" data-section="'+esc(s.id)+'">'+esc(s.name)+'</button>').join('')+'</div><div id="project-body" class="body"></div></div>','projects');
   $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
   $$('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>renderProjectTool(project,button.dataset.projectTool));
   renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
 }
 async function renderProjectTool(project,tool){
-  const map={brain:renderBrain,architecture:renderArchitecture,simulation:renderSimulation,improve:renderMakeGreat,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery};
+  const map={brain:renderBrain,architecture:renderArchitecture,simulation:renderSimulation,improve:renderMakeGreat,optimize:renderOptimize,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery};
   return (map[tool]||renderBrain)(project);
 }
 function toolShell(kicker,title,description,body){
@@ -311,6 +311,32 @@ async function renderMakeGreat(project){
     $('#great-content').innerHTML='<div class="sub">'+esc(data?.summary||'No improvements identified.')+'</div>'+(adds.length?'<div class="brain-group"><b>Safe additions</b>'+adds.map(x=>'<div class="brain-row">'+esc(x)+'</div>').join('')+'</div>':'')+(sections.length?'<div class="brain-group"><b>Workspace improvements</b>'+sections.map(x=>'<div class="brain-row"><b>'+esc(x.name)+'</b><div class="sub">'+esc(x.purpose)+'</div></div>').join('')+'</div>':'')+'<div class="actions"><button class="primary" id="apply-great" '+(adds.length||sections.length?'':'disabled')+'>Apply safe improvements</button></div>';
     $('#apply-great').onclick=()=>{snapshot(project,'Before Make it Great');const mutation=applyProjectMutation(project,{specPatch:{requirements:{add:adds}},workspaceSections:sections});if(mutation.changed){project.status='changed';saveProject(project);syncRemoteProject(project);notify('Safe improvements applied.','success');}renderMakeGreat(project);};
   }catch(error){$('#great-content').innerHTML='<div class="sub">Analysis failed: '+esc(error.message)+'</div>';}
+}
+async function renderOptimize(project){
+  const software=projectArtifactKind(project.type)==='software';
+  const staticChecks=[
+    {name:'Output exists',pass:Boolean(project.artifacts?.output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length),detail:'Optimization should start from the current generated artifact.'},
+    {name:'Verification state',pass:project.tests?.specVersion===project.specVersion&&project.tests?.status==='passed',detail:'The current artifact should pass its tests before optimization.'}
+  ];
+  toolShell('OPTIMIZE','Optimize','Improve the current output without changing the user’s core goal. ProjectX keeps the current version available for rollback.', '<div class="result-list">'+staticChecks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+esc(x.pass?'READY':'NOT READY')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div><div class="actions" style="margin-top:12px"><button class="primary" id="run-optimize" '+(staticChecks.every(x=>x.pass)?'':'disabled')+'>Apply AI optimization</button><button class="ghost" id="open-tests">Tests</button></div><div id="optimize-status" class="sub" style="margin-top:10px"></div>');
+  $('#open-tests').onclick=()=>renderTests(project);
+  $('#run-optimize').onclick=async()=>{
+    if(!software){$('#optimize-status').textContent='Document optimization is handled by Make it Great and the deliverable builder.';return;}
+    const button=$('#run-optimize'),status=$('#optimize-status');button.disabled=true;status.textContent='Analyzing the current output and preparing a safe optimization…';
+    try{
+      snapshot(project,'Before optimization');
+      const data=await aiJson('discuss',{project,history:[],message:'Optimize the current generated software artifact for runtime performance, accessibility, and maintainability without changing the core user goal. Return only concrete fileOperations for existing project files or clearly necessary new files. Do not add dependencies, remote assets, fake work, or placeholders.',system:projectAgentSystem},7000);
+      const ops=Array.isArray(data?.fileOperations)?data.fileOperations:[];
+      if(!ops.length)throw new Error('The optimization model returned no executable file changes.');
+      const mutation=applyProjectMutation(project,{fileOperations:ops});
+      if(!mutation.changed)throw new Error('The optimization produced no project changes.');
+      project.status='needs-build';saveProject(project);await syncRemoteProject(project);
+      renderOutput(project);await buildArtifact(project,[{name:'Optimization verification',detail:'Rebuilt after optimization; run the saved tests against the optimized output.'}]);
+      status.textContent='Optimization applied and rebuilt. Review the updated verification results.';
+    }catch(error){
+      status.textContent='Optimization failed: '+error.message;
+    }finally{button.disabled=false;}
+  };
 }
 async function renderTransform(project){
   const targets=[['Website','Website'],['App','Web app'],['API','API'],['Agent','AI agent'],['Automation','Automation'],['Business','Business system'],['Research','Research project'],['Other','Custom creation']];
