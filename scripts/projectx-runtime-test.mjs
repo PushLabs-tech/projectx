@@ -114,6 +114,8 @@ assert.match(runtime, /intent==='build'\|\|data.needsBuild/);
 assert.match(runtime, /intent==='test'/);
 assert.match(runtime, /project.tests=/);
 assert.match(runtime, /rebuild-from-tests/);
+assert.match(runtime, /executionMode==='Autonomous'/);
+assert.match(runtime, /for\(let cycle=0;cycle<2/);
 assert.match(runtime, /status==='passed'\?'verified':'needs-fix'/);
 assert.match(runtime, /projectArtifactKind/);
 assert.match(runtime, /renderResearchSection/);
