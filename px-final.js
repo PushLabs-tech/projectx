@@ -409,7 +409,7 @@ async function mountProjectXHero3D(){
 }
 
 function home(){
-  shell(`<main class="landing-home">
+  shell(`<div class="landing-home">
     <nav class="landing-nav" aria-label="ProjectX">
       <button class="landing-brand" data-nav="home" aria-label="ProjectX home">
         <span class="landing-logo-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.25" fill="currentColor"/></svg></span>
@@ -458,7 +458,7 @@ function home(){
       <div><div class="kicker">ANY AMBITION</div><h2>Start with what you want done.</h2><p class="landing-section-copy">A website, a game, a business plan, research, a tool, a campaign, or something that does not fit a template. Describe the outcome first.</p></div>
       <button class="landing-primary landing-final-cta" id="landing-final-start">Start a project <span aria-hidden="true">→</span></button>
     </section>
-  </main>`,'home');
+  </div>`,'home');
 
   const start=()=>{const input=$('#start-input');if(input){input.focus();input.scrollIntoView({behavior:'smooth',block:'center');return;}beginCreation('');};
   $('#landing-start')?.addEventListener('click',()=>{const composer=document.createElement('div');composer.className='landing-start-modal modal-bg';composer.innerHTML=`<div class="modal landing-compose-modal"><div class="kicker">START PROJECT</div><h2>What are you trying to accomplish?</h2><p class="sub">Describe the outcome. ProjectX will take it from there.</p><div class="form" style="margin-top:14px"><textarea id="landing-intent" placeholder="Example: Build a clean website for my sneaker-cleaning business…"></textarea><button class="primary" id="landing-intent-send">Start</button></div><div class="actions"><button class="ghost" id="landing-intent-close">Close</button></div></div></div>`;document.body.appendChild(composer);$('#landing-intent')?.focus();$('#landing-intent-close').onclick=()=>composer.remove();$('#landing-intent-send').onclick=async()=>{const v=$('#landing-intent').value.trim();if(!v)return;composer.remove();beginCreation(v);};$('#landing-intent')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')$('#landing-intent-send')?.click();});});
