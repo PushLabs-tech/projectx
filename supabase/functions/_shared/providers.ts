@@ -235,7 +235,7 @@ export async function listModels(
       await fetch(url, {
         headers: {
           Authorization:
-            credential.apiKey
+            `Key ${credential.apiKey}`
         },
         signal:
           AbortSignal.timeout(20_000)
@@ -437,7 +437,7 @@ export async function chat(
     const headers:
       Record<string, string> = {
       Authorization:
-        credential.apiKey,
+        `Key ${credential.apiKey}`,
       "Content-Type":
         "application/json"
     };
