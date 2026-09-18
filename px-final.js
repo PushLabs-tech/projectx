@@ -635,10 +635,16 @@ function mountArtifact(project){
 }
 function renderFiles(project){
   const paths=Object.keys(project.files||{}).sort(),first=paths[0]||null,body=$('#project-body');
-  body.innerHTML='<div class="box"><div class="files"><div class="file-list">'+(paths.map((path,i)=>'<button class="'+(i===0?'active':'')+'" data-file="'+esc(path)+'">'+esc(path)+'</button>').join('')||'<div class="sub">No generated files yet.</div>')+'</div><div style="padding-left:14px"><div class="row"><b id="file-name">'+esc(first||'No file selected')+'</b><div class="actions">'+(first?'<button class="ghost" id="save-file">Save</button><button class="download" id="download-file">Download</button>':'')+'</div></div><textarea id="file-code-editor" class="code-editor" spellcheck="false">'+esc(first?project.files[first]:'Build the project to create real files.')+'</textarea></div></div></div>';
+  body.innerHTML='<div class="box"><div class="files"><div class="file-list">'+(paths.map((path,i)=>'<button class="'+(i===0?'active':'')+'" data-file="'+esc(path)+'">'+esc(path)+'</button>').join('')||'<div class="sub">No generated files yet.</div>')+'</div><div style="padding-left:14px"><div class="row"><b id="file-name">'+esc(first||'No file selected')+'</b><div class="actions">'+(first?'<button class="ghost" id="preview-file">Preview changes</button><button class="ghost" id="save-file">Save</button><button class="download" id="download-file">Download</button>':'')+'</div></div><textarea id="file-code-editor" class="code-editor" spellcheck="false">'+esc(first?project.files[first]:'Build the project to create real files.')+'</textarea></div></div></div>';
   let currentPath=first;
   const selectFile=path=>{$$('[data-file]',body).forEach(x=>x.classList.toggle('active',x.dataset.file===path));currentPath=path;$('#file-name').textContent=path;$('#file-code-editor').value=project.files[path]||'';};
-  $$('[data-file]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.file));
+  $('[data-file]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.file));
+  $('#preview-file')?.addEventListener('click',()=>{
+    if(!currentPath||!Object.hasOwn(project.files,currentPath))return;
+    const before=String(project.files[currentPath]||''),after=$('#file-code-editor').value;
+    const beforeLines=before?before.split(/\r?\n/).length:0,afterLines=after?after.split(/\r?\n/).length:0;
+    notify(before===after?'No changes pending.':currentPath+' · '+Math.abs(afterLines-beforeLines)+' line count delta pending save.','info');
+  });
   $('#save-file')?.addEventListener('click',async()=>{
     if(!currentPath||!Object.hasOwn(project.files,currentPath))return;
     const content=$('#file-code-editor').value;
