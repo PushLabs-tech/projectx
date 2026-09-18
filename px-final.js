@@ -105,6 +105,15 @@ async function authAction(action, email, password) {
   return data;
 }
 
+async function socialAuth(provider) {
+  const client = ensureSupabase();
+  if (!client) throw new Error('Supabase authentication is not configured.');
+  const redirectTo = location.origin + location.pathname;
+  const { data, error } = await client.auth.signInWithOAuth({ provider, options: { redirectTo } });
+  if (error) throw error;
+  return data;
+}
+
 async function signOut() { try { projectRealtimeChannel&&await ensureSupabase()?.removeChannel(projectRealtimeChannel); } catch {} projectRealtimeChannel=null; try { await ensureSupabase()?.auth.signOut(); } catch {} session = null; }
 
 async function edge(action, payload = {}) {
@@ -301,11 +310,104 @@ const CSS = `#px-app{position:fixed;inset:0;z-index:2147483000;background:#f8faf
 .public-examples{position:relative;z-index:1;width:min(820px,calc(100% - 32px));margin:24px auto 70px;text-align:center}.public-examples-label{display:flex;align-items:center;justify-content:center;gap:8px;color:#8a8b90;font-size:11px;margin-bottom:10px}.public-example-refresh{border:0;background:transparent;color:#696c72;cursor:pointer;font-size:14px}.public-example-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.public-example{border:1px solid #ddd9d4;background:#fff;border-radius:8px;padding:9px 11px;color:#555960;font-size:11px;cursor:pointer}.public-example:hover{border-color:#c8c3bd;color:#23262b}.public-note{margin-top:13px;color:#a09e9b;font-size:10px}
 @media(max-width:760px){.public-nav{width:calc(100% - 24px);height:64px}.public-nav-links{display:none}.public-nav-actions{margin-left:auto}.public-nav-login,.public-nav-create{height:35px}.public-hero{padding-top:75px}.public-hero h1{font-size:clamp(42px,13vw,60px)}.public-composer{margin-top:26px}.public-category{min-width:78px}.public-examples{margin-bottom:40px}}
 
+.workspace-active{background:#171719!important}
+.workspace-active .side{background:#1d1d1f;border-right:1px solid #2d2d30;color:#fff}
+.workspace-active .logo{color:#fff}
+.workspace-active .new{background:#2a2a2d;color:#fff;border:1px solid #39393d}
+.workspace-active .nav button,.workspace-active .recent button{color:#a7a7ac}
+.workspace-active .nav button.active,.workspace-active .nav button:hover,.workspace-active .recent button:hover{background:#2a2a2d;color:#fff}
+.workspace-active .divider{background:#303034}
+.workspace-active .label{color:#74747a}
+.workspace-active .acct{background:#222225;border-color:#343438;color:#d6d6da}
+.workspace-active .acct .sub{color:#89898f}
+.workspace-active .main{background:#171719}
+.workspace-active .top{display:none}
+.workspace-home-screen{min-height:100%;background:radial-gradient(560px 300px at 50% 72%,rgba(82,44,28,.28),transparent 68%),#171719;color:#eee;overflow:auto}
+.workspace-home-inner{width:min(820px,calc(100% - 34px));margin:0 auto;padding:clamp(92px,15vh,150px) 0 72px}
+.workspace-greeting{text-align:center}.workspace-greeting .kicker{color:#77777d}.workspace-greeting h1{margin:12px 0 8px;font-size:clamp(35px,5vw,54px);line-height:1.02;letter-spacing:-.055em;color:#ececef;font-weight:600}.workspace-greeting p{max-width:660px;margin:0 auto;color:#8f8f96;font-size:13px;line-height:1.65}
+.workspace-suggestions{margin:25px auto 0}.workspace-suggestion-label{color:#77777d;font-size:10px;margin-bottom:8px}.workspace-suggestion-row{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}.workspace-suggestion-row button,.workspace-capabilities button{border:1px solid #36363a;background:#202023;color:#c9c9ce;border-radius:999px;padding:8px 11px;font-size:10px;cursor:pointer}.workspace-suggestion-row button:hover,.workspace-capabilities button:hover{background:#29292d;color:#fff}.workspace-suggestion-row button:first-letter{color:#ff7a4d}
+.workspace-composer{margin-top:22px;border:1px solid #36363a;border-radius:14px;background:#202022;box-shadow:0 16px 50px rgba(0,0,0,.18);overflow:hidden}.workspace-composer textarea{width:100%;min-height:105px;padding:17px;border:0;outline:0;resize:none;background:transparent;color:#ededf0;font-size:13px;line-height:1.55}.workspace-composer textarea::placeholder{color:#77777d}.workspace-composer-foot{display:flex;align-items:center;justify-content:space-between;padding:8px 9px;border-top:1px solid #303034}.workspace-compose-left{display:flex;align-items:center;gap:8px;color:#707076;font-size:9px;min-width:0}.workspace-compose-left span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.workspace-compose-left button{width:30px;height:30px;border:0;background:transparent;color:#8b8b91;font-size:20px;border-radius:7px;cursor:pointer}.workspace-compose-left button:hover{background:#2a2a2d;color:#fff}.workspace-compose-right{display:flex;align-items:center;gap:8px}.workspace-mode{border:1px solid #343438;background:#242427;border-radius:7px;padding:7px 9px;color:#9c9ca2;font-size:9px}.workspace-compose-right #workspace-send{width:31px;height:31px;border:0;border-radius:8px;background:#f1f1f2;color:#151517;font-size:16px;cursor:pointer}.workspace-compose-right #workspace-send:hover{background:#fff}
+.workspace-capabilities{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin-top:16px}.workspace-capabilities button{border-radius:8px;padding:7px 10px;color:#97979d}.workspace-footer-note{text-align:center;margin-top:23px;color:#65656b;font-size:9px}
+@media(max-width:820px){.workspace-active .side{inset:0 0 auto;width:auto;height:56px;padding:7px 9px;background:#1d1d1f}.workspace-active .main{margin-left:0;padding-top:56px}.workspace-active .nav{display:flex}.workspace-active .nav button{display:none}.workspace-active .nav button:first-child{display:block}.workspace-active .new{height:34px}.workspace-active .acct{margin-left:auto}.workspace-home-inner{width:calc(100% - 24px);padding-top:75px}.workspace-greeting h1{font-size:clamp(34px,10vw,50px)}.workspace-compose-left span{display:none}}
+
 `;
+
+.auth-ref-bg{background:rgba(10,10,11,.62);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+.auth-ref-modal{position:relative;width:min(500px,calc(100% - 30px));background:#faf7f2;border:1px solid #e5dfd6;border-radius:18px;padding:31px 28px 23px;box-shadow:0 24px 90px rgba(0,0,0,.28);text-align:center;color:#24262a}.auth-ref-close{position:absolute;right:10px;top:8px;width:31px;height:31px;border:0;background:transparent;color:#6d6b69;font-size:21px;cursor:pointer;border-radius:8px}.auth-ref-close:hover{background:#eee9e2}.auth-ref-mark{display:flex;justify-content:center;margin-bottom:9px}.auth-ref-mark .public-brand-mark{width:32px;height:32px;color:#ff5a1f}.auth-ref-modal>.kicker{color:#aaa39a}.auth-ref-modal h2{margin:9px 0 6px;font-size:28px;letter-spacing:-.05em;font-weight:600}.auth-ref-modal>.sub{max-width:400px;margin:0 auto;color:#797773;font-size:12px}.auth-ref-socials{display:grid;gap:8px;margin-top:20px}.auth-ref-socials button{height:43px;border:1px solid #dfd6cb;border-radius:9px;background:#fbf8f4;color:#31343a;font-size:12px;cursor:pointer}.auth-ref-socials button:hover{background:#fff;border-color:#cfc5b9}.auth-ref-socials span{display:inline-grid;place-items:center;width:20px;margin-right:7px;font-weight:800}.auth-ref-divider{display:flex;align-items:center;gap:10px;margin:19px 0 10px;color:#9a9690;font-size:10px}.auth-ref-divider:before,.auth-ref-divider:after{content:"";height:1px;flex:1;background:#ded8d0}.auth-ref-name-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.auth-ref-modal .input{height:43px;background:#fff;border-color:#ddd7d0}.auth-ref-status{min-height:28px;text-align:left;color:#7e4d4d;font-size:10px;line-height:1.45;padding-top:8px}.auth-ref-submit{width:100%;height:45px;border:0;border-radius:9px;background:#202124;color:#fff;font-size:12px;font-weight:700;cursor:pointer}.auth-ref-submit:hover{background:#111}.auth-ref-switch{margin-top:13px;color:#8a8782;font-size:10px}.auth-ref-switch button{border:0;background:none;color:#202124;font:inherit;font-weight:700;cursor:pointer;text-decoration:underline}.auth-ref-note{margin:15px 0 0;color:#aaa49b;font-size:9px;line-height:1.5}
+@media(max-width:560px){.auth-ref-modal{padding:27px 18px 20px}.auth-ref-modal h2{font-size:24px}}
 function installCss(){if($('#px-style'))return;const style=document.createElement('style');style.id='px-style';style.textContent=CSS;document.head.appendChild(style);}
 function ensureShell(){installCss();let root=$('#px-app');if(!root){root=document.createElement('div');root.id='px-app';document.body.appendChild(root);}return root;}
-function shell(body, active='home'){const root=ensureShell();const recents=state.projects.slice(0,6);root.innerHTML=`<aside class="side"><div class="logo">ProjectX</div><button class="new" data-nav="home">+ New project</button><nav class="nav"><button data-nav="home" class="${active==='home'?'active':''}">Home</button><button data-nav="projects" class="${active==='projects'?'active':''}">Projects</button><button data-nav="assistant" class="${active==='assistant'?'active':''}">Assistant</button><button data-nav="analytics" class="${active==='analytics'?'active':''}">Analytics</button><button data-nav="settings" class="${active==='settings'?'active':''}">Settings</button></nav><div class="divider"></div><div class="label">Recent</div><div class="recent">${recents.map(p=>`<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('')||'<div class="sub" style="padding:6px 10px">No projects yet</div>'}</div><div class="acct">${session?.user?.email?`Signed in as ${esc(session.user.email)}`:'Guest workspace'}<div class="sub" style="font-size:10px;margin-top:2px">${session?'Cloud sync enabled':'Local sync enabled'}</div></div></aside><main class="main"><div class="top"><button data-nav="home">Home</button>${session?'<button data-action="signout">Sign out</button>':'<button data-action="signin">Sign in</button>'}</div>${body}</main>`;root.onclick=async e=>{const nav=e.target.closest('[data-nav]')?.dataset.nav;if(nav)return navigate(nav);const open=e.target.closest('[data-open]')?.dataset.open;if(open)return openProject(open);const action=e.target.closest('[data-action]')?.dataset.action;if(action==='signin')return authModal();if(action==='signout'){await signOut();home();}};return root;}
-function workspaceHome(){shell(`<div class="wrap"><div class="center"><div class="kicker">PROJECT X</div><h1 class="hero-title">What do you want to accomplish?</h1><p class="sub" style="max-width:680px;margin:0 auto">Describe the outcome in plain language. ProjectX will clarify what is missing, shape the right workspace, and help you move from idea to something usable.</p><div class="chips" aria-label="How ProjectX works"><span class="chip" style="cursor:default">1 · Describe the outcome</span><span class="chip" style="cursor:default">2 · Refine the important details</span><span class="chip" style="cursor:default">3 · Build and verify</span></div><div class="composer"><textarea id="start-input" placeholder="Example: Build a landing page for my sneaker-cleaning business…"></textarea><div class="composer-foot"><span class="sub">${session?'Signed in · AI connection available':localGuestKey()?'Free Gemini key ready':'AI connection needed to begin'}</span><button class="send" id="start-send" aria-label="Start project">→</button></div></div><div class="sub" style="margin-top:12px">You do not need to know the project type or structure first. Start with the result you want.</div></div></div>`,'home');const input=$('#start-input');$('#start-send').onclick=()=>beginCreation(input.value);input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#start-send').click();}};}
+function shell(body, active='home'){
+  const root=ensureShell();
+  root.classList.remove('workspace-active');
+  const recents=state.projects.slice(0,6);
+  root.innerHTML=`<aside class="side"><div class="logo">ProjectX</div><button class="new" data-nav="home">+ New project</button><nav class="nav"><button data-nav="home" class="${active==='home'?'active':''}">Home</button><button data-nav="projects" class="${active==='projects'?'active':''}">Projects</button><button data-nav="assistant" class="${active==='assistant'?'active':''}">Assistant</button><button data-nav="analytics" class="${active==='analytics'?'active':''}">Analytics</button><button data-nav="settings" class="${active==='settings'?'active':''}">Settings</button></nav><div class="divider"></div><div class="label">Recent</div><div class="recent">${recents.map(p=>`<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('')||'<div class="sub" style="padding:6px 10px">No projects yet</div>'}</div><div class="acct">${session?.user?.email?`Signed in as ${esc(session.user.email)}`:'Guest workspace'}<div class="sub" style="font-size:10px;margin-top:2px">${session?'Cloud sync enabled':'Local sync enabled'}</div></div></aside><main class="main"><div class="top"><button data-nav="home">Home</button>${session?'<button data-action="signout">Sign out</button>':'<button data-action="signin">Sign in</button>'}</div>${body}</main>`;
+  root.onclick=async e=>{
+    const nav=e.target.closest('[data-nav]')?.dataset.nav;if(nav)return navigate(nav);
+    const open=e.target.closest('[data-open]')?.dataset.open;if(open)return openProject(open);
+    const action=e.target.closest('[data-action]')?.dataset.action;
+    if(action==='signin')return authModal();
+    if(action==='signout'){await signOut();home();}
+  };
+  return root;
+}
+
+function workspaceHome(){
+  const username=String(session?.user?.user_metadata?.full_name||session?.user?.user_metadata?.name||session?.user?.email||'there').split('@')[0].split(' ')[0]||'there';
+  const root=shell(`<div class="workspace-home-screen">
+    <div class="workspace-home-inner">
+      <div class="workspace-greeting">
+        <div class="kicker">PROJECTX WORKSPACE</div>
+        <h1>What are we working on today?</h1>
+        <p>Start with a goal, problem, idea, or task. ProjectX figures out the kind of work and builds the right workspace around it.</p>
+      </div>
+
+      <div class="workspace-suggestions">
+        <div class="workspace-suggestion-label">Suggested for you</div>
+        <div class="workspace-suggestion-row">
+          <button data-work-example="Help me turn an idea into a clear plan">✦ <span>Turn an idea into a plan</span></button>
+          <button data-work-example="Research a problem and give me an evidence-backed action plan">⌕ <span>Research a problem</span></button>
+          <button data-work-example="Plan and build a small business from scratch">◫ <span>Plan a business</span></button>
+          <button data-work-example="Build a polished website for my project">▣ <span>Build a website</span></button>
+        </div>
+      </div>
+
+      <div class="workspace-composer">
+        <textarea id="workspace-input" placeholder="Start chatting or describe what you want to accomplish…"></textarea>
+        <div class="workspace-composer-foot">
+          <div class="workspace-compose-left">
+            <button id="workspace-plus" type="button" aria-label="Add to project">+</button>
+            <span>ProjectX can handle planning, building, research, creation, and more.</span>
+          </div>
+          <div class="workspace-compose-right">
+            <span class="workspace-mode">Mostly Automatic</span>
+            <button id="workspace-send" type="button" aria-label="Start project">→</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="workspace-capabilities">
+        <button data-work-example="Build a website or web app for me">Build</button>
+        <button data-work-example="Research this topic and organize the evidence">Research</button>
+        <button data-work-example="Create a step-by-step plan for this goal">Plan</button>
+        <button data-work-example="Create a presentation or other deliverable">Create</button>
+        <button data-work-example="Help me solve a real-world problem">Solve</button>
+        <button data-work-example="Make a game prototype with the right systems and structure">Game</button>
+      </div>
+
+      <div class="workspace-footer-note">${esc(username)}, your workspace adapts to the work — not the other way around.</div>
+    </div>
+  </div>`,'home');
+  root.classList.add('workspace-active');
+
+  const input=$('#workspace-input');
+  const send=async()=>{const value=input.value.trim();if(!value){input.focus();return;}await beginCreation(value);};
+  $('#workspace-send').onclick=send;
+  $('#workspace-plus').onclick=()=>input.focus();
+  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send();}};
+  $$('.workspace-home-screen [data-work-example]').forEach(btn=>btn.onclick=()=>{input.value=btn.dataset.workExample||'';input.focus();});
+}
+
 function publicHome(){
   const root=ensureShell();
   root.innerHTML=`<div class="public-home">
@@ -1212,7 +1314,68 @@ function bindSettings(which){
   });
   if(which==='billing'&&session)loadUsagePanel();$('#open-billing')?.addEventListener('click',()=>{location.href='./billing.html';});
   $('#execution-mode')?.addEventListener('change',e=>{settingsState.executionMode=e.target.value;persistSettings();});$('#toggle-autosave')?.addEventListener('click',()=>{settingsState.autoSave=!settingsState.autoSave;persistSettings();renderSettings(which)});$('#toggle-confirm')?.addEventListener('click',()=>{settingsState.confirmDelete=!settingsState.confirmDelete;persistSettings();renderSettings(which)});$('#language')?.addEventListener('change',e=>{settingsState.language=e.target.value;persistSettings()});$('#timezone')?.addEventListener('change',e=>{settingsState.timezone=e.target.value;persistSettings()});$('#default-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$('#ai-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$$('[data-agent]').forEach(button=>button.onclick=()=>{const id=button.dataset.agent;settingsState.agents[id]=!settingsState.agents[id];persistSettings();renderSettings('agents')});$$('[data-notification]').forEach(button=>button.onclick=()=>{const id=button.dataset.notification;settingsState.notifications[id]=!settingsState.notifications[id];persistSettings();renderSettings('notifications')});$('#security-signin')?.addEventListener('click',authModal);$('#security-signout')?.addEventListener('click',()=>signOut().then(()=>settingsPage('security')));$('#export-state')?.addEventListener('click',()=>downloadText('projectx-state.json',JSON.stringify(state,null,2),'application/json'));$('#clear-state')?.addEventListener('click',()=>{if(settingsState.confirmDelete&&!confirm('Clear local project cache? Cloud projects remain in your account.'))return;state={version:6,projects:[],active:null};persistLocal();home();});}
-function authModal(){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">PROJECT X ACCOUNT</div><h2>Use secure project storage</h2><p class="sub">Sign in to sync projects and store AI credentials in the encrypted server-side vault.</p><div style="display:flex;gap:7px;margin:12px 0"><button class="ghost" id="auth-signin-mode">Sign in</button><button class="ghost" id="auth-signup-mode">Create account</button></div><input id="auth-email" class="input full" type="email" placeholder="Email"><input id="auth-password" class="input full" type="password" placeholder="Password" style="margin-top:7px"><div id="auth-status" class="sub" style="margin-top:8px"></div><div class="actions"><button class="ghost" id="auth-cancel">Cancel</button><button class="primary" id="auth-submit">Continue</button></div></div>`;document.body.appendChild(modal);currentModal=modal;let mode='signin';const setMode=m=>{mode=m;$('#auth-signin-mode').classList.toggle('active',m==='signin');$('#auth-signup-mode').classList.toggle('active',m==='signup');};$('#auth-signin-mode').onclick=()=>setMode('signin');$('#auth-signup-mode').onclick=()=>setMode('signup');$('#auth-cancel').onclick=closeModal;$('#auth-submit').onclick=async()=>{const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<6){$('#auth-status').textContent='Enter an email and a password with at least 6 characters.';return;}const button=$('#auth-submit');button.disabled=true;try{await authAction(mode,email,password);closeModal();await syncRemoteProjects();settingsPage('ai');notify('Secure account connected.','success');}catch(error){$('#auth-status').textContent=error.message;}finally{button.disabled=false;}};}
+function authModal(initialMode='signup'){
+  closeModal();
+  const modal=document.createElement('div');
+  modal.className='modal-bg auth-ref-bg';
+  modal.innerHTML=`<div class="auth-ref-modal">
+    <button class="auth-ref-close" id="auth-cancel" aria-label="Close">×</button>
+    <div class="auth-ref-mark"><span class="public-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg></span></div>
+    <div class="kicker">PROJECTX ACCOUNT</div>
+    <h2 id="auth-title">${initialMode==='signup'?'Create your ProjectX account':'Welcome back'}</h2>
+    <p class="sub" id="auth-subtitle">${initialMode==='signup'?'Create an account to keep projects, workspaces, and progress synced.':'Sign in to continue to your ProjectX workspace.'}</p>
+    <div class="auth-ref-socials">
+      <button id="auth-google" type="button"><span>G</span>Continue with Google</button>
+      <button id="auth-github" type="button"><span>⌁</span>Continue with GitHub</button>
+    </div>
+    <div class="auth-ref-divider"><span>or continue with email</span></div>
+    <div id="auth-name-grid" class="auth-ref-name-grid" hidden>
+      <input id="auth-first" class="input" placeholder="First name">
+      <input id="auth-last" class="input" placeholder="Last name">
+    </div>
+    <input id="auth-email" class="input full" type="email" autocomplete="email" placeholder="you@example.com">
+    <input id="auth-password" class="input full" type="password" autocomplete="${initialMode==='signup'?'new-password':'current-password'}" placeholder="Password" style="margin-top:8px">
+    <div id="auth-status" class="auth-ref-status"></div>
+    <button class="auth-ref-submit" id="auth-submit">${initialMode==='signup'?'Create account':'Sign in'}</button>
+    <div class="auth-ref-switch" id="auth-switch"></div>
+    <p class="auth-ref-note">ProjectX does not require phone verification to use your workspace.</p>
+  </div>`;
+  document.body.appendChild(modal);
+  currentModal=modal;
+  let mode=initialMode==='signup'?'signup':'signin';
+
+  const syncMode=()=>{
+    const signup=mode==='signup';
+    $('#auth-title').textContent=signup?'Create your ProjectX account':'Welcome back';
+    $('#auth-subtitle').textContent=signup?'Create an account to keep projects, workspaces, and progress synced.':'Sign in to continue to your ProjectX workspace.';
+    $('#auth-submit').textContent=signup?'Create account':'Sign in';
+    $('#auth-password').autocomplete=signup?'new-password':'current-password';
+    $('#auth-switch').innerHTML=signup?'Already have an account? <button type="button" id="auth-to-signin">Log in</button>':'New to ProjectX? <button type="button" id="auth-to-signup">Create account</button>';
+    $('#auth-to-signin')?.addEventListener('click',()=>{mode='signin';syncMode();});
+    $('#auth-to-signup')?.addEventListener('click',()=>{mode='signup';syncMode();});
+  };
+
+  syncMode();
+  $('#auth-cancel').onclick=closeModal;
+  const runSocial=async provider=>{try{await socialAuth(provider);}catch(error){$('#auth-status').textContent=error.message||'Could not start sign-in.';}};
+  $('#auth-google').onclick=()=>runSocial('google');
+  $('#auth-github').onclick=()=>runSocial('github');
+
+  $('#auth-submit').onclick=async()=>{
+    const email=$('#auth-email').value.trim(),password=$('#auth-password').value;
+    if(!email||!/^S+@S+.S+$/.test(email)){ $('#auth-status').textContent='Enter a valid email address.';return; }
+    if(mode==='signup'&&password.length<8){$('#auth-status').textContent='Use at least 8 characters for your password.';return;}
+    if(mode==='signin'&&!password){$('#auth-status').textContent='Enter your password.';return;}
+    const button=$('#auth-submit');button.disabled=true;$('#auth-status').textContent=mode==='signup'?'Creating your account…':'Signing you in…';
+    try{
+      const data=await authAction(mode,email,password);
+      if(mode==='signup'&&!data.session){$('#auth-status').textContent='Account created. Check your email to confirm your address, then sign in.';return;}
+      closeModal();await syncRemoteProjects();notify('Account connected.','success');
+    }catch(error){$('#auth-status').textContent=error.message||'Authentication failed.';}
+    finally{button.disabled=false;}
+  };
+}
+
 function closeModal(){currentModal?.remove();currentModal=null;}
 function aiRequiredModal(message){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">AI CONNECTION REQUIRED</div><h2>Connect your AI</h2><p class="sub">${esc(message)}</p><p class="sub" style="margin-top:10px"><a href="${GEMINI_KEY_URL}" target="_blank" rel="noopener noreferrer">Create a free-tier Gemini API key</a> in Google AI Studio, then paste it into Settings → AI.</p><div class="actions"><button class="ghost" id="ai-close">Cancel</button><button class="primary" id="ai-settings">Open Settings</button></div></div>`;document.body.appendChild(modal);currentModal=modal;$('#ai-close').onclick=closeModal;$('#ai-settings').onclick=()=>{closeModal();settingsPage('ai');};}
 function navigate(route){if(route==='home')home();else if(route==='projects')projectsPage();else if(route==='analytics')analyticsPage();else if(route==='assistant')assistantPage();else if(route==='settings')settingsPage('general');}
