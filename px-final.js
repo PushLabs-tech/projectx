@@ -408,7 +408,15 @@ async function mountProjectXHero3D(){
   }
 }
 
+function authenticatedHome(){
+  shell(`<div class="wrap"><div class="center"><div class="kicker">PROJECT X</div><h1 class="hero-title">What do you want to accomplish?</h1><p class="sub" style="max-width:680px;margin:0 auto">Describe the outcome in plain language. ProjectX will clarify what is missing, shape the right workspace, and help you move from idea to something usable.</p><div class="chips" aria-label="How ProjectX works"><span class="chip" style="cursor:default">1 · Describe the outcome</span><span class="chip" style="cursor:default">2 · Refine the important details</span><span class="chip" style="cursor:default">3 · Build and verify</span></div><div class="composer"><textarea id="start-input" placeholder="Example: Build a landing page for my sneaker-cleaning business…"></textarea><div class="composer-foot"><span class="sub">${session?'Signed in · AI connection available':localGuestKey()?'Free Gemini key ready':'AI connection needed to begin'}</span><button class="send" id="start-send" aria-label="Start project">→</button></div></div><div class="sub" style="margin-top:12px">You do not need to know the project type or structure first. Start with the result you want.</div></div></div>`,'home');
+  const input=$('#start-input');
+  $('#start-send').onclick=()=>beginCreation(input.value);
+  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#start-send').click();}};
+}
+
 function home(){
+  if(session){authenticatedHome();return;}
   shell(`<div class="landing-home">
     <nav class="landing-nav" aria-label="ProjectX">
       <button class="landing-brand" data-nav="home" aria-label="ProjectX home">
