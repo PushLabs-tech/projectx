@@ -30,10 +30,17 @@ This checklist reflects the current canonical runtime: `index.html` → `px-fina
 - [x] Delivery/export.
 - [x] Version snapshots, comparison and restore.
 - [x] Project resource/URL capture.
+- [x] Structured text/CSV/JSON/Markdown resource ingestion.
+- [x] Selectively bounded resource context sent to AI.
 - [x] Decision capture in Project Brain.
 - [x] Make it Great additive improvement flow.
 - [x] Optimize flow for verified software projects.
+- [x] Ask Me approval gate with mutation preview.
+- [x] Autonomous build → test → repair → retest loop.
+- [x] One-click full verification lifecycle.
 - [x] Blueprint transformation flow.
+- [x] Expanded creation types and presentation artifacts.
+- [x] Project forks/alternative branches.
 - [x] Project search.
 
 ## 3. Research
