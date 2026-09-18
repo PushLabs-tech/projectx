@@ -307,11 +307,11 @@ function renderDiscoveryPoll(poll,meta,history){
   const decision=String(poll?.decision||'').trim();
   const aiOptions=Array.isArray(poll?.options)?poll.options.map(v=>String(v||'').trim()).filter(Boolean):[];
   const options=[...new Set(aiOptions)].filter(v=>v.toLowerCase()!=='describe in your own words').slice(0,4);
+
   if(!decision||/\?\s*$/.test(decision)||options.length!==4||options.some(v=>/\?\s*$/.test(v))){
     root.innerHTML='<div class="poll-card"><div class="poll-title">The AI could not generate a contextual poll.</div><div class="sub" style="margin-top:6px">Nothing generic was substituted. Generate a fresh decision from the current project context.</div><div class="actions"><button type="button" class="ghost" id="poll-retry">Regenerate poll</button></div></div>';
     $('#poll-retry')?.addEventListener('click',async()=>{
-      const button=$('#poll-retry');
-      if(button)button.disabled=true;
+      const button=$('#poll-retry'); if(button)button.disabled=true;
       if(status)status.textContent='Generating a new contextual poll…';
       try{await regenerateDiscoveryPoll(history,meta);}
       catch(error){if(status)status.textContent='Could not regenerate the poll: '+String(error?.message||error);if(button)button.disabled=false;}
@@ -337,10 +337,8 @@ function renderDiscoveryPoll(poll,meta,history){
     </div>
   </div>`;
 
-  root.__pollHandler&&root.removeEventListener('click',root.__pollHandler);
-  const onPollClick=async function(event){
-    const button=event.target.closest?.('[data-poll-index]');
-    if(button && root.contains(button)){
+  root.querySelectorAll('[data-poll-index]').forEach(button=>{
+    button.onclick=async()=>{
       const index=Number(button.dataset.pollIndex||0);
       root.querySelectorAll('[data-poll-index]').forEach(x=>{
         x.classList.remove('selected');
@@ -354,23 +352,22 @@ function renderDiscoveryPoll(poll,meta,history){
         return;
       }
       await submitDiscoveryChoice(renderedOptions[index],history,meta);
-      return;
-    }
-    if(event.target.closest?.('#poll-regenerate')){
-      const btn=$('#poll-regenerate');
-      if(btn)btn.disabled=true;
-      if(status)status.textContent='Generating a new contextual poll…';
-      try{await regenerateDiscoveryPoll(history,meta);}
-      catch(error){if(status)status.textContent='Could not regenerate the poll: '+String(error?.message||error);if(btn)btn.disabled=false;}
-    }
-    if(event.target.closest?.('#poll-custom-send')){
-      const value=String($('#poll-custom-input')?.value||'').trim();
-      if(value)await submitDiscoveryChoice(value,history,meta);
-    }
-  };
-  root.__pollHandler=onPollClick;
-  root.addEventListener('click',onPollClick);
+    };
+  });
 
+  $('#poll-regenerate')?.addEventListener('click',async()=>{
+    const button=$('#poll-regenerate'); if(button)button.disabled=true;
+    root.querySelectorAll('[data-poll-index]').forEach(x=>x.disabled=true);
+    if(status)status.textContent='Generating a new contextual poll…';
+    try{await regenerateDiscoveryPoll(history,meta);}
+    catch(error){if(status)status.textContent='Could not regenerate the poll: '+String(error?.message||error);if(button)button.disabled=false;root.querySelectorAll('[data-poll-index]').forEach(x=>x.disabled=false);}
+  });
+
+  $('#poll-custom-send')?.addEventListener('click',async()=>{
+    const value=String($('#poll-custom-input')?.value||'').trim();
+    if(!value)return;
+    await submitDiscoveryChoice(value,history,meta);
+  });
   $('#poll-custom-input')?.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&e.key==='Enter')$('#poll-custom-send')?.click();
   });
@@ -379,14 +376,11 @@ function renderDiscoveryPoll(poll,meta,history){
 async function regenerateDiscoveryPoll(history,meta={}){
   const latest=String(history?.[history.length-1]?.text||meta?.initialIntent||'').trim();
   if(!latest)throw new Error('No current project context is available.');
-  const instruction=latest+'\n\n[PROJECTX ACTION: Regenerate the current discovery poll. Keep the project context and intent unchanged, but generate a fresh set of four concrete candidate options for the single most important missing detail. Do not finish the project and do not change the underlying project understanding.]';
-  meta.regeneratingPoll=true;
-  try{
-    await continueInterview(history,Array.isArray(meta.answers)?meta.answers:[],{...meta,messageOverride:instruction});
-  }finally{
-    meta.regeneratingPoll=false;
-  }
+  const instruction=latest+'\n\n[PROJECTX ACTION: Regenerate ONLY the current discovery poll. Do not finish discovery, do not create a project, do not change the underlying project understanding, and return a valid discovery result with done=false and a fresh poll with exactly four new concrete candidate options.]';
+  const nextMeta={...meta,messageOverride:instruction,regeneratingPoll:true};
+  await continueInterview(history,Array.isArray(meta.answers)?meta.answers:[],nextMeta);
 }
+
 async function submitDiscoveryChoice(value,history,meta){
   const text=String(value||'').trim();
   if(!text)return;
@@ -445,7 +439,7 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
     const missing=[...new Set([...quality.missing,...declaredMissing,...(Array.isArray(spec.openQuestions)?spec.openQuestions:[])])];
     const confidence=Number(data.confidence||0);
     const workspace=(Array.isArray(workspaceCandidate)?workspaceCandidate:[]).filter(s=>s&&String(s.name||'').trim()).slice(0,8);
-    const done=data.done===true&&quality.valid&&confidence>=.82&&missing.length===0&&ambiguities.length===0&&workspace.length>=2;
+    const done=!meta.regeneratingPoll&&data.done===true&&quality.valid&&confidence>=.82&&missing.length===0&&ambiguities.length===0&&workspace.length>=2;
     meta.messageOverride='';
     if(!done){
       if(!validDiscoveryPollLocal(data?.poll)){
