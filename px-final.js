@@ -460,7 +460,7 @@ function home(){
     </section>
   </div>`,'home');
 
-  const start=()=>{const input=$('#start-input');if(input){input.focus();input.scrollIntoView({behavior:'smooth',block:'center');return;}beginCreation('');};
+  const start=()=>{const input=$('#start-input');if(input){input.focus();input.scrollIntoView({behavior:'smooth',block:'center'});return;}beginCreation('');};
   $('#landing-start')?.addEventListener('click',()=>{const composer=document.createElement('div');composer.className='landing-start-modal modal-bg';composer.innerHTML=`<div class="modal landing-compose-modal"><div class="kicker">START PROJECT</div><h2>What are you trying to accomplish?</h2><p class="sub">Describe the outcome. ProjectX will take it from there.</p><div class="form" style="margin-top:14px"><textarea id="landing-intent" placeholder="Example: Build a clean website for my sneaker-cleaning business…"></textarea><button class="primary" id="landing-intent-send">Start</button></div><div class="actions"><button class="ghost" id="landing-intent-close">Close</button></div></div></div>`;document.body.appendChild(composer);$('#landing-intent')?.focus();$('#landing-intent-close').onclick=()=>composer.remove();$('#landing-intent-send').onclick=async()=>{const v=$('#landing-intent').value.trim();if(!v)return;composer.remove();beginCreation(v);};$('#landing-intent')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')$('#landing-intent-send')?.click();});});
   $('#hero-start')?.addEventListener('click',()=>$('#landing-start')?.click());
   $('#landing-final-start')?.addEventListener('click',()=>$('#landing-start')?.click());
