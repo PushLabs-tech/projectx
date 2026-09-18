@@ -219,7 +219,7 @@ export function restoreProjectSnapshot(project, snapshot = {}) {
   invalidateArtifacts(project);
   project.sectionContent = {};
   project.tests = {status:'stale',specVersion:project.specVersion,results:[],updatedAt:null};
-  project.research = {...(project.research || {status:'ready',queries:[],sources:[],findings:[]}),status:'stale'};
+  project.research = {...(project.research || {status:'ready',queries:[],sources:[],findings:[]}),status:(project.research?.findings?.length?'ready':'stale')};
   project.executionState = {...(project.executionState || {}),status:'dirty',lastMutationId:globalThis.crypto?.randomUUID?.() || `restore-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,staleFromVersion:project.specVersion};
   return {changed:true};
 }
