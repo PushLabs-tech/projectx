@@ -295,8 +295,10 @@ function renderBrain(project){
     u.summary?'Summary: '+u.summary:'',
     Number(u.confidence)?'Confidence: '+Math.round(Number(u.confidence)*100)+'%':''
   ];
-  const html=brainList('Understanding',rows)+brainList('Requirements',s.requirements)+brainList('Constraints',s.constraints)+brainList('Decisions',s.decisions)+brainList('Deliverables',s.deliverables)+brainList('Success criteria',s.successCriteria)+brainList('Dependencies',s.dependencies)+brainList('Known resources',s.resources);
-  toolShell('PROJECT BRAIN','Canonical project state','Read-only view of what ProjectX currently knows. Use Project Chat to change it.',html);
+  const html=brainList('Understanding',rows)+brainList('Requirements',s.requirements)+brainList('Constraints',s.constraints)+brainList('Decisions',s.decisions)+brainList('Deliverables',s.deliverables)+brainList('Success criteria',s.successCriteria)+brainList('Dependencies',s.dependencies)+brainList('Known resources',s.resources)+
+    '<div class="brain-group"><b>Capture a decision</b><form id="decision-form" class="form" style="margin-top:8px"><input id="decision-value" class="input full" maxlength="600" placeholder="Record an important project decision"><button class="primary">Save decision</button></form><div class="sub" style="margin-top:6px">Decisions become part of the canonical project brain.</div></div>';
+  toolShell('PROJECT BRAIN','Canonical project state','Read-only project knowledge with a quick decision capture. Changes are versioned in the canonical project model.',html);
+  $('#decision-form').onsubmit=e=>{e.preventDefault();const value=$('#decision-value').value.trim();if(!value)return;const mutation=applyProjectMutation(project,{specPatch:{decisions:{add:[value]}}});if(mutation.changed){project.status='changed';saveProject(project);syncRemoteProject(project);notify('Decision captured in the project brain.','success');}renderBrain(project);};
 }
 function renderArchitecture(project){
   const sections=buildDependencyMap(project.sections||[]);
