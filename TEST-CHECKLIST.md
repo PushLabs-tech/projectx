@@ -1,133 +1,126 @@
-# Builder launch checklist
+# ProjectX canonical launch checklist
 
-## A. Core UI / old UI preservation
+This checklist reflects the current canonical runtime: `index.html` → `px-final.js` → Supabase `ai` Edge Function.
 
-- [ ] Sidebar looks like the classic Builder UI.
-- [ ] Home button works.
-- [ ] Projects button works.
-- [ ] Activity button works.
-- [ ] Research button works.
-- [ ] Integrations button works.
-- [ ] Agents button works.
-- [ ] Recent projects open correctly.
-- [ ] Usage Manage opens Settings.
-- [ ] Account opens Settings.
-- [ ] Sign out works.
-- [ ] New project works from the sidebar.
-- [ ] Command center works.
-- [ ] Search works.
+## 1. Core creation flow
 
-## B. Agents / models
+- [x] One natural-language starting point.
+- [x] First classify REAL-WORLD vs NON-REAL-WORLD.
+- [x] Show classification and evolving understanding.
+- [x] Ask one high-value discovery question at a time.
+- [x] AI-derived lower-level category.
+- [x] Evolving Project Brain.
+- [x] AI-generated project-specific workspace sections.
+- [x] Project-specific specialist agents.
+- [x] Canonical project mutations with version invalidation.
+- [x] Type-aware software vs document outputs.
 
-- [ ] Discuss chat works.
-- [ ] Plan chat updates the plan.
-- [ ] Build can write safe relative files.
-- [ ] Visual can update front-end files.
-- [ ] Research returns evidence-focused responses.
-- [ ] Chat model dropdown is visible.
-- [ ] Auto routing is visible.
-- [ ] Manual model selection persists.
-- [ ] Provider model discovery works.
-- [ ] Fallback model is attempted after a provider/model failure.
-- [ ] No provider secret appears in localStorage.
+## 2. Create / edit / verify
 
-## C. UX / polish
+- [x] Build software artifacts with `index.html`.
+- [x] Generate real-world/document deliverables.
+- [x] Browser runtime verification.
+- [x] Type-aware tests.
+- [x] Feed verified failures into rebuild/repair.
+- [x] Direct safe file editing.
+- [x] Natural-language visual editing entrypoint.
+- [x] Responsive desktop/tablet/mobile preview.
+- [x] Outcome readiness simulation.
+- [x] Security checks on generated files.
+- [x] Delivery/export.
+- [x] Version snapshots, comparison and restore.
+- [x] Project resource/URL capture.
+- [x] Decision capture in Project Brain.
+- [x] Make it Great additive improvement flow.
+- [x] Optimize flow for verified software projects.
+- [x] Blueprint transformation flow.
+- [x] Project search.
 
-- [ ] CTA is above the fold.
-- [ ] Loading/thinking state is visible.
-- [ ] Empty states are useful.
-- [ ] Invalid form submissions show errors.
-- [ ] Mobile sidebar opens/closes.
-- [ ] Mobile sticky CTA works.
-- [ ] Reduced-motion preference is respected.
-- [ ] Buttons have hover/focus/disabled states.
-- [ ] No broken buttons in old navigation.
+## 3. Research
 
-## D. SEO / website essentials
+- [x] Authenticated source-backed research action.
+- [x] HTTPS-only source URLs.
+- [x] Private/local host blocking.
+- [x] Redirect rejection.
+- [x] HTML/plain-text/JSON source support.
+- [x] Source size limits.
+- [x] Evidence extraction restricted to supplied sources.
+- [x] Findings persisted in `research_findings`.
+- [x] Findings restored with the project brain.
 
-- [ ] Custom 404 page works.
-- [ ] Every public page has its own title.
-- [ ] Every public page has a description.
-- [ ] Open Graph image exists and loads.
-- [ ] Favicon 16px exists.
-- [ ] Favicon 32px exists.
-- [ ] Apple touch icon exists.
-- [ ] robots.txt points to the production sitemap.
-- [ ] sitemap.xml uses the real production domain.
-- [ ] Every image has meaningful alt text where applicable.
-- [ ] Mobile breakpoints tested at 320, 375, 768 and 820px.
-- [ ] Thank-you page works.
-- [ ] Privacy page is reviewed.
-- [ ] Terms page is reviewed.
-- [ ] Cookie/analytics consent is reviewed for the countries where the service operates.
-- [ ] Analytics ID is configured only if analytics is actually being used.
-- [ ] Real business/contact address is inserted before launch.
+## 4. AI / provider layer
 
-## E. Security
+- [x] Server-side encrypted provider credentials.
+- [x] Provider model discovery.
+- [x] Deterministic model routing/fallbacks.
+- [x] Provider-agnostic working modes: Fast, Balanced, Powerful, Ask Me, Mostly Automatic, Autonomous.
+- [x] Gemini guest mode.
+- [x] OpenAI, Anthropic, OpenRouter, NVIDIA, Bytez and OpenAI-compatible connection slots.
+- [x] Public HTTPS validation for custom provider base URLs.
+- [x] 30-day AI usage endpoint and UI.
+- [x] Account security-event endpoint and UI.
 
-- [ ] `npm audit --audit-level=high` passes.
-- [ ] No unreviewed package was added.
-- [ ] No suspicious/malicious package is present.
-- [ ] Security headers are active in production.
-- [ ] Prompt injection tests are performed against every agent.
-- [ ] No API key is stored unencrypted.
-- [ ] AI access requires a valid user session.
-- [ ] RLS is enabled on every exposed private table.
-- [ ] Grants are reviewed in addition to RLS policies.
-- [ ] Tenant isolation is tested with two accounts.
-- [ ] Audit logs are written for sensitive operations.
-- [ ] Security events are reviewable.
-- [ ] Mass-assignment paths are not exposed; server code accepts explicit fields only.
-- [ ] Command execution is impossible through Build/Visual operations.
-- [ ] Database/project restore procedure is tested.
-- [ ] Internal dashboards are not publicly exposed.
-- [ ] OAuth redirect URLs are exact and production-only.
-- [ ] Cookies/auth storage settings match the deployment architecture.
-- [ ] Webhook signatures are verified.
-- [ ] Payment webhook events are idempotent.
+## 5. Persistence / security
 
-## F. Supabase
+- [x] Supabase Auth integration.
+- [x] Tenant-aware project authorization.
+- [x] RLS enabled on private project data.
+- [x] Project/file/message/version persistence.
+- [x] Project Brain persistence.
+- [x] Research finding persistence.
+- [x] Optimistic server version check.
+- [x] Audit log writes for project persistence.
+- [x] Sandboxed preview execution.
+- [x] Safe relative file paths.
+- [x] No browser shell execution path.
+- [x] No provider secrets committed to the repository.
+- [x] Security headers for supported hosts.
+- [x] Consent-gated analytics.
 
-- [ ] Auth site URL is correct.
-- [ ] Redirect URLs are correct.
-- [ ] Schema applied.
-- [ ] Security/billing migration applied.
-- [ ] Edge Function secrets configured.
-- [ ] `ai` deployed.
-- [ ] `payments` deployed.
-- [ ] Provider key encryption secret is set.
-- [ ] No server secret is in frontend files.
-- [ ] Storage buckets are private where required.
+## 6. UX / accessibility / web essentials
 
-## G. Payments
+- [x] Clean canonical navigation.
+- [x] Loading states.
+- [x] Empty states.
+- [x] Form validation/error states.
+- [x] Focus-visible keyboard states.
+- [x] Disabled button states.
+- [x] Reduced-motion support.
+- [x] Mobile responsive layout.
+- [x] Custom 404.
+- [x] Page metadata.
+- [x] Open Graph image.
+- [x] Favicons.
+- [x] robots.txt.
+- [x] sitemap.xml.
+- [x] Privacy and Terms pages.
+- [x] Billing page.
+- [x] Thank-you page.
 
-- [ ] Test plans created.
-- [ ] Test keys configured.
-- [ ] Pro plan ID configured.
-- [ ] Max plan ID configured.
-- [ ] Checkout tested.
-- [ ] Webhook endpoint configured.
-- [ ] Webhook signature verified.
-- [ ] Subscription row created.
-- [ ] Duplicate webhook is idempotent.
-- [ ] Cancellation tested.
-- [ ] Renewal/failure tested.
-- [ ] Refund policy published.
-- [ ] Live credentials added only after the complete test pass.
+## 7. Still requires real external configuration
 
-## H. Backup / restore
+These cannot be completed honestly from repository code alone:
 
-- [ ] Supabase backup/retention plan is enabled for the production project.
-- [ ] A documented restore procedure exists.
-- [ ] Project snapshot/restore has been tested.
-- [ ] Critical environment secrets are stored in a secure password manager.
-- [ ] Recovery owner and recovery contact are documented.
+- [ ] Production business/operator contact address in legal pages.
+- [ ] Final production domain/DNS and hosting choice.
+- [ ] Supabase Auth Site URL and exact production redirects.
+- [ ] Production AI provider credentials and spending/rate policy.
+- [ ] Supabase backup/retention and a tested production restore procedure.
+- [ ] Enable Supabase Auth leaked-password protection.
+- [ ] Real GitHub OAuth/repository integration, if repository automation is required.
+- [ ] Real deployment-provider integration, if one-click customer deployment is required.
+- [ ] Realtime collaboration infrastructure, if team collaboration is required.
+- [ ] Durable background workers, if long-running autonomous jobs are required.
+- [ ] Payment merchant credentials, plans, webhooks and end-to-end live/test verification before selling subscriptions.
 
-## Final automated checks
+## 8. Verification commands
 
 ```bash
 npm install
 npm run check
 npm run security:scan
 npm audit --audit-level=high
+npm run build
 ```
+
+Do not mark the external configuration section complete until those real services and credentials have been configured and tested.
