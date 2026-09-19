@@ -288,186 +288,22 @@ function installOptionalAnalytics(){
   window.__projectxAnalyticsInstalled=true;
 }
 const CSS = `#px-app{position:fixed;inset:0;z-index:2147483000;background:#f8fafc;color:#171a1f;font:14px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}#px-app *{box-sizing:border-box}#px-app button,#px-app input,#px-app textarea,#px-app select{font:inherit}#px-app button:focus-visible,#px-app input:focus-visible,#px-app textarea:focus-visible,#px-app select:focus-visible{outline:2px solid #2674ff;outline-offset:2px}#px-app button:disabled{opacity:.55;cursor:not-allowed}@media (prefers-reduced-motion: reduce){#px-app *,#px-app *::before,#px-app *::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}#px-app .side{position:fixed;inset:0 auto 0 0;width:240px;background:#fafbfc;border-right:1px solid #e5e8eb;padding:24px 14px;display:flex;flex-direction:column;overflow:auto}.logo{font-size:21px;font-weight:800;letter-spacing:-.04em;padding:0 10px 24px}.new,.primary{border:0;border-radius:8px;background:#171a1f;color:#fff;cursor:pointer}.new{height:38px;font-size:12px;font-weight:700}.nav{display:grid;gap:2px;margin-top:12px}.nav button,.recent button,.assist-btn{border:1px solid transparent;background:transparent;color:#68717d;text-align:left;padding:9px 10px;border-radius:8px;font-size:11px;cursor:pointer}.nav button.active,.nav button:hover,.recent button:hover,.assist-btn:hover{background:#eef0f3;color:#171a1f}.label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#9aa2ad;padding:0 10px 8px}.divider{height:1px;background:#e5e8eb;margin:18px 7px}.acct{margin-top:auto;border:1px solid #dde1e5;border-radius:10px;background:#fff;padding:9px;font-size:11px}.main{margin-left:240px;height:100%;overflow:auto}.top{height:58px;border-bottom:1px solid #eceef1;display:flex;justify-content:flex-end;align-items:center;gap:7px;padding:0 28px}.top button,.ghost,.download{border:1px solid #dfe3e7;background:#fff;color:#505966;border-radius:7px;padding:8px 11px;font-size:11px;cursor:pointer}.wrap,.interview,.panel,.project{width:min(1040px,calc(100% - 48px));margin:auto;padding:42px 0}.center{text-align:center}.kicker{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#a0a7b0}.hero-title,.project-title{font-size:clamp(34px,4.5vw,52px);line-height:1.04;letter-spacing:-.045em;margin:12px 0;font-weight:720}.sub{color:#78818d;line-height:1.55;font-size:13px}.composer{border:1px solid #d7dce2;border-radius:12px;max-width:900px;margin:26px auto 0;overflow:hidden}.composer textarea{width:100%;min-height:140px;border:0;outline:0;resize:vertical;padding:18px}.composer-foot{border-top:1px solid #edf0f2;display:flex;justify-content:space-between;align-items:center;padding:7px}.send{width:39px;height:39px;border:0;border-radius:8px;background:#171a1f;color:#fff;cursor:pointer}.send:disabled,.primary:disabled{opacity:.45;cursor:wait}.chips{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin:16px 0}.chip{border:1px solid #dfe3e7;background:#fff;border-radius:999px;padding:7px 10px;font-size:10px;color:#68717d;cursor:pointer}.conversation{display:grid;gap:9px;max-height:58vh;overflow:auto;margin:20px 0}.discovery-poll{max-width:720px;margin:26px auto 0}.poll-card{border:1px solid #dfe4e9;border-radius:16px;background:#fff;box-shadow:0 10px 32px rgba(25,34,45,.06);padding:18px}.poll-head{padding:2px 4px 13px}.poll-eyebrow{font-size:9px;letter-spacing:.15em;font-weight:800;color:#9aa3ad}.poll-title{margin-top:5px;font-size:16px;font-weight:750;letter-spacing:-.015em;color:#171a1f}.poll-options{display:grid;gap:8px}.poll-option{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:1px solid #e0e5e9;background:#fff;border-radius:10px;padding:12px 13px;color:#303842;font-size:12px;line-height:1.45;cursor:pointer;transition:border-color .15s ease,background .15s ease,transform .15s ease}.poll-option:hover{border-color:#aeb7c0;background:#fafbfc;transform:translateY(-1px)}.poll-option.selected{border-color:#171a1f;background:#f4f5f6}.poll-radio{width:16px;height:16px;border:1.5px solid #b6bec7;border-radius:50%;flex:0 0 auto;position:relative}.poll-option.selected .poll-radio{border-color:#171a1f}.poll-option.selected .poll-radio:after{content:"";position:absolute;inset:3px;border-radius:50%;background:#171a1f}.poll-custom{display:grid;gap:8px;margin-top:10px}.poll-custom textarea{width:100%;min-height:88px;border:1px solid #d7dce2;border-radius:10px;padding:12px;outline:0;resize:vertical;font:12px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.poll-custom .primary{justify-self:end;padding:9px 14px}.poll-status{max-width:720px;margin:9px auto 0;text-align:center}.msg{max-width:84%;padding:11px 14px;border-radius:13px;white-space:pre-wrap;font-size:13px;line-height:1.5}.msg.ai{background:#f3f4f5}.msg.user{background:#171a1f;color:#fff;justify-self:end}.form{display:flex;gap:7px;border:1px solid #d7dce2;border-radius:12px;padding:7px}.form textarea{flex:1;min-height:45px;border:0;outline:0;resize:none;padding:9px}.form button{border:0;border-radius:8px;background:#171a1f;color:#fff;padding:0 16px;cursor:pointer}.project-context{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:8px 0 4px;color:#6f7884;font-size:11px}.project-tools{display:flex;gap:6px;overflow:auto;padding:10px 0 6px}.tool-btn{border:1px solid #e1e5e9;background:#fff;border-radius:999px;padding:6px 9px;color:#66707c;font-size:10px;white-space:nowrap;cursor:pointer}.tool-btn:hover,.tool-btn:focus{border-color:#aeb6bf;color:#171a1f}.brain-group{padding:12px 0;border-top:1px solid #edf0f2}.brain-group:first-child{border-top:0;padding-top:0}.brain-row{padding:7px 0;color:#3e4650;font-size:12px;line-height:1.45}.preview-toolbar{display:flex;gap:6px;justify-content:center;margin-bottom:9px}.code-editor{width:100%;min-height:560px;margin-top:10px;border:1px solid #e1e5e9;border-radius:8px;padding:12px;background:#fbfcfd;color:#252a30;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical;box-sizing:border-box}.preview-toolbar .ghost.active{background:#171a1f;color:#fff}.artifact{display:flex;justify-content:center;border:1px solid #e1e5e9;border-radius:10px;background:#f6f7f8;overflow:auto;padding:12px}.artifact iframe{border:0;background:#fff;min-height:620px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:width .2s ease}.preview-desktop iframe{width:100%}.preview-tablet iframe{width:768px;max-width:100%}.preview-mobile iframe{width:390px;max-width:100%}.architecture-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.architecture-node{border:1px solid #e5e8eb;border-radius:10px;padding:12px;background:#fbfcfd}.simulation-score{font-size:24px;letter-spacing:-.03em;margin-bottom:14px}.version-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-top:1px solid #edf0f2}.version-row:first-child{border-top:0}.project-context+.project-tools{margin-top:2px}.project-tools+.sections{margin-top:4px}.context-group{font-size:9px;letter-spacing:.12em;font-weight:800;color:#171a1f}.project-context+.sections{margin-top:10px}.sections{display:flex;overflow:auto;border-bottom:1px solid #e6e9ec;justify-content:center}.tab{border:0;background:transparent;padding:12px 13px;color:#7b8490;font-size:11px;font-weight:700;white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer}.tab.active{color:#171a1f;border-bottom-color:#171a1f}.body{padding-top:24px}.box{border:1px solid #e1e5e9;border-radius:11px;background:#fff;padding:16px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.section-block{padding:11px 12px;margin:10px 0;border:1px solid #edf0f2;border-radius:9px;background:#fbfcfd}.document-output{border:1px solid #e1e5e9;border-radius:10px;background:#fbfcfd;overflow:auto;max-height:650px}.document-text{margin:0;padding:18px;white-space:pre-wrap;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#252a30}.section-block b{font-size:12px}.section-block p{margin:4px 0 0;color:#6f7884;font-size:12px;line-height:1.5}.item{border-top:1px solid #edf0f2;padding:12px 0}.item:first-child{border-top:0}.item b{font-size:12px}.item p{margin:4px 0;color:#6f7884;font-size:12px;line-height:1.5}.files{display:grid;grid-template-columns:220px 1fr;min-height:470px}.file-list{border-right:1px solid #e7eaed;padding-right:10px;overflow:auto}.file-list button{width:100%;border:0;background:transparent;text-align:left;padding:8px;border-radius:6px;font-size:11px;color:#65707c;cursor:pointer}.file-list button.active,.file-list button:hover{background:#f0f2f4;color:#171a1f}.code{margin:0;background:#f7f8f9;border-radius:8px;padding:14px;white-space:pre-wrap;overflow:auto;max-height:560px;font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}.artifact iframe{width:100%;height:620px;border:1px solid #dfe3e7;border-radius:9px;background:#fff}.result-list{display:grid;gap:8px}.result{border:1px solid #e1e5e9;border-radius:9px;padding:11px}.result.pass{border-color:#cde8d5}.result.fail{border-color:#efcaca}.settings{display:grid;grid-template-columns:190px 1fr;gap:25px}.settings-nav{display:grid;align-content:start;gap:2px;border-right:1px solid #e5e8eb;padding-right:12px}.settings-nav button{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:7px;color:#68717d;font-size:11px;cursor:pointer}.settings-nav button.active,.settings-nav button:hover{background:#eef0f3;color:#171a1f}.input,.select{height:35px;border:1px solid #d9dee3;border-radius:7px;padding:0 9px;outline:0;background:#fff;font-size:11px}.input.full{width:100%}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px 0}.row+.row{border-top:1px solid #edf0f2}.status{font-size:10px;font-weight:700}.ok{color:#287a45}.bad{color:#a33a3a}.warn{color:#8f6b11}.placeholder{border:1px dashed #d9dee3;border-radius:8px;padding:12px;color:#8a939d;font-size:11px;line-height:1.5}.modal-bg{position:fixed;inset:0;z-index:2147483600;background:rgba(15,19,24,.34);display:grid;place-items:center;padding:20px}.modal{width:min(540px,100%);background:#fff;border-radius:14px;padding:22px;box-shadow:0 18px 70px rgba(0,0,0,.18)}.modal h2{margin:0 0 7px;font-size:22px;letter-spacing:-.04em}.actions{display:flex;justify-content:flex-end;gap:7px;margin-top:17px}.actions button{height:35px;padding:0 11px;border-radius:7px;border:1px solid #d9dee3;background:#fff;cursor:pointer;font-size:10px}.actions .primary{background:#171a1f;color:#fff;border-color:#171a1f}.understanding{max-width:900px;margin:18px auto 0}.understanding-main{border:1px solid #dfe4e9;border-radius:14px;padding:18px 20px;background:#fff;box-shadow:0 8px 28px rgba(25,34,45,.05)}.understanding-copy{min-width:0}.understanding-eyebrow{font-size:9px;letter-spacing:.16em;font-weight:800;color:#929ba6}.understanding-title{font-size:15px;font-weight:760;letter-spacing:-.01em;margin:5px 0 3px}.understanding-summary{font-size:12px;line-height:1.6;max-width:760px}.understanding-category{display:inline-block;margin-top:10px;font-size:10px;color:#4f5863;background:#f2f5f7;border:1px solid #e2e6ea;border-radius:999px;padding:5px 8px}.understanding-known{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.understanding-known span{font-size:10px;color:#4f5863;background:#f6f8fa;border:1px solid #e3e7eb;border-radius:999px;padding:5px 8px}.understanding-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:9px;font-size:10px;color:#6f7884}.notice{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2147483700;background:#171a1f;color:#fff;padding:10px 14px;border-radius:10px;font-size:12px;max-width:calc(100vw - 28px);box-shadow:0 10px 30px rgba(0,0,0,.14)}.notice.error{background:#8e2d2d}.notice.success{background:#1f6d3c}.approval-card{margin-top:12px;padding:13px;border:1px solid #d8dde2;border-radius:10px;background:#fafbfc}.approval-card .kicker{margin-bottom:5px}.approval-card .brain-group{margin-top:10px}.analytics-banner{position:fixed;left:18px;right:18px;bottom:18px;z-index:2147483690;display:flex;justify-content:space-between;gap:15px;align-items:center;border:1px solid #d7dce2;border-radius:12px;background:#fff;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.1)}@media(max-width:720px){.analytics-banner{align-items:flex-start;flex-direction:column}}@media(max-width:820px){#px-app .side{inset:0 0 auto;width:auto;height:58px;flex-direction:row;align-items:center;padding:7px 10px;overflow:hidden}.logo{padding:0 8px;font-size:19px}.new{height:34px;padding:0 10px;margin-right:7px}.nav{display:flex;flex:1;justify-content:center;margin:0}.nav span,.divider,.label,.assist-btn,.recent{display:none}.acct{margin:0}.main{margin-left:0;padding-top:58px}.top{height:50px;padding:0 12px}.wrap,.interview,.panel,.project{width:calc(100% - 28px);padding:38px 0}.grid{grid-template-columns:1fr}.settings{grid-template-columns:1fr}.settings-nav{display:flex;overflow:auto;border-right:0;border-bottom:1px solid #e5e8eb;padding-bottom:8px}.files{grid-template-columns:1fr}.file-list{border-right:0;border-bottom:1px solid #e7eaed;padding-right:0;padding-bottom:8px}.sections{justify-content:flex-start}.msg{max-width:92%}}
-
-/* Home-only presentation layer. Shared app shell and feature pages remain untouched. */
-#px-app.projectx-home-active{background:#f8f9fb}
-#px-app.projectx-home-active .side{background:#1a1a1d;border-right-color:#2d2d31;color:#f2f2f4}
-#px-app.projectx-home-active .logo{color:#f2f2f4}
-#px-app.projectx-home-active .new{background:#252528;border-color:#35353a;color:#fff}
-#px-app.projectx-home-active .nav button,#px-app.projectx-home-active .recent button{color:#a0a0a6}
-#px-app.projectx-home-active .nav button.active,#px-app.projectx-home-active .nav button:hover,#px-app.projectx-home-active .recent button:hover{background:#29292d;color:#fff}
-#px-app.projectx-home-active .label{color:#77777e}
-#px-app.projectx-home-active .divider{background:#2f2f33}
-#px-app.projectx-home-active .acct{background:#222225;border-color:#343439;color:#dadadd}
-#px-app.projectx-home-active .acct .sub{color:#8f8f96}
-#px-app.projectx-home-active .main{background:#141416}
-#px-app.projectx-home-active .top{display:none}
-.workspace-home{min-height:100%;background:radial-gradient(580px 300px at 50% 78%,rgba(104,58,36,.20),transparent 70%),#141416;color:#ededf0;overflow:auto}
-.workspace-home-inner{width:min(820px,calc(100% - 34px));margin:0 auto;padding:clamp(86px,14vh,138px) 0 70px}
-.workspace-home-kicker{text-align:center;font-size:9px;letter-spacing:.18em;color:#74747c;font-weight:800}
-.workspace-home h1{text-align:center;margin:12px 0 9px;font-size:clamp(37px,5vw,55px);line-height:1.03;letter-spacing:-.06em;color:#efeff1;font-weight:600}
-.workspace-home-sub{max-width:650px;margin:0 auto;text-align:center;color:#8d8d95;font-size:13px;line-height:1.65}
-.workspace-suggested{margin:27px auto 0}.workspace-section-label{color:#77777e;font-size:10px;margin-bottom:8px}
-.workspace-suggestion-row{display:flex;justify-content:center;gap:7px;flex-wrap:wrap}
-.workspace-suggestion-row button{border:1px solid #36363b;background:#202023;color:#c8c8cd;border-radius:999px;padding:8px 11px;font-size:10px;cursor:pointer}
-.workspace-suggestion-row button:hover{background:#29292d;color:#fff}
-.workspace-command{margin-top:21px;border:1px solid #37373c;border-radius:14px;background:#202023;overflow:hidden;box-shadow:0 15px 50px rgba(0,0,0,.20)}
-.workspace-command textarea{display:block;width:100%;height:116px;border:0;outline:0;resize:none;padding:17px;background:transparent;color:#f0f0f2;font-size:13px;line-height:1.55}
-.workspace-command textarea::placeholder{color:#77777e}.workspace-command-footer{display:flex;align-items:center;gap:8px;padding:8px;border-top:1px solid #303034;color:#77777e;font-size:9px}.workspace-command-footer span{flex:1;text-align:center}.workspace-command-footer button{width:31px;height:31px;border:0;border-radius:8px;background:transparent;color:#92929a;font-size:20px;cursor:pointer}.workspace-command-footer button:last-child{background:#f0f0f1;color:#171719;font-size:16px}
-.workspace-quick-actions{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin-top:14px}.workspace-quick-actions button{border:1px solid #323237;background:#1d1d20;color:#9999a0;border-radius:8px;padding:7px 10px;font-size:9px;cursor:pointer}.workspace-quick-actions button:hover{background:#27272b;color:#fff}
-
-#px-app.projectx-public-home{background:#faf8f5;color:#303238}
-.public-home{min-height:100%;background:#faf8f5;color:#303238;overflow:auto}
-.public-header{height:72px;width:min(1120px,calc(100% - 36px));margin:0 auto;display:flex;align-items:center;gap:28px}
-.public-brand{display:flex;align-items:center;gap:8px;border:0;background:none;color:#303238;font-size:20px;font-weight:800;letter-spacing:-.045em;cursor:pointer;padding:0}
-.public-brand-mark{width:24px;height:24px;display:grid;place-items:center;color:#ff5724}.public-brand-mark svg{width:22px;height:22px}
-.public-links{display:flex;gap:28px;margin-left:auto}.public-links a{text-decoration:none;color:#62656a;font-size:11px}.public-links a:hover{color:#22252a}
-.public-actions{display:flex;gap:8px}.public-login,.public-create{height:38px;padding:0 13px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer}.public-login{border:1px solid #dedad4;background:transparent;color:#4e5258}.public-create{border:1px solid #ff5724;background:#ff5724;color:#fff}
-.public-hero{width:min(900px,calc(100% - 30px));margin:0 auto;text-align:center;padding:113px 0 30px}.public-kicker{font-size:9px;letter-spacing:.18em;color:#9b9792;font-weight:800}.public-hero h1{margin:15px 0 11px;font-size:clamp(46px,7vw,74px);line-height:1.01;letter-spacing:-.068em;font-weight:500;color:#3d3e43}.public-hero>p{max-width:690px;margin:0 auto;color:#76797e;font-size:14px;line-height:1.65}
-.public-command{max-width:770px;margin:31px auto 0;border:1px solid #ddd9d4;background:#fff;border-radius:15px;overflow:hidden;box-shadow:0 9px 30px rgba(44,37,30,.05);text-align:left}.public-command textarea{display:block;width:100%;height:108px;border:0;outline:0;resize:none;padding:17px 18px;background:transparent;color:#303238;font-size:13px;line-height:1.55}.public-command textarea::placeholder{color:#999a9e}.public-command-footer{display:flex;align-items:center;gap:8px;border-top:1px solid #eeeae6;padding:8px;color:#999a9e;font-size:9px}.public-command-footer span{flex:1;text-align:center}.public-command-footer button{width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:#7c7f84;font-size:21px;cursor:pointer}.public-command-footer button:last-child{background:#ff5a24;color:#fff;font-size:16px}
-.public-scope{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;margin-top:17px}.public-scope button{width:105px;border:1px solid #e0ddd8;background:rgba(255,255,255,.78);border-radius:11px;padding:10px 8px;color:#55585e;cursor:pointer}.public-scope button:hover{background:#fff;border-color:#cac4bd}.public-scope b{display:block;font-size:10px;font-weight:700}.public-scope small{display:block;margin-top:4px;color:#929397;font-size:8px}
-.public-examples{width:min(860px,calc(100% - 30px));margin:6px auto 56px;text-align:center}.public-section-heading{font-size:10px;color:#8c8d91;margin-bottom:10px}.public-section-heading button{border:0;background:none;color:#686b70;cursor:pointer}.public-example-row{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}.public-example-chip{border:1px solid #ddd9d4;background:#fff;color:#55585e;border-radius:8px;padding:8px 11px;font-size:10px;cursor:pointer}.public-example-chip:hover{border-color:#c7c1ba;color:#25272b}.public-how{width:min(860px,calc(100% - 30px));margin:0 auto 70px;padding:21px 0;border-top:1px solid #e6e2dd;text-align:center}.public-how-line{font-size:9px;letter-spacing:.16em;color:#a09d99}.public-how-line span{margin:0 8px;color:#beb8b2}.public-how p{max-width:630px;margin:9px auto 0;color:#8e8f93;font-size:11px;line-height:1.6}
-@media(max-width:760px){.public-header{width:calc(100% - 20px);height:64px}.public-links{display:none}.public-actions{margin-left:auto}.public-login,.public-create{height:35px}.public-hero{padding-top:78px}.public-hero h1{font-size:clamp(42px,12vw,62px)}.public-command-footer span{display:none}.public-scope button{width:92px}.workspace-home-inner{width:calc(100% - 24px);padding-top:70px}.workspace-home h1{font-size:clamp(35px,10vw,50px)}.workspace-home-sub{font-size:12px}}
-
 `;
 function installCss(){if($('#px-style'))return;const style=document.createElement('style');style.id='px-style';style.textContent=CSS;document.head.appendChild(style);}
 function ensureShell(){installCss();let root=$('#px-app');if(!root){root=document.createElement('div');root.id='px-app';document.body.appendChild(root);}return root;}
 function shell(body, active='home'){const root=ensureShell();const recents=state.projects.slice(0,6);root.innerHTML=`<aside class="side"><div class="logo">ProjectX</div><button class="new" data-nav="home">+ New project</button><nav class="nav"><button data-nav="home" class="${active==='home'?'active':''}">Home</button><button data-nav="projects" class="${active==='projects'?'active':''}">Projects</button><button data-nav="assistant" class="${active==='assistant'?'active':''}">Assistant</button><button data-nav="analytics" class="${active==='analytics'?'active':''}">Analytics</button><button data-nav="settings" class="${active==='settings'?'active':''}">Settings</button></nav><div class="divider"></div><div class="label">Recent</div><div class="recent">${recents.map(p=>`<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('')||'<div class="sub" style="padding:6px 10px">No projects yet</div>'}</div><div class="acct">${session?.user?.email?`Signed in as ${esc(session.user.email)}`:'Guest workspace'}<div class="sub" style="font-size:10px;margin-top:2px">${session?'Cloud sync enabled':'Local sync enabled'}</div></div></aside><main class="main"><div class="top"><button data-nav="home">Home</button>${session?'<button data-action="signout">Sign out</button>':'<button data-action="signin">Sign in</button>'}</div>${body}</main>`;root.onclick=async e=>{const nav=e.target.closest('[data-nav]')?.dataset.nav;if(nav)return navigate(nav);const open=e.target.closest('[data-open]')?.dataset.open;if(open)return openProject(open);const action=e.target.closest('[data-action]')?.dataset.action;if(action==='signin')return authModal();if(action==='signout'){await signOut();home();}};return root;}
-function workspaceHome(){
-  const root=ensureShell();
-  root.classList.remove('projectx-public-home');
-  root.classList.add('projectx-home-active');
-  shell(`<section class="workspace-home">
-    <div class="workspace-home-inner">
-      <div class="workspace-home-kicker">PROJECTX WORKSPACE</div>
-      <h1>What are we working on today?</h1>
-      <p class="workspace-home-sub">Start with an idea, goal, problem, or task. ProjectX understands the work and builds the right path around it.</p>
-      <div class="workspace-suggested">
-        <div class="workspace-section-label">Suggested for you</div>
-        <div class="workspace-suggestion-row">
-          <button data-home-example="Turn my idea into a clear plan">✦ <span>Turn an idea into a plan</span></button>
-          <button data-home-example="Research a problem and organize the evidence">⌕ <span>Research a problem</span></button>
-          <button data-home-example="Plan a business from scratch">◫ <span>Plan a business</span></button>
-        </div>
-      </div>
-      <div class="workspace-command">
-        <textarea id="start-input" placeholder="Start chatting or describe what you want to accomplish…"></textarea>
-        <div class="workspace-command-footer">
-          <button id="home-focus" type="button" aria-label="Focus command box">+</button>
-          <span>ProjectX can plan, research, build, create, test, and coordinate work.</span>
-          <button id="start-send" type="button" aria-label="Start project">↑</button>
-        </div>
-      </div>
-      <div class="workspace-quick-actions">
-        <button data-home-example="Build a website or web app for me">Build</button>
-        <button data-home-example="Research this topic and organize the evidence">Research</button>
-        <button data-home-example="Create a step-by-step plan for this goal">Plan</button>
-        <button data-home-example="Create a presentation, document, or other deliverable">Create</button>
-        <button data-home-example="Help me solve a real-world problem">Solve</button>
-        <button data-home-example="Make a game prototype">Game</button>
-        <button data-home-example="Plan and launch a small business">Business</button>
-      </div>
-    </div>
-  </section>`,'home');
-  root.classList.add('projectx-home-active');
-  const input=$('#start-input');
-  const send=async()=>{const value=input.value.trim();if(!value){input.focus();return;}await beginCreation(value);};
-  $('#start-send').onclick=send;
-  $('#home-focus').onclick=()=>input.focus();
-  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send();}};
-  $$('#px-app.projectx-home-active [data-home-example]').forEach(button=>button.onclick=()=>{input.value=button.dataset.homeExample||'';input.focus();});
-}
-
+function workspaceHome(){shell(`<div class="wrap"><div class="center"><div class="kicker">PROJECT X</div><h1 class="hero-title">What do you want to accomplish?</h1><p class="sub" style="max-width:680px;margin:0 auto">Describe the outcome in plain language. ProjectX will clarify what is missing, shape the right workspace, and help you move from idea to something usable.</p><div class="chips" aria-label="How ProjectX works"><span class="chip" style="cursor:default">1 · Describe the outcome</span><span class="chip" style="cursor:default">2 · Refine the important details</span><span class="chip" style="cursor:default">3 · Build and verify</span></div><div class="composer"><textarea id="start-input" placeholder="Example: Build a landing page for my sneaker-cleaning business…"></textarea><div class="composer-foot"><span class="sub">${session?'Signed in · AI connection available':localGuestKey()?'Free Gemini key ready':'AI connection needed to begin'}</span><button class="send" id="start-send" aria-label="Start project">→</button></div></div><div class="sub" style="margin-top:12px">You do not need to know the project type or structure first. Start with the result you want.</div></div></div>`,'home');const input=$('#start-input');$('#start-send').onclick=()=>beginCreation(input.value);input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#start-send').click();}};}
 function publicHome(){
   const root=ensureShell();
-  root.classList.remove('projectx-home-active');
-  root.classList.add('projectx-public-home');
-  root.innerHTML=`<div class="public-home">
-    <header class="public-header">
-      <button class="public-brand" id="public-brand" type="button" aria-label="ProjectX home">
-        <span class="public-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg></span>
-        <span>ProjectX</span>
-      </button>
-      <nav class="public-links">
-        <a href="#public-how">How it works</a>
-        <a href="#public-examples">Examples</a>
-        <a href="#public-scope">What it can do</a>
-      </nav>
-      <div class="public-actions">
-        <button id="public-signin" class="public-login">Sign in</button>
-        <button id="public-signup" class="public-create">Create account</button>
-      </div>
-    </header>
-
-    <main>
-      <section class="public-hero" id="public-build">
-        <div class="public-kicker">ONE WORKSPACE · MANY KINDS OF WORK</div>
-        <h1>What are you trying to make real?</h1>
-        <p>Start with the outcome. ProjectX can understand the work, research what matters, create a plan, build what is needed, and help you move it forward.</p>
-
-        <div class="public-command">
-          <textarea id="public-input" placeholder="Tell ProjectX what you want to accomplish…"></textarea>
-          <div class="public-command-footer">
-            <button id="public-focus" type="button" aria-label="Focus prompt">+</button>
-            <span>Start with the outcome — not the structure.</span>
-            <button id="public-send" type="button" aria-label="Start with ProjectX">↑</button>
-          </div>
-        </div>
-
-        <div class="public-scope" id="public-scope">
-          <button data-public-example="Build a website or web app for my project"><b>Build</b><small>Web · apps · games</small></button>
-          <button data-public-example="Research this problem and organize the evidence"><b>Research</b><small>Evidence · insight</small></button>
-          <button data-public-example="Create a business plan and execution roadmap"><b>Business</b><small>Plan · execute</small></button>
-          <button data-public-example="Create a presentation or document for my project"><b>Create</b><small>Outputs · deliverables</small></button>
-          <button data-public-example="Turn this goal into a step-by-step plan"><b>Plan</b><small>Tasks · checklists</small></button>
-          <button data-public-example="Help me solve this real-world problem"><b>Solve</b><small>Beyond software</small></button>
-        </div>
-      </section>
-
-      <section class="public-examples" id="public-examples">
-        <div class="public-section-heading">Try an example <button id="public-example-refresh" type="button" aria-label="Refresh examples">↻</button></div>
-        <div class="public-example-row">
-          <button class="public-example-chip" data-public-example="Build a sales pipeline tracker for a small business">Sales pipeline tracker</button>
-          <button class="public-example-chip" data-public-example="Create a study system around my subjects and deadlines">Study system</button>
-          <button class="public-example-chip" data-public-example="Plan a product launch from idea to execution">Product launch plan</button>
-          <button class="public-example-chip" data-public-example="Create a game concept and build plan">Game concept</button>
-        </div>
-      </section>
-
-      <section class="public-how" id="public-how">
-        <div class="public-how-line">UNDERSTAND <span>→</span> PLAN <span>→</span> BUILD <span>→</span> VERIFY</div>
-        <p>ProjectX adapts to the kind of work — software, research, business, creative projects, games, or real-world goals.</p>
-      </section>
-    </main>
-  </div>`;
-
-  $('#public-brand').onclick=()=>{location.hash='';window.scrollTo({top:0,behavior:'smooth'});};
+  root.innerHTML=`<div style="min-height:100vh;display:grid;place-items:center;background:#fff;color:#171a1f;padding:32px"><div style="width:min(760px,100%);text-align:center"><div style="font-size:22px;font-weight:800;letter-spacing:-.04em">ProjectX</div><h1 style="margin:32px 0 12px;font-size:clamp(40px,7vw,72px);line-height:1;letter-spacing:-.06em">Turn an idea into something real.</h1><p style="max-width:620px;margin:0 auto;color:#707987;font-size:15px;line-height:1.6">Describe what you want to accomplish, and ProjectX will help you understand it, plan it, build it, and move it forward.</p><div style="display:flex;justify-content:center;gap:9px;margin-top:24px;flex-wrap:wrap"><button class="primary" id="public-signin" style="height:42px;padding:0 17px">Sign in</button><button class="ghost" id="public-signup" style="height:42px;padding:0 17px">Create account</button></div></div></div>`;
   $('#public-signin').onclick=()=>authModal();
-  $('#public-signup').onclick=()=>authModal();
-  $('#public-focus').onclick=()=>$('#public-input').focus();
-
-  const input=$('#public-input');
-  const send=async()=>{const value=input.value.trim();if(!value){input.focus();return;}if(!session&&!localGuestKey()){authModal();return;}await beginCreation(value);};
-  $('#public-send').onclick=send;
-  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send();}};
-  $$('.public-home [data-public-example]').forEach(button=>button.onclick=()=>{input.value=button.dataset.publicExample||'';input.focus();});
-
-  $('#public-example-refresh').onclick=()=>{
-    const examples=[
-      ['Inventory planner','Build an inventory planner for a small business'],
-      ['Research brief','Research a topic and create an evidence-backed brief'],
-      ['Event plan','Plan a student event from idea to execution'],
-      ['Game concept','Create a small game with a clear gameplay loop']
-    ];
-    $$('.public-example-chip').forEach((button,i)=>{button.textContent=examples[i][0];button.dataset.publicExample=examples[i][1];});
-  };
+  $('#public-signup').onclick=()=>authModal('signup');
 }
 
 function home(){
-  if(session){workspaceHome();return;}
+  if(session)return workspaceHome();
   publicHome();
 }
-
 async function beginCreation(text){const intent=String(text||'').trim();if(!intent)return;if(!session&&!localGuestKey())return aiRequiredModal('ProjectX needs an AI connection. You can use a free-tier Gemini key in this browser, or sign in and use a server-side provider connection.');const history=[{role:'user',text:intent}],meta={answers:[],brain:null};renderInterview(history,meta);await continueInterview(history,meta.answers,meta);}
 function renderInterview(history,meta){
   shell(`<div class="interview poll-interview">
