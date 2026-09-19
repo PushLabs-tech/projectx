@@ -25,6 +25,14 @@ const BRAIN_MUTATION_PATHS = new Map([
   ['identity.type','identity'],
   ['context.intent','context'],
   ['context.resources','context'],
+  ['context.discoveryAnswers','context'],
+  ['classification.work_shape','classification'],
+  ['classification.domains','classification'],
+  ['classification.outputs','classification'],
+  ['classification.execution_mode','classification'],
+  ['classification.risk_level','classification'],
+  ['classification.confidence','classification'],
+  ['classification.provenance','classification'],
   ['classification.group','classification'],
   ['classification.label','classification'],
   ['classification.reason','classification'],
@@ -39,7 +47,8 @@ const BRAIN_MUTATION_PATHS = new Map([
   ['requirements.successCriteria','requirements'],
   ['workspace.sections','workspace'],
   ['execution.state','execution'],
-  ['execution.status','execution']
+  ['execution.status','execution'],
+  ['plan','plan']
 ]);
 const arr = value => Array.isArray(value) ? value.map(v=>String(v ?? '').trim()).filter(Boolean) : [];
 const clone = value => JSON.parse(JSON.stringify(value ?? null));
@@ -358,9 +367,17 @@ export function applyBrainMutation(project, mutation = {}, actor = {}) {
     if (path === 'identity.type') { projectType = normalizeProjectType(op.value); continue; }
     if (path === 'context.intent') { patch.goal = String(op.value || '').trim().slice(0,5000); continue; }
     if (path === 'context.resources') { patch.resources = kind === 'remove' ? {remove:Array.isArray(op.value)?op.value:[op.value]} : (kind === 'add' ? {add:Array.isArray(op.value)?op.value:[op.value]} : {replace:Array.isArray(op.value)?op.value:[]}); continue; }
+    if (path === 'context.discoveryAnswers') {
+      const existing = Array.isArray(project?.understanding?.discoveryAnswers) ? project.understanding.discoveryAnswers : [];
+      understandingPatch.discoveryAnswers = kind === 'remove' ? [] : kind === 'add' ? [...new Set([...existing,...(Array.isArray(op.value)?op.value:[op.value]).map(v=>String(v||'').trim()).filter(Boolean)])].slice(-100) : (Array.isArray(op.value)?op.value.map(v=>String(v||'').trim()).filter(Boolean):[String(op.value||'').trim()].filter(Boolean));
+      continue;
+    }
     if (path.startsWith('classification.')) {
       const key = path.split('.').slice(1).join('.');
-      understandingPatch.classification = {...(understandingPatch.classification || {}),[key]:String(op.value || '').slice(0,400)};
+      const value = clone(op.value);
+      understandingPatch.classification = {...(understandingPatch.classification || {})};
+      if (kind === 'remove') delete understandingPatch.classification[key];
+      else understandingPatch.classification[key] = Array.isArray(value) ? value.slice(0,20) : (value && typeof value === 'object' ? value : String(value ?? '').slice(0,400));
       continue;
     }
     if (path in BRAIN_ARRAY_FIELD) {
@@ -368,6 +385,11 @@ export function applyBrainMutation(project, mutation = {}, actor = {}) {
       if (kind === 'replace') patch[field] = {replace:Array.isArray(op.value) ? op.value : [op.value]};
       if (kind === 'add') patch[field] = {...(patch[field] || {}),add:[...((patch[field] || {}).add || []),...(Array.isArray(op.value) ? op.value : [op.value])]};
       if (kind === 'remove') patch[field] = {...(patch[field] || {}),remove:[...((patch[field] || {}).remove || []),...(Array.isArray(op.value) ? op.value : [op.value])]};
+      continue;
+    }
+    if (path === 'plan') {
+      if (kind === 'remove') patch.plan = [];
+      else patch.plan = Array.isArray(op.value) ? op.value.slice(0,80) : [];
       continue;
     }
     if (path === 'workspace.sections') { workspaceSections = Array.isArray(op.value) ? op.value : []; continue; }
