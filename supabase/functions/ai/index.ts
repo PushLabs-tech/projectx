@@ -3,13 +3,14 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { decryptSecret, encryptSecret } from "../_shared/crypto.ts";
 import { chat as providerChat, listModels as providerListModels, detectProvider, type Credential, type ProviderId } from "../_shared/providers.ts";
 import { deterministicCandidates } from "../_shared/router.ts";
+import { applyBrainMutationToProject, snapshotForPersistence, validateBrainMutation } from "../_shared/brain.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
-const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject"]);
+const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary"]);
 const MAX_BODY_BYTES = 180000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
@@ -225,11 +226,10 @@ async function authorizeProject(user: any, projectId: string) {
   const { data: existing, error } = await admin.from("projects").select("id,owner_id,workspace_id,spec_version,updated_at").eq("id", projectId).maybeSingle();
   if (error) throw error;
   if (!existing) throw new Error("Project not found");
-  if (existing.owner_id !== user.id) {
-    const { data: member } = await admin.from("workspace_members").select("role").eq("workspace_id", existing.workspace_id).eq("user_id", user.id).maybeSingle();
-    if (!member || !["owner", "admin", "editor"].includes(member.role)) throw new Error("Not authorized");
-  }
-  return existing;
+  if (existing.owner_id === user.id) return {...existing, role:"owner"};
+  const { data: member } = await admin.from("workspace_members").select("role").eq("workspace_id", existing.workspace_id).eq("user_id", user.id).maybeSingle();
+  if (!member || !["owner", "admin", "editor", "viewer"].includes(member.role)) throw new Error("Not authorized");
+  return {...existing, role:String(member.role)};
 }
 
 async function persistProject(user: any, p: any) {
@@ -283,6 +283,18 @@ async function persistProject(user: any, p: any) {
   };
   const { data: saved, error } = await admin.from("projects").upsert(row).select("id,workspace_id,updated_at").single();
   if (error) throw error;
+  const incomingVersion = Number(p?.specVersion || 1);
+  const { data: latestVersion, error: latestVersionError } = await admin.from("project_versions").select("version_number").eq("project_id", saved.id).order("version_number",{ascending:false}).limit(1).maybeSingle();
+  if (latestVersionError) throw latestVersionError;
+  if (!latestVersion || Number(latestVersion.version_number) < incomingVersion) {
+    const { error: versionError } = await admin.from("project_versions").insert({
+      project_id:saved.id,version_number:incomingVersion,label:projectId ? "Project state update" : "Initial Brain",
+      snapshot:cleanProjectSnapshot({...p,id:saved.id,specVersion:incomingVersion}),created_by:user.id,
+      parent_version:latestVersion ? Number(latestVersion.version_number) : null,
+      mutation_id:null,actor:{user_id:user.id,role:"owner"},change_summary:projectId ? "Compatibility persistence" : "Initial Project Brain"
+    });
+    if(versionError && !/duplicate key/i.test(String(versionError.message||""))) throw versionError;
+  }
 
   const researchFindings = Array.isArray(p?.research?.findings) ? p.research.findings.slice(-100) : [];
   const { error: rd } = await admin.from("research_findings").delete().eq("project_id", saved.id);
@@ -360,7 +372,7 @@ async function getProject(user: any, projectId: string) {
   const [{ data: files, error: fe }, { data: messages, error: me }, { data: versions, error: ve }, { data: findings, error: re }] = await Promise.all([
     admin.from("project_files").select("path,content,mime_type,size_bytes,updated_at").eq("project_id", projectId).order("path"),
     admin.from("project_messages").select("role,content,created_at").eq("project_id", projectId).order("created_at").limit(100),
-    admin.from("project_versions").select("version_number,label,snapshot,created_at").eq("project_id", projectId).order("version_number"),
+    admin.from("project_versions").select("version_number,label,snapshot,created_at,parent_version,mutation_id,actor,change_summary").eq("project_id", projectId).order("version_number"),
     admin.from("research_findings").select("query,finding,source_title,source_url,source_date,confidence,provider,created_at").eq("project_id", projectId).order("created_at").limit(100)
   ]);
   if (fe) throw fe; if (me) throw me; if (ve) throw ve; if (re) throw re;
@@ -378,7 +390,7 @@ async function getProject(user: any, projectId: string) {
       findings: (findings || []).map((f: any) => ({ query: f.query, finding: f.finding, sourceTitle: f.source_title, sourceUrl: f.source_url, sourceDate: f.source_date, confidence: f.confidence, provider: f.provider, createdAt: f.created_at }))
     }, agents: settings.agents || {}, executionState: settings.executionState || {},
     outputs: settings.outputs || {}, sectionContent: settings.sectionContent || {},
-    versions: (versions || []).map((v: any) => ({ version: v.version_number, label: v.label, ...v.snapshot })), updatedAt: p.updated_at,
+    versions: (versions || []).map((v: any) => ({ version: v.version_number, label: v.label, parentVersion: v.parent_version, mutationId: v.mutation_id, actor: v.actor, changeSummary: v.change_summary, ...v.snapshot })), updatedAt: p.updated_at,
     sync: { remoteId: p.id, mode: "cloud", lastSyncedAt: p.updated_at }
   };
 }
@@ -514,6 +526,220 @@ async function listProjects(user: any) {
   })) };
 }
 
+function cleanProjectSnapshot(project:any) {
+  const next = snapshotForPersistence(project || {});
+  const safeFiles:any = {};
+  for (const [path, content] of Object.entries(next.files || {})) {
+    const p = String(path);
+    if (!p || p.startsWith("/") || p.includes("..") || p.includes("\\") || p.length > 180) continue;
+    if (typeof content !== "string" || content.length > 600000) continue;
+    safeFiles[p] = content;
+  }
+  next.files = safeFiles;
+  return next;
+}
+
+async function commitBrainChange(user:any, project:any, mutation:any, actor:any) {
+  const authz = await authorizeProject(user, String(project.id || ""));
+  const current = await getProject(user, String(project.id || ""));
+  const currentVersion = Number(current.specVersion || authz.spec_version || 1);
+  const baseVersion = Number(mutation?.baseVersion);
+  const mutationId = String(mutation?.id || crypto.randomUUID());
+  const clientRequestId = String(mutation?.clientRequestId || "");
+  const provenance = mutation?.provenance && typeof mutation.provenance === "object" ? mutation.provenance : {source:actor?.source || "agent",sourceId:mutationId,confidence:0.7,userConfirmed:false};
+  const actorCtx = {...actor, role:authz.role, user_id:user.id};
+
+  if (baseVersion !== currentVersion) {
+    const stale = await admin.rpc("commit_project_brain_mutation", {
+      p_project_id: current.id,
+      p_base_version: Number.isFinite(baseVersion) ? baseVersion : 0,
+      p_mutation_id: mutationId,
+      p_client_request_id: clientRequestId || null,
+      p_actor: actorCtx,
+      p_snapshot: cleanProjectSnapshot(current),
+      p_operations: Array.isArray(mutation?.operations) ? mutation.operations : [],
+      p_change_summary: String(mutation?.changeSummary || "Stale Brain mutation").slice(0,500)
+    });
+    if (stale.error) throw stale.error;
+    return {ok:true,...(stale.data || {}),project:current};
+  }
+
+  const applied = applyBrainMutationToProject(current, {...mutation,baseVersion}, actorCtx);
+  if (!applied.applied) return {ok:false,...applied};
+
+  const snapshot = cleanProjectSnapshot(applied.project);
+  const committed = await admin.rpc("commit_project_brain_mutation", {
+    p_project_id: current.id,
+    p_base_version: currentVersion,
+    p_mutation_id: mutationId,
+    p_client_request_id: clientRequestId || null,
+    p_actor: actorCtx,
+    p_snapshot: snapshot,
+    p_operations: mutation.operations,
+    p_change_summary: String(mutation.changeSummary || "Brain mutation").slice(0,500)
+  });
+  if (committed.error) throw committed.error;
+  const result = committed.data || {};
+  if (result.status === "accepted") {
+    const fresh = await getProject(user, current.id);
+    return {ok:true,status:"accepted",mutationId,newVersion:result.newVersion,project:fresh};
+  }
+  return {ok:true,...result,project:current};
+}
+
+async function createProjectFromIntent(user:any, body:any) {
+  const intent = body?.intent || body?.project || {};
+  const goal = String(intent.goal || intent.intent || intent.intention || "").trim().slice(0,10000);
+  if (goal.length < 3) throw new Error("Project intent is required.");
+  const project = {
+    id: null,
+    title: String(intent.title || "New Project").trim().slice(0,200),
+    type: String(intent.type || "Other").trim().slice(0,100),
+    intention: goal,
+    intent: goal,
+    spec: intent.spec && typeof intent.spec === "object" ? intent.spec : {
+      goal,
+      users: Array.isArray(intent.users) ? intent.users : [],
+      requirements: Array.isArray(intent.requirements) ? intent.requirements : [],
+      constraints: Array.isArray(intent.constraints) ? intent.constraints : [],
+      deliverables: Array.isArray(intent.deliverables) ? intent.deliverables : [],
+      acceptanceCriteria: Array.isArray(intent.acceptanceCriteria) ? intent.acceptanceCriteria : [],
+      successCriteria: Array.isArray(intent.successCriteria) ? intent.successCriteria : [],
+      openQuestions: Array.isArray(intent.openQuestions) ? intent.openQuestions : [],
+      platform: String(intent.platform || "")
+    },
+    understanding: intent.understanding && typeof intent.understanding === "object" ? intent.understanding : {},
+    workspace: intent.workspace && typeof intent.workspace === "object" ? intent.workspace : {sections:[]},
+    plan: Array.isArray(intent.plan) ? intent.plan : [],
+    selectedSection: String(intent.selectedSection || "chat"),
+    status: String(intent.status || "discovery").slice(0,60),
+    files: intent.files && typeof intent.files === "object" ? intent.files : {},
+    artifacts: intent.artifacts && typeof intent.artifacts === "object" ? intent.artifacts : {},
+    tests: intent.tests || {status:"not_checked"},
+    research: intent.research || {status:"ready",queries:[],sources:[],findings:[]},
+    agents: Array.isArray(intent.agents) ? intent.agents : [],
+    resources: Array.isArray(intent.resources) ? intent.resources : [],
+    executionState: intent.executionState || {},
+    outputs: intent.outputs || {},
+    sectionContent: intent.sectionContent || {},
+    conversation: []
+  };
+  const saved = await persistProject(user, project);
+  const created = await getProject(user, String(saved.projectId || saved.id));
+  const version = Number(created.specVersion || 1);
+  const existing = await admin.from("project_versions").select("id").eq("project_id", created.id).eq("version_number", version).maybeSingle();
+  if (existing.error) throw existing.error;
+  if (!existing.data) {
+    const {error: ve}=await admin.from("project_versions").insert({
+      project_id:created.id, version_number:version, label:"Initial Brain", snapshot:cleanProjectSnapshot(created),
+      created_by:user.id, parent_version:null, mutation_id:null, actor:{user_id:user.id,role:"owner"},
+      change_summary:"Initial Project Brain"
+    });
+    if(ve) throw ve;
+  }
+  return {ok:true,project:created,projectId:created.id,version};
+}
+
+async function generateDiscoveryPoll(user:any, body:any) {
+  const project = body?.projectId ? await getProject(user,String(body.projectId)) : (body?.project || {});
+  const result = await chat(user,{mode:"understand",agent:"interviewer",project,message:String(body.message || ""),history:Array.isArray(body.history)?body.history:[],model:String(body.model || "auto")});
+  return {ok:true,result:result.result || parseDiscoveryJson(result.text || ""),projectVersion:Number(project?.specVersion || 1)};
+}
+
+async function applyBrainMutation(user:any, body:any) {
+  const projectId=String(body?.projectId || "");
+  if(!projectId) throw new Error("Project ID is required.");
+  const mutation={...(body?.mutation || {}),baseVersion:Number(body?.baseVersion ?? body?.mutation?.baseVersion)};
+  const authz=await authorizeProject(user,projectId);
+  const validation=validateBrainMutation(mutation,{role:authz.role});
+  if(!validation.ok) {
+    if(validation.reason==="forbidden") throw new Error("Not authorized");
+    throw new Error("Invalid Brain mutation: "+String(validation.reason));
+  }
+  const current=await getProject(user,projectId);
+  mutation.id=String(mutation.id || crypto.randomUUID());
+  mutation.clientRequestId=String(body?.clientRequestId || mutation.clientRequestId || "");
+  return await commitBrainChange(user,current,mutation,{source:"agent"});
+}
+
+async function createPlan(user:any, body:any) {
+  const projectId=String(body?.projectId || "");
+  if(!projectId) throw new Error("Project ID is required.");
+  const current=await getProject(user,projectId);
+  await authorizeProject(user,projectId);
+  const prompt=String(body?.message || "Create a practical first execution plan from the canonical Project Brain. Return JSON with plan: [{title,status,steps,dependencies,acceptanceCriteria}] only.").slice(0,8000);
+  const result=await chat(user,{mode:"plan",agent:"planner",project:current,message:prompt,history:[],model:String(body?.model || "auto")});
+  const parsed=result.result && typeof result.result==="object" ? result.result : parseDiscoveryJson(result.text || "");
+  const plan=Array.isArray(parsed?.plan)?parsed.plan:(Array.isArray(parsed)?parsed:null);
+  if(!plan?.length) throw new Error("The planner returned no usable plan.");
+  const mutation={
+    id:crypto.randomUUID(),baseVersion:Number(current.specVersion || 1),
+    provenance:{source:"agent",sourceId:"planner",confidence:0.9,userConfirmed:false},
+    operations:[{op:"replace",path:"plan",value:plan}],
+    changeSummary:"Create execution plan"
+  };
+  return await commitBrainChange(user,current,mutation,{source:"agent"});
+}
+
+async function createArtifactVersion(user:any, body:any) {
+  const projectId=String(body?.projectId || "");
+  if(!projectId) throw new Error("Project ID is required.");
+  const current=await getProject(user,projectId);
+  const authz=await authorizeProject(user,projectId);
+  if(!["owner","admin","editor"].includes(authz.role)) throw new Error("Not authorized");
+  const baseVersion=Number(body?.baseVersion ?? current.specVersion ?? 1);
+  if(baseVersion !== Number(current.specVersion || 1)) {
+    return await commitBrainChange(user,current,{id:String(body?.mutationId || crypto.randomUUID()),clientRequestId:String(body?.clientRequestId || ""),baseVersion,operations:[{op:"replace",path:"plan",value:current.plan || []}],changeSummary:"Stale artifact version"}, {source:"builder"});
+  }
+  const candidate=body?.project && typeof body.project==="object" ? body.project : current;
+  if(String(candidate.id || projectId)!==projectId) throw new Error("Project mismatch");
+  candidate.id=projectId;
+  candidate.specVersion=baseVersion;
+  candidate.artifacts={...(candidate.artifacts||{}),output:body?.artifact || candidate.artifacts?.output || {}};
+  candidate.files=body?.files && typeof body.files==="object" ? body.files : candidate.files;
+  const snapshot=cleanProjectSnapshot(candidate);
+  const committed=await admin.rpc("commit_project_brain_mutation",{
+    p_project_id:projectId,p_base_version:baseVersion,p_mutation_id:String(body?.mutationId || crypto.randomUUID()),
+    p_client_request_id:String(body?.clientRequestId || "") || null,p_actor:{user_id:user.id,role:authz.role,source:"builder"},
+    p_snapshot:snapshot,p_operations:[{op:"replace",path:"execution.artifacts.output",value:body?.artifact || {}}],
+    p_change_summary:String(body?.changeSummary || "Artifact version").slice(0,500)
+  });
+  if(committed.error) throw committed.error;
+  if(committed.data?.status!=="accepted") return {ok:true,...(committed.data||{}),project:current};
+  return {ok:true,...committed.data,project:await getProject(user,projectId)};
+}
+
+async function runVerification(user:any, body:any) {
+  const projectId=String(body?.projectId || "");
+  if(!projectId) throw new Error("Project ID is required.");
+  const current=await getProject(user,projectId);
+  const authz=await authorizeProject(user,projectId);
+  const checks=Array.isArray(body?.checks)?body.checks.slice(0,100):[];
+  const results=checks.map((c:any)=>({
+    subject_type:String(c?.subjectType || "artifact").slice(0,60),
+    subject_id:String(c?.subjectId || body?.artifactVersion || "output").slice(0,120),
+    check_type:String(c?.checkType || c?.name || "verification").slice(0,120),
+    status:["pass","fail","warning","blocked","skipped","human_review"].includes(String(c?.status))?String(c.status):"warning",
+    severity:String(c?.severity || "info").slice(0,30),
+    evidence:c?.evidence && typeof c.evidence==="object"?c.evidence:{detail:String(c?.evidence || c?.detail || "").slice(0,1000)},
+    requirement_refs:Array.isArray(c?.requirementRefs)?c.requirementRefs.slice(0,30):[],
+    verifier:String(c?.verifier || "projectx").slice(0,80),
+    project_id:projectId,brain_version:Number(current.specVersion || 1)
+  }));
+  if(results.length){
+    const {error}=await admin.from("verification_results").insert(results);
+    if(error) throw error;
+  }
+  return {ok:true,status:results.some((r:any)=>r.status==="fail")?"fail":results.some((r:any)=>r.status==="blocked")?"blocked":results.some((r:any)=>r.status==="human_review")?"human_review":results.length&&results.every((r:any)=>r.status==="pass")?"pass":"warning",results};
+}
+
+async function getUsageSummary(user:any, body:any) {
+  const u=await usage(user);
+  const since=new Date(Date.now()-30*24*60*60*1000).toISOString();
+  const {data:credits}=await admin.from("credit_transactions").select("amount,kind,created_at").eq("user_id",user.id).gte("created_at",since).order("created_at",{ascending:false}).limit(200);
+  return {ok:true,usage:u,credits:credits||[],projectId:body?.projectId || null};
+}
+
 async function authoritativeProjectForChat(user: any, supplied: any) {
   const id = String(supplied?.id || "");
   if (!id) return supplied || {};
@@ -582,6 +808,13 @@ Deno.serve(async req => {
     const body = JSON.parse(raw || "{}"); const action = String(body.action || "");
     if (!ACTIONS.has(action)) throw new Error("Unsupported action");
 
+    if (action === "createProjectFromIntent") return json(await createProjectFromIntent(user, body));
+    if (action === "applyBrainMutation") return json(await applyBrainMutation(user, body));
+    if (action === "generateDiscoveryPoll") return json(await generateDiscoveryPoll(user, body));
+    if (action === "createPlan") return json(await createPlan(user, body));
+    if (action === "createArtifactVersion") return json(await createArtifactVersion(user, body));
+    if (action === "runVerification") return json(await runVerification(user, body));
+    if (action === "getUsageSummary") return json(await getUsageSummary(user, body));
     if (action === "persistProject") return json(await persistProject(user, body.project || {}));
     if (action === "listProjects") return json(await listProjects(user));
     if (action === "getProject") return json({ ok: true, project: await getProject(user, String(body.projectId || "")) });
