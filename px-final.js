@@ -526,7 +526,7 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
       workspace:workspaceCandidate,
       understanding:{
         ...(discoveryUnderstanding||{}),
-        confidence:Number(data?.confidence??classification?.confidence||0),
+        confidence:Number(data?.confidence??classification?.confidence??0),
         missing:Array.isArray(data?.missing)?data.missing:[],
         ambiguities:Array.isArray(data?.ambiguities)?data.ambiguities:[],
         group,category,summary,
