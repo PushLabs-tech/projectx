@@ -125,6 +125,42 @@ async function edge(action, payload = {}) {
   return data;
 }
 
+function discoveryBrainOperations(project,data,answers,workspace){
+  const ops=[];
+  const add=(path,value)=>{if(value!==undefined&&value!==null)ops.push({op:'replace',path,value});};
+  add('identity.title',project.title||data?.project?.title||'');
+  add('identity.type',project.type||data?.project?.type||'Other');
+  add('context.intent',project.goal||'');
+  add('context.discoveryAnswers',Array.isArray(answers)?answers:[]);
+  for(const field of ['requirements','constraints','decisions','dependencies','deliverables','acceptanceCriteria','successCriteria','openQuestions']){
+    if(Array.isArray(project[field]))add('requirements.'+field,project[field].slice(0,100));
+  }
+  if(Array.isArray(project.resources))add('context.resources',project.resources.slice(-50));
+  if(Array.isArray(workspace)&&workspace.length)add('workspace.sections',workspace.slice(0,12));
+  const c=data?.classification&&typeof data.classification==='object'?data.classification:{};
+  for(const key of ['work_shape','domains','outputs','execution_mode','risk_level','confidence','provenance','group','label','reason']){
+    if(c[key]!==undefined)add('classification.'+key,c[key]);
+  }
+  return ops;
+}
+
+async function commitDiscoveryBrain(meta,project,data,answers,workspace){
+  if(!session?.access_token||!meta?.remoteId)return null;
+  const baseVersion=Number(meta.remoteVersion||1);
+  const mutation={
+    id:'discovery-'+baseVersion+'-'+Date.now(),
+    baseVersion,
+    provenance:{source:'agent',sourceId:'discovery',confidence:Math.max(0,Math.min(1,Number(data?.confidence??data?.classification?.confidence??0.7)||0.7)),userConfirmed:false},
+    operations:discoveryBrainOperations(project,data,answers,workspace),
+    changeSummary:'Update Project Brain from discovery'
+  };
+  const result=await edge('applyBrainMutation',{projectId:meta.remoteId,baseVersion,mutation,clientRequestId:mutation.id});
+  if(result.status==='stale')throw new Error('The discovery draft changed on the server. Please reopen the project to continue.');
+  if(result.project){const remote=migrateProject(result.project);meta.remoteVersion=Number(remote.specVersion||result.newVersion||baseVersion);meta.brain={...(meta.brain||{}),project:remote};}
+  else if(result.newVersion)meta.remoteVersion=Number(result.newVersion);
+  return result;
+}
+
 async function directGemini(messages, system, jsonMode = false, maxOutputTokens = 3000) {
   const key = localGuestKey();
   if (!key) throw Object.assign(new Error('Connect an AI provider in Settings before continuing.'), { code: 'NO_KEY' });
@@ -304,7 +340,31 @@ function home(){
   if(session)return workspaceHome();
   publicHome();
 }
-async function beginCreation(text){const intent=String(text||'').trim();if(!intent)return;if(!session&&!localGuestKey())return aiRequiredModal('ProjectX needs an AI connection. You can use a free-tier Gemini key in this browser, or sign in and use a server-side provider connection.');const history=[{role:'user',text:intent}],meta={answers:[],brain:null};renderInterview(history,meta);await continueInterview(history,meta.answers,meta);}
+async function beginCreation(text){
+  const intent=String(text||'').trim();
+  if(!intent)return;
+  if(!session&&!localGuestKey())return aiRequiredModal('ProjectX needs an AI connection. You can use a free-tier Gemini key in this browser, or sign in and use a server-side provider connection.');
+  const history=[{role:'user',text:intent}];
+  const meta={answers:[],brain:null,initialIntent:intent};
+  try{
+    if(session?.access_token){
+      const draft=await edge('createProjectFromIntent',{intent:{
+        title:intent.length>72?intent.slice(0,72).trim()+'…':intent,
+        type:'Other',
+        goal:intent,
+        status:'discovery'
+      }});
+      if(!draft?.projectId)throw new Error('ProjectX could not create the discovery workspace.');
+      meta.remoteId=draft.projectId;
+      meta.remoteVersion=Number(draft.version||draft.project?.specVersion||1);
+      meta.brain={project:draft.project||{},workspace:draft.project?.sections||[],understanding:draft.project?.understanding||{}};
+    }
+    renderInterview(history,meta);
+    await continueInterview(history,meta.answers,meta);
+  }catch(error){
+    $('#interview-status')&&($('#interview-status').textContent='Could not start discovery: '+String(error.message||error));
+  }
+}
 function renderInterview(history,meta){
   shell(`<div class="interview poll-interview">
     <div id="interview-poll" class="discovery-poll" aria-live="polite"></div>
@@ -440,22 +500,44 @@ function renderInterviewUnderstanding(data){
   ].filter(Boolean).slice(0,4);
   root.innerHTML=`<div class="understanding-main"><div class="understanding-copy"><div class="understanding-eyebrow">PROJECT BRIEF</div><div class="understanding-title">What ProjectX understands</div><div class="sub understanding-summary">${esc(summary||'Building the project brief from your request.')}</div>${category?`<div class="understanding-category">Focus · ${esc(category)}</div>`:''}${known.length?`<div class="understanding-known">${known.map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}${missing.length?`<div class="understanding-meta"><span>Project brief is still being refined</span></div>`:''}</div></div>`;
 }
-const interviewSystem = "You are ProjectX's discovery architect. Treat the user's original request as the source of truth. Drive discovery with exactly one AI-generated poll at a time. The poll is the only discovery interaction: poll.decision is a short contextual label, never a question. Generate exactly four concrete, realistic, context-specific candidate options from the user's request, current project state, latest answer, and the most important missing detail. Never use generic fallback phrases, canned choices, unrelated options, or question-form options. Never include Describe in your own words in the four AI options; the runtime adds it as option five. Return the same discovery JSON shape ProjectX expects, with question empty, poll containing four AI options, and the existing project, classification, category, domainPack, workspace, agents, confidence, missing, ambiguities, and summary fields. When done=false, the poll must be valid. When done=true, poll may be omitted. Never invent facts.";async function continueInterview(history, answers, meta={}){
+const interviewSystem = "You are ProjectX's discovery architect. Treat the user's original request as the source of truth. Classify multidimensionally with work_shape (build, investigate, create, plan, operate, decide, learn, solve), domains (software, research, business, creative, planning, real_world, education, game, engineering, personal), outputs (app, website, code, report, presentation, document, plan, checklist, campaign, dataset, prototype, physical_steps), execution_mode (digital, physical, mixed), and risk_level (low, consequential, regulated_or_high_impact). Multiple domains are allowed. Never force a single category or a REAL_WORLD/NON_REAL_WORLD binary. Ask only when an answer materially changes workflow, deliverable, scope, risk, tools, acceptance criteria, or next action. Generate exactly one contextual poll at a time with exactly four concrete candidate values; the runtime adds the fifth fixed choice 'Describe in your own words'. Never use generic filler, duplicates, unrelated options, or question-form options. Return JSON only with classification, category, domainPack, project, workspace, agents, confidence, missing, ambiguities, summary, and poll. Project should contain title,type,goal,users,requirements,constraints,features,decisions,dependencies,assets,deliverables,acceptanceCriteria,successCriteria,openQuestions,platform,technology,visualDirection,game,plan. Workspace sections must be genuinely relevant to the actual request. Never invent facts.";async function continueInterview(history, answers, meta={}){
   $('#interview-status')&&($('#interview-status').textContent='Thinking…');
   try{
     const discoveryProject=meta.brain?.project||{};
     const discoveryUnderstanding=meta.brain?.understanding||{};
-    const data=await aiJson('understand',{project:{...discoveryProject,understanding:discoveryUnderstanding},history,message:meta.messageOverride||history[history.length-1]?.text||'',system:interviewSystem},3600);
+    const data=await aiJson('understand',{
+      project:{...discoveryProject,understanding:discoveryUnderstanding},
+      history,
+      message:meta.messageOverride||history[history.length-1]?.text||'',
+      system:interviewSystem
+    },3600);
     if(!data||!data.project)throw new Error('The AI returned no usable project-understanding result.');
-    const group=String(data.classification?.group||discoveryUnderstanding.group||'').trim().toUpperCase();
-    if(group!=='REAL_WORLD'&&group!=='NON_REAL_WORLD')throw new Error('The AI did not return a valid REAL_WORLD/NON_REAL_WORLD classification.');
+
     const mergedProject=mergeDiscoveryProject(discoveryProject,data.project);
     const priorWorkspace=Array.isArray(meta.brain?.workspace)?meta.brain.workspace:[];
     const workspaceCandidate=Array.isArray(data.workspace?.sections)&&data.workspace.sections.length?data.workspace.sections:priorWorkspace;
+    const classification=data.classification&&typeof data.classification==='object'?data.classification:{};
+    const group=String(classification.group||discoveryUnderstanding.group||'').trim().toUpperCase();
     const category=String(data.category||discoveryUnderstanding.category||'').trim();
     const summary=String(data.summary||discoveryUnderstanding.summary||'').trim();
-    meta.brain={project:mergedProject,workspace:workspaceCandidate,understanding:{confidence:Number(data?.confidence||0),missing:Array.isArray(data?.missing)?data.missing:[],ambiguities:Array.isArray(data?.ambiguities)?data.ambiguities:[],group,category,summary,domainPack:data.domainPack||discoveryUnderstanding.domainPack||{}}};
 
+    meta.brain={
+      project:mergedProject,
+      workspace:workspaceCandidate,
+      understanding:{
+        ...(discoveryUnderstanding||{}),
+        confidence:Number(data?.confidence??classification?.confidence||0),
+        missing:Array.isArray(data?.missing)?data.missing:[],
+        ambiguities:Array.isArray(data?.ambiguities)?data.ambiguities:[],
+        group,category,summary,
+        domainPack:data.domainPack||discoveryUnderstanding.domainPack||{},
+        classification
+      }
+    };
+
+    if(session?.access_token&&meta.remoteId){
+      await commitDiscoveryBrain(meta,mergedProject,data,Array.isArray(meta.answers)?meta.answers:[],workspaceCandidate);
+    }
 
     const type=normalizeProjectType(mergedProject.type||data.project.type||'Other');
     const safeCategory=category.slice(0,120);
@@ -464,10 +546,11 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
     const declaredMissing=Array.isArray(data.missing)?data.missing:[];
     const ambiguities=Array.isArray(data.ambiguities)?data.ambiguities:[];
     const missing=[...new Set([...quality.missing,...declaredMissing,...(Array.isArray(spec.openQuestions)?spec.openQuestions:[])])];
-    const confidence=Number(data.confidence||0);
-    const workspace=(Array.isArray(workspaceCandidate)?workspaceCandidate:[]).filter(s=>s&&String(s.name||'').trim()).slice(0,8);
+    const confidence=Number(data.confidence??classification.confidence??0);
+    const workspace=(Array.isArray(workspaceCandidate)?workspaceCandidate:[]).filter(x=>x&&String(x.name||'').trim()).slice(0,8);
     const done=!meta.regeneratingPoll&&data.done===true&&quality.valid&&confidence>=.82&&missing.length===0&&ambiguities.length===0&&workspace.length>=2;
     meta.messageOverride='';
+
     if(!done){
       if(!validDiscoveryPollLocal(data?.poll)){
         throw new Error('The AI returned invalid contextual poll options. No generic choices were substituted.');
@@ -475,9 +558,60 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
       renderDiscoveryPoll(data.poll,meta,history);
       return;
     }
-    const project=createProject({title:mergedProject.title||data.project.title,type,intent:mergedProject.goal||history[0].text,spec,sections:workspace,conversation:history,agents:Array.isArray(mergedProject.agents)?mergedProject.agents:[],plan:Array.isArray(mergedProject.plan)?mergedProject.plan:[]});
+
+    const normalizedUnderstanding={
+      confidence,missing:[],ambiguities:[],method:session?'secure-ai':'guest-ai',
+      group,groupLabel:group==='REAL_WORLD'?'REAL-WORLD':group==='NON_REAL_WORLD'?'NON-REAL-WORLD':'',
+      category:safeCategory||type,
+      domainPack:data.domainPack||mergedProject.domainPack||{},
+      executionType:type,
+      classification:classification||{},
+      summary:summary||''
+    };
+
+    if(session?.access_token&&meta.remoteId){
+      const ready=await edge('applyBrainMutation',{
+        projectId:meta.remoteId,
+        baseVersion:Number(meta.remoteVersion||1),
+        mutation:{
+          id:'discovery-ready-'+Date.now(),
+          baseVersion:Number(meta.remoteVersion||1),
+          provenance:{source:'system',sourceId:'discovery-complete',confidence:confidence||0.9,userConfirmed:false},
+          operations:[{op:'replace',path:'execution.status',value:'ready'}],
+          changeSummary:'Complete discovery brief'
+        }
+      });
+      if(ready.status==='stale')throw new Error('The discovery project changed on the server. Reopen the project before continuing.');
+      meta.remoteVersion=Number(ready.newVersion||meta.remoteVersion||1);
+
+      const planned=await edge('createPlan',{projectId:meta.remoteId});
+      meta.remoteVersion=Number(planned.newVersion||meta.remoteVersion||1);
+
+      const remoteProject=await edge('getProject',{projectId:meta.remoteId});
+      if(remoteProject.project){
+        const saved=migrateProject(remoteProject.project);
+        saved.category=safeCategory||type;
+        saved.understanding=normalizedUnderstanding;
+        saveProject(saved,true);
+        openProject(saved.id);
+        return;
+      }
+      openProject(meta.remoteId);
+      return;
+    }
+
+    const project=createProject({
+      title:mergedProject.title||data.project.title,
+      type,
+      intent:mergedProject.goal||history[0].text,
+      spec,
+      sections:workspace,
+      conversation:history,
+      agents:Array.isArray(mergedProject.agents)?mergedProject.agents:[],
+      plan:Array.isArray(mergedProject.plan)?mergedProject.plan:[]
+    });
     project.category=safeCategory||type;
-    project.understanding={confidence,missing:[],ambiguities:[],method:session?'secure-ai':'guest-ai',group,groupLabel:group==='REAL_WORLD'?'REAL-WORLD':'NON-REAL-WORLD',category:safeCategory||type,domainPack:data.domainPack||mergedProject.domainPack||{},executionType:type,classification:data.classification||{group,label:group==='REAL_WORLD'?'REAL-WORLD':'NON-REAL-WORLD',reason:'Classification established from the request.'},summary:summary||''};
+    project.understanding=normalizedUnderstanding;
     project.status='ready';
     saveProject(project,true);
     await syncRemoteProject(project);
@@ -486,6 +620,8 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
     $('#interview-status')&&($('#interview-status').textContent='Discovery failed safely: '+String(error.message||error)+'. No project was created from partial or fallback data.');
   }
 }
+
+
 function saveProject(project,initial=false){if(initial)snapshot(project,'Initial project');const i=state.projects.findIndex(p=>p.id===project.id);if(i>=0)state.projects[i]=project;else state.projects.unshift(project);state.active=project.id;persistLocal();}
 function snapshot(project,label){project.versions=Array.isArray(project.versions)?project.versions:[];project.versions.push({version:project.specVersion,label,at:now(),title:project.title,type:project.type,understanding:JSON.parse(JSON.stringify(project.understanding||{})),sections:JSON.parse(JSON.stringify(project.sections||[])),spec:JSON.parse(JSON.stringify(project.spec)),files:JSON.parse(JSON.stringify(project.files||{})),artifacts:JSON.parse(JSON.stringify(project.artifacts||{})),research:JSON.parse(JSON.stringify(project.research||{}))});if(project.versions.length>20)project.versions.splice(0,project.versions.length-20);}
 async function syncRemoteProjects(){await refreshSession();if(!session)return;try{const result=await edge('listProjects');for(const remoteRaw of result.projects||[]){const remote=migrateProject(remoteRaw);const local=state.projects.find(p=>p.id===remote.id);if(!local||new Date(remote.updatedAt)>new Date(local.updatedAt||0)){const i=state.projects.findIndex(p=>p.id===remote.id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);}}persistLocal();}catch(e){notify(`Cloud sync unavailable: ${e.message}`,'error');}}
