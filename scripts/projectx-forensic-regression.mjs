@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createProject, applyProjectMutation, applySpecChange, validateSpec, serializeForPersistence, projectArtifactKind, normalizeSections } from '../projectx-core.js';
+import { createProject, applyProjectMutation, applySpecChange, validateSpec, serializeForPersistence, projectArtifactKind, normalizeSections, applyBrainMutation } from '../projectx-core.js';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
 const edge = fs.readFileSync(new URL('../supabase/functions/ai/index.ts', import.meta.url), 'utf8');
@@ -60,6 +60,22 @@ assert.ok(contradiction.contradictions.length > 0);
 
 const persisted = serializeForPersistence(game);
 for (const key of ['files', 'artifacts', 'outputs', 'sectionContent', 'tests', 'research', 'agents', 'resources', 'executionState', 'versions']) assert.ok(Object.hasOwn(persisted, key), `missing persisted ${key}`);
+const brainMutation = applyBrainMutation(game,{
+  id:'forensic-brain-1',
+  baseVersion:game.specVersion,
+  provenance:{source:'agent',sourceId:'forensic-check'},
+  operations:[
+    {op:'add',path:'requirements.deliverables',value:['Playable demo build']},
+    {op:'mark_uncertain',path:'requirements.assumptions',value:'Target distribution channel',reason:'Needs product decision'}
+  ]
+},{role:'editor',allowedClasses:['requirements']});
+assert.equal(brainMutation.applied,true);
+assert.equal(game.spec.deliverables.includes('Playable demo build'),true);
+assert.equal(Array.isArray(game.executionState.uncertainties),true);
+assert.equal(game.executionState.mutationAudit.at(-1).kind,'applied');
+const staleBrain = applyBrainMutation(game,{id:'forensic-brain-stale',baseVersion:1,operations:[{op:'replace',path:'context.intent',value:'outdated'}]},{role:'editor'});
+assert.equal(staleBrain.stale,true);
+assert.equal(staleBrain.applied,false);
 assert.match(runtime, /Project Chat/);
 assert.match(edge, /projectContext/);
 assert.doesNotMatch(runtime, /Game over.*Flappy|ctx\.arc\(bird\.x/);
