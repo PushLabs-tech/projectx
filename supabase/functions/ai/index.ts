@@ -695,7 +695,8 @@ async function createArtifactVersion(user:any, body:any) {
   if(String(candidate.id || projectId)!==projectId) throw new Error("Project mismatch");
   candidate.id=projectId;
   candidate.specVersion=baseVersion;
-  candidate.artifacts={...(candidate.artifacts||{}),output:body?.artifact || candidate.artifacts?.output || {}};
+  const artifact={...(body?.artifact || candidate.artifacts?.output || {}),specVersion:baseVersion+1,updatedAt:new Date().toISOString()};
+  candidate.artifacts={...(candidate.artifacts||{}),output:artifact};
   candidate.files=body?.files && typeof body.files==="object" ? body.files : candidate.files;
   const snapshot=cleanProjectSnapshot(candidate);
   const committed=await admin.rpc("commit_project_brain_mutation",{
