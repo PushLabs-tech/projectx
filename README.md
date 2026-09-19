@@ -62,6 +62,15 @@ AI path:
 
 The workspace keeps provider-specific complexity out of normal project work. Provider credentials are tested and stored through the authenticated server-side vault, previews run in sandboxed iframes, and generated changes are verified before being marked current.
 
+### Project Brain mutation boundary
+
+`projectx-core.js` now includes a version-aware Brain mutation boundary (`applyBrainMutation`) and task-shaped internal helpers (`createProjectFromIntent`, `generateDiscoveryPoll`, `createPlan`, `startAgentRun`, `approveAction`, `createArtifactVersion`, `runVerification`, `getUsageSummary`).
+
+- Mutations are operation-based (`add`, `replace`, `remove`, `mark_uncertain`) and require a matching `baseVersion`.
+- Unauthorized, stale, or invalid operations are recorded in `executionState.mutationAudit`.
+- Applied mutations create a new project version through the existing canonical mutation path and keep legacy compatibility projections (`intent` and `resources`) aligned with the canonical spec.
+- Provenance metadata tracks source/sourceId/capturedAt/confidence/userConfirmed without storing chain-of-thought text.
+
 ## Local setup
 
 ### Requirements

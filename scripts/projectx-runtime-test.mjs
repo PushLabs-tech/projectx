@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, normalizeResources, projectArtifactKind, serializeForPersistence, assemblePreviewHtml, sanitizePath } from '../projectx-core.js';
+import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, normalizeResources, projectArtifactKind, serializeForPersistence, assemblePreviewHtml, sanitizePath, applyBrainMutation, createProjectFromIntent, generateDiscoveryPoll, createPlan, startAgentRun, approveAction, createArtifactVersion, runVerification, getUsageSummary } from '../projectx-core.js';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -68,6 +68,10 @@ assert.equal(resources.length,2);
 assert.equal(resources[0].name,'notes.md');
 assert.equal(resources[1].url,'https://example.com');
 assert.equal(projectArtifactKind('Presentation'),'software');
+const createdFromIntent = createProjectFromIntent({title:'Solar pitch',type:'Business',goal:'Create a solar prototype and investor pitch',deliverables:['Pitch deck']});
+assert.equal(createdFromIntent.title,'Solar pitch');
+assert.equal(createdFromIntent.spec.goal,'Create a solar prototype and investor pitch');
+assert.equal(generateDiscoveryPoll('Preferred scope',['Hardware prototype','Pilot proposal','Investor deck','Hybrid plan']).options.length,4);
 
 const transformed = createProject({title:'Original',type:'Website',spec:{goal:'Build a useful website',deliverables:['Working website']}});
 const typeMutation = applyProjectMutation(transformed,{projectType:'API',projectTitle:'Transformed API'});
@@ -82,6 +86,42 @@ assert.equal(restoreTarget.type,'Research');
 assert.equal(restoreTarget.title,'Restore me');
 assert.equal(restoreTarget.files['brief.md'],'source version');
 assert.equal(restoreTarget.tests.status,'stale');
+const brainProject = createProject({
+  title:'Cafe website',type:'Website',
+  spec:{goal:'Build a cafe website',deliverables:['Live website'],requirements:['Menu page'],platform:'Web'}
+});
+const staleBrain = applyBrainMutation(brainProject,{id:'m-stale',baseVersion:999,operations:[{op:'replace',path:'context.intent',value:'Mismatch'}]},{role:'editor'});
+assert.equal(staleBrain.applied,false);
+assert.equal(staleBrain.stale,true);
+const appliedBrain = applyBrainMutation(brainProject,{
+  id:'m-1',
+  baseVersion:brainProject.specVersion,
+  provenance:{source:'user',sourceId:'intent:cafe',confidence:0.9,userConfirmed:true},
+  operations:[
+    {op:'replace',path:'context.intent',value:'Launch a cafe website with ordering and events'},
+    {op:'add',path:'requirements.requirements',value:['Online ordering','Events calendar']},
+    {op:'mark_uncertain',path:'requirements.assumptions',value:'Delivery radius',reason:'Customer delivery boundary is undecided.'}
+  ]
+},{role:'editor',allowedClasses:['context','requirements']});
+assert.equal(appliedBrain.applied,true);
+assert.equal(brainProject.intent,'Launch a cafe website with ordering and events');
+assert.equal(brainProject.spec.requirements.includes('Online ordering'),true);
+assert.equal(Array.isArray(brainProject.executionState.uncertainties),true);
+assert.equal(brainProject.executionState.mutationAudit.at(-1).kind,'applied');
+const plannedResult = createPlan(brainProject,[{title:'Ship MVP',status:'pending',steps:['Finalize scope']}]);
+assert.equal(plannedResult.changed,true);
+const run = startAgentRun(brainProject,{agent:'planner',task:'Draft sprint tasks',requiresApproval:true,approvalAction:'publish-plan'});
+assert.equal(run.status,'in_progress');
+assert.equal(brainProject.executionState.pendingApproval.runId,run.id);
+const approved = approveAction(brainProject,{runId:run.id,approver:'reviewer@example.com'});
+assert.equal(approved.approved,true);
+const artifactVersion = createArtifactVersion(brainProject,{key:'brief',kind:'document',summary:'Cafe launch brief'});
+assert.equal(artifactVersion.verification.status,'not_checked');
+const verification = runVerification(brainProject,[{name:'Manual review',status:'human_review',requiredHumanReview:true}]);
+assert.equal(verification.status,'human_review');
+const usage = getUsageSummary(brainProject);
+assert.equal(usage.status,'human_review');
+assert.ok(usage.specVersion >= 1);
 
 const files = { 'index.html': '<!doctype html><html><head><link rel="stylesheet" href="styles.css"></head><body><script src="app.js"></script></body></html>', 'styles.css': 'body{font-family:system-ui}', 'app.js': 'document.body.dataset.ready="1";' };
 const preview = assemblePreviewHtml(files);

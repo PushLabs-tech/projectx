@@ -19,7 +19,30 @@ const SECTION_KIND_BY_NAME = {
   test:'test',tests:'test',qa:'test',verify:'test',preview:'output',playtest:'output',output:'output',publish:'publish',launch:'publish',deploy:'publish',report:'publish'
 };
 const DEFAULT_AGENT_BY_KIND = {conversation:'interviewer',planning:'planner',research:'researcher',workspace:'planner',code:'builder',output:'builder',test:'tester',publish:'publisher'};
+const BRAIN_MUTATION_OPS = new Set(['add','replace','remove','mark_uncertain']);
+const BRAIN_MUTATION_PATHS = new Map([
+  ['identity.title','identity'],
+  ['identity.type','identity'],
+  ['context.intent','context'],
+  ['context.resources','context'],
+  ['classification.group','classification'],
+  ['classification.label','classification'],
+  ['classification.reason','classification'],
+  ['requirements.requirements','requirements'],
+  ['requirements.constraints','requirements'],
+  ['requirements.assumptions','requirements'],
+  ['requirements.decisions','requirements'],
+  ['requirements.openQuestions','requirements'],
+  ['requirements.dependencies','requirements'],
+  ['requirements.deliverables','requirements'],
+  ['requirements.acceptanceCriteria','requirements'],
+  ['requirements.successCriteria','requirements'],
+  ['workspace.sections','workspace'],
+  ['execution.state','execution'],
+  ['execution.status','execution']
+]);
 const arr = value => Array.isArray(value) ? value.map(v=>String(v ?? '').trim()).filter(Boolean) : [];
+const clone = value => JSON.parse(JSON.stringify(value ?? null));
 export function normalizeResource(value) {
   if (typeof value === 'string') return value.trim().slice(0,20000);
   const raw=value&&typeof value==='object'?value:{};
@@ -176,7 +199,7 @@ export function invalidateArtifacts(project) {
 export function applyProjectMutation(project, mutation = {}) {
   project.files = project.files || {};
   project.agents = normalizeAgents(project.agents || [], project.type);
-  const before = JSON.stringify({title:project.title,type:project.type,plan:project.plan||[],spec:project.spec,sections:project.sections,files:project.files,agents:project.agents,research:project.research || {}});
+  const before = JSON.stringify({title:project.title,type:project.type,status:project.status,plan:project.plan||[],spec:project.spec,understanding:project.understanding || {},sections:project.sections,files:project.files,agents:project.agents,research:project.research || {},executionState:project.executionState || {}});
   const beforeSpec = JSON.stringify(project.spec || {});
   const beforeType = project.type;
   const beforeTitle = project.title;
@@ -198,6 +221,9 @@ export function applyProjectMutation(project, mutation = {}) {
     project.plan = mutation.plan.slice(0,50).map(item => typeof item === 'string' ? {title:item,status:'proposed',steps:[]} : item).filter(Boolean);
   }
   if (mutation.projectType || mutation.projectTitle || mutation.plan) project.agents = normalizeAgents(project.agents || [], project.type);
+  if (mutation.understandingPatch && typeof mutation.understandingPatch === 'object') project.understanding = {...(project.understanding || {}),...mutation.understandingPatch};
+  if (typeof mutation.status === 'string' && mutation.status.trim()) project.status = mutation.status.trim().slice(0,60);
+  if (mutation.executionStatePatch && typeof mutation.executionStatePatch === 'object') project.executionState = {...(project.executionState || {}),...mutation.executionStatePatch};
   if (mutation.researchPatch && typeof mutation.researchPatch === 'object') {
     const research = project.research || {status:'ready',queries:[],sources:[],findings:[]};
     const patch = mutation.researchPatch;
@@ -220,7 +246,8 @@ export function applyProjectMutation(project, mutation = {}) {
     project.research = research;
   }
   project.resources = Array.isArray(project.spec?.resources) ? [...project.spec.resources] : [];
-  const after = JSON.stringify({title:project.title,type:project.type,plan:project.plan||[],spec:project.spec,sections:project.sections,files:project.files,agents:project.agents,research:project.research || {}});
+  if (typeof project.spec?.goal === 'string' && project.spec.goal.trim()) project.intent = project.spec.goal.trim();
+  const after = JSON.stringify({title:project.title,type:project.type,status:project.status,plan:project.plan||[],spec:project.spec,understanding:project.understanding || {},sections:project.sections,files:project.files,agents:project.agents,research:project.research || {},executionState:project.executionState || {}});
   const changed = before !== after, specChanged = beforeSpec !== JSON.stringify(project.spec || {}), typeChanged = beforeType !== project.type, titleChanged = beforeTitle !== project.title;
   if (changed) {
     project.specVersion = Number(project.specVersion || 1) + 1;
@@ -259,6 +286,189 @@ export function restoreProjectSnapshot(project, snapshot = {}) {
   return {changed:true};
 }
 export function applySpecChange(project,patch = {}) { return applyProjectMutation(project,{specPatch:patch}); }
+
+function appendMutationAudit(project, entry) {
+  const execution = project.executionState || {};
+  const current = Array.isArray(execution.mutationAudit) ? execution.mutationAudit : [];
+  project.executionState = {...execution,mutationAudit:[...current,{...entry,at:new Date().toISOString()}].slice(-80)};
+}
+
+const BRAIN_ARRAY_FIELD = {
+  'requirements.requirements':'requirements',
+  'requirements.constraints':'constraints',
+  'requirements.assumptions':'openQuestions',
+  'requirements.decisions':'decisions',
+  'requirements.openQuestions':'openQuestions',
+  'requirements.dependencies':'dependencies',
+  'requirements.deliverables':'deliverables',
+  'requirements.acceptanceCriteria':'acceptanceCriteria',
+  'requirements.successCriteria':'successCriteria'
+};
+
+export function applyBrainMutation(project, mutation = {}, actor = {}) {
+  const role = String(actor.role || 'viewer').toLowerCase();
+  if (!['owner','admin','editor'].includes(role)) {
+    const rejected = {kind:'rejected',reason:'forbidden',role,mutationId:String(mutation?.id || '')};
+    appendMutationAudit(project, rejected);
+    return {applied:false,reason:'forbidden',rejected:[rejected],stale:false};
+  }
+  const baseVersion = Number(mutation?.baseVersion);
+  const currentVersion = Number(project?.specVersion || 1);
+  if (!Number.isFinite(baseVersion) || baseVersion !== currentVersion) {
+    const stale = {kind:'stale',reason:'base_version_mismatch',baseVersion,currentVersion,mutationId:String(mutation?.id || '')};
+    appendMutationAudit(project, stale);
+    return {applied:false,reason:'stale',rejected:[],stale:true,currentVersion};
+  }
+  const operations = Array.isArray(mutation?.operations) ? mutation.operations.slice(0,80) : [];
+  const payloadSize = JSON.stringify(mutation || {}).length;
+  if (!operations.length || payloadSize > 120000) {
+    const rejected = {kind:'rejected',reason:operations.length ? 'payload_too_large' : 'missing_operations',payloadSize,mutationId:String(mutation?.id || '')};
+    appendMutationAudit(project, rejected);
+    return {applied:false,reason:rejected.reason,rejected:[rejected],stale:false};
+  }
+  const provenanceInput = mutation?.provenance && typeof mutation.provenance === 'object' ? mutation.provenance : {};
+  const provenance = {
+    source:['user','import','agent','system','verification'].includes(String(provenanceInput.source || '').toLowerCase()) ? String(provenanceInput.source).toLowerCase() : 'agent',
+    sourceId:String(provenanceInput.sourceId || '').slice(0,120) || null,
+    capturedAt:typeof provenanceInput.capturedAt === 'string' ? provenanceInput.capturedAt : new Date().toISOString(),
+    confidence:Math.max(0, Math.min(1, Number(provenanceInput.confidence ?? 0.7) || 0.7)),
+    userConfirmed:Boolean(provenanceInput.userConfirmed)
+  };
+  const patch = {};
+  const understandingPatch = {};
+  const executionUncertainties = [];
+  const rejected = [];
+  let projectType;
+  let projectTitle;
+  let workspaceSections;
+  let status;
+  for (const opRaw of operations) {
+    const op = opRaw && typeof opRaw === 'object' ? opRaw : {};
+    const kind = String(op.op || '').trim();
+    const path = String(op.path || '').trim();
+    const actionClass = BRAIN_MUTATION_PATHS.get(path);
+    if (!BRAIN_MUTATION_OPS.has(kind) || !actionClass) { rejected.push({reason:'invalid_operation',op:kind,path}); continue; }
+    const allowedClasses = Array.isArray(actor.allowedClasses) ? new Set(actor.allowedClasses.map(v => String(v))) : null;
+    if (allowedClasses && !allowedClasses.has(actionClass)) { rejected.push({reason:'action_class_forbidden',op:kind,path,actionClass}); continue; }
+    if (kind === 'mark_uncertain') {
+      executionUncertainties.push({path,value:clone(op.value),reason:String(op.reason || 'Marked uncertain by mutation boundary.').slice(0,240),provenance});
+      continue;
+    }
+    if (path === 'identity.title') { projectTitle = String(op.value || '').trim().slice(0,120); continue; }
+    if (path === 'identity.type') { projectType = normalizeProjectType(op.value); continue; }
+    if (path === 'context.intent') { patch.goal = String(op.value || '').trim().slice(0,5000); continue; }
+    if (path === 'context.resources') { patch.resources = kind === 'remove' ? {remove:Array.isArray(op.value)?op.value:[op.value]} : (kind === 'add' ? {add:Array.isArray(op.value)?op.value:[op.value]} : {replace:Array.isArray(op.value)?op.value:[]}); continue; }
+    if (path.startsWith('classification.')) {
+      const key = path.split('.').slice(1).join('.');
+      understandingPatch.classification = {...(understandingPatch.classification || {}),[key]:String(op.value || '').slice(0,400)};
+      continue;
+    }
+    if (path in BRAIN_ARRAY_FIELD) {
+      const field = BRAIN_ARRAY_FIELD[path];
+      if (kind === 'replace') patch[field] = {replace:Array.isArray(op.value) ? op.value : [op.value]};
+      if (kind === 'add') patch[field] = {...(patch[field] || {}),add:[...((patch[field] || {}).add || []),...(Array.isArray(op.value) ? op.value : [op.value])]};
+      if (kind === 'remove') patch[field] = {...(patch[field] || {}),remove:[...((patch[field] || {}).remove || []),...(Array.isArray(op.value) ? op.value : [op.value])]};
+      continue;
+    }
+    if (path === 'workspace.sections') { workspaceSections = Array.isArray(op.value) ? op.value : []; continue; }
+    if (path === 'execution.state' || path === 'execution.status') { status = String(op.value || '').trim().slice(0,60) || status; continue; }
+  }
+  if (rejected.length) {
+    rejected.forEach(item => appendMutationAudit(project, {kind:'rejected',...item,mutationId:String(mutation?.id || '')}));
+    if (!Object.keys(patch).length && !Object.keys(understandingPatch).length && !executionUncertainties.length && !workspaceSections && !status && !projectType && !projectTitle) {
+      return {applied:false,reason:'rejected',rejected,stale:false};
+    }
+  }
+  const mutationId = String(mutation?.id || `brain-${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
+  const boundaryMutation = {
+    projectType,
+    projectTitle,
+    specPatch:patch,
+    workspaceSections,
+    understandingPatch:{
+      ...understandingPatch,
+      provenance:{...(project.understanding?.provenance || {}),lastMutation:{id:mutationId,...provenance}}
+    },
+    status,
+    executionStatePatch:executionUncertainties.length ? {uncertainties:[...(Array.isArray(project.executionState?.uncertainties) ? project.executionState.uncertainties : []),...executionUncertainties].slice(-80)} : {}
+  };
+  const outcome = applyProjectMutation(project, boundaryMutation);
+  if (!outcome.changed) {
+    appendMutationAudit(project, {kind:'rejected',reason:'no_effective_change',mutationId,provenance});
+    return {applied:false,reason:'no_effective_change',rejected,stale:false};
+  }
+  appendMutationAudit(project, {kind:'applied',mutationId,baseVersion,version:project.specVersion,operations:operations.length,rejected:rejected.length,provenance});
+  return {applied:true,mutationId,newVersion:project.specVersion,rejected,stale:false,outcome};
+}
+
+export function createProjectFromIntent(intent = {}, options = {}) {
+  const spec = mergeSpec(emptySpec(), {
+    goal:String(intent.goal || intent.intent || '').trim(),
+    users:intent.users,
+    requirements:intent.requirements,
+    constraints:intent.constraints,
+    deliverables:intent.deliverables,
+    acceptanceCriteria:intent.acceptanceCriteria,
+    successCriteria:intent.successCriteria,
+    openQuestions:intent.openQuestions,
+    platform:intent.platform
+  });
+  return createProject({title:intent.title || options.title || 'Untitled project',type:intent.type || options.type || 'Other',intent:spec.goal,spec,sections:Array.isArray(intent.sections)?intent.sections:[],agents:Array.isArray(intent.agents)?intent.agents:[]});
+}
+
+export function generateDiscoveryPoll(decision = '', options = [], customOption = 'Describe in your own words') {
+  const selected = [...new Set((Array.isArray(options) ? options : []).map(v => String(v || '').trim()).filter(Boolean))].slice(0,4);
+  return {decision:String(decision || '').trim(),options:selected,customOption:String(customOption || 'Describe in your own words')};
+}
+
+export function createPlan(project, plan = []) {
+  return applyProjectMutation(project, { plan: Array.isArray(plan) ? plan : [] });
+}
+
+export function startAgentRun(project, run = {}) {
+  const id = String(run.id || `run-${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
+  const runs = Array.isArray(project.executionState?.runs) ? project.executionState.runs : [];
+  const entry = {id,agent:String(run.agent || 'planner').slice(0,60),status:'in_progress',startedAt:new Date().toISOString(),task:String(run.task || '').slice(0,240),requiresApproval:Boolean(run.requiresApproval)};
+  applyProjectMutation(project, { executionStatePatch:{runs:[...runs,entry].slice(-30),status:'in_progress',lastAgent:entry.agent,pendingApproval:entry.requiresApproval ? {runId:id,action:String(run.approvalAction || 'review').slice(0,80)} : null} });
+  return entry;
+}
+
+export function approveAction(project, approval = {}) {
+  const pending = project.executionState?.pendingApproval;
+  if (!pending) return {approved:false,reason:'no_pending_approval'};
+  if (approval.runId && approval.runId !== pending.runId) return {approved:false,reason:'approval_mismatch'};
+  const approver = String(approval.approver || 'human-reviewer').slice(0,120);
+  applyProjectMutation(project, { executionStatePatch:{pendingApproval:null,lastApproval:{runId:pending.runId,action:pending.action,approver,approvedAt:new Date().toISOString()}} });
+  return {approved:true,runId:pending.runId};
+}
+
+export function createArtifactVersion(project, artifact = {}) {
+  const key = String(artifact.key || 'primary').trim() || 'primary';
+  const current = project.artifacts || {};
+  const entry = {kind:String(artifact.kind || projectArtifactKind(project.type)).slice(0,40),specVersion:Number(project.specVersion || 1),summary:String(artifact.summary || '').slice(0,500),deliverables:Array.isArray(artifact.deliverables)?artifact.deliverables.slice(0,30):[],stale:false,updatedAt:new Date().toISOString(),verification:{status:'not_checked'}};
+  applyProjectMutation(project, { executionStatePatch:{status:'artifact_updated'} });
+  project.artifacts = {...current,[key]:entry};
+  return entry;
+}
+
+export function runVerification(project, checks = []) {
+  const normalized = (Array.isArray(checks) ? checks : []).map(check => ({name:String(check?.name || 'Unnamed check').slice(0,120),status:['passed','not_checked','blocked','human_review'].includes(String(check?.status || 'not_checked')) ? String(check.status) : 'not_checked',evidence:String(check?.evidence || '').slice(0,500),requiredHumanReview:Boolean(check?.requiredHumanReview)}));
+  const hasBlocker = normalized.some(check => check.status === 'blocked');
+  const passed = normalized.length > 0 && normalized.every(check => check.status === 'passed');
+  const status = hasBlocker ? 'blocked' : passed ? 'passed' : normalized.some(check => check.status === 'human_review' || check.requiredHumanReview) ? 'human_review' : 'not_checked';
+  project.tests = {specVersion:project.specVersion,results:normalized,updatedAt:new Date().toISOString(),status};
+  project.status = status === 'passed' ? 'verified' : status;
+  return project.tests;
+}
+
+export function getUsageSummary(project) {
+  const conversation = Array.isArray(project.conversation) ? project.conversation.length : 0;
+  const files = Object.keys(project.files || {}).length;
+  const findings = Array.isArray(project.research?.findings) ? project.research.findings.length : 0;
+  const deliverables = Array.isArray(project.spec?.deliverables) ? project.spec.deliverables.length : 0;
+  const runs = Array.isArray(project.executionState?.runs) ? project.executionState.runs.length : 0;
+  return {projectId:project.id,specVersion:Number(project.specVersion || 1),conversation,files,findings,deliverables,runs,status:String(project.status || 'draft')};
+}
 
 export function createProject({id,title,type='Other',intent='',spec={},sections=[],conversation=[],agents=[],research={},plan=[]} = {}) {
   const normalizedType = normalizeProjectType(type), projectId = id || globalThis.crypto?.randomUUID?.() || `px-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, normalizedSpec = mergeSpec(emptySpec(),spec);
