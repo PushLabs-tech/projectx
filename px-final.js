@@ -723,7 +723,34 @@ function renderSimulation(project){
       project.tests={status:testPass?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};
       const security=projectSecurityChecks(project),blocking=security.filter(x=>x.blockBuild&&!x.pass);
       project.status=testPass&&!blocking.length?'verified':'needs-fix';
-      saveProject(project);await syncRemoteProject(project);
+      if(session?.access_token){
+        const verificationChecks=results.map(x=>({
+          name:x.name,
+          checkType:'local',
+          status:x.pass?'pass':'fail',
+          severity:x.pass?'info':'error',
+          evidence:{detail:x.detail||''},
+          verifier:'projectx-local'
+        })).concat(security.map(x=>({
+          name:x.name,
+          checkType:'security',
+          status:x.pass?'pass':(x.blockBuild?'fail':'warning'),
+          severity:x.pass?'info':(x.blockBuild?'error':'warning'),
+          evidence:{detail:x.detail||''},
+          verifier:'projectx-security'
+        })));
+        try{
+          await edge('runVerification',{
+            projectId:project.id,
+            artifactVersion:String(project.artifacts?.output?.specVersion||project.specVersion||1),
+            checks:verificationChecks
+          });
+        }catch(error){
+          notify('Verification ran locally, but its durable server record could not be saved: '+String(error.message||error),'error');
+        }
+      }
+      saveProject(project);
+      await syncRemoteProject(project);
       status.textContent=testPass&&!blocking.length?'Full verification passed.':'Verification found issues; review Tests and Security.';
       renderSimulation(project);
     }catch(error){status.textContent='Verification failed: '+error.message;button.disabled=false;}
@@ -1026,8 +1053,24 @@ async function buildArtifact(project,repairResults=[]){
     snapshot(project,'Before rebuild');
     project.files=files;
     project.status='built';
+    if(session?.access_token){
+      const committed=await edge('createArtifactVersion',{
+        projectId:project.id,
+        baseVersion:Number(project.specVersion||1),
+        artifact:project.artifacts?.output || {},
+        files
+      });
+      if(committed?.status==='stale') throw new Error('The project changed while the artifact was being saved. Reopen the project and rebuild from the latest Brain.');
+      if(committed?.project){
+        const remote=migrateProject(committed.project);
+        Object.assign(project,remote);
+      } else {
+        await syncRemoteProject(project);
+      }
+    }else{
+      saveProject(project);
+    }
     saveProject(project);
-    await syncRemoteProject(project);
     renderOutput(project);
     if(software)mountArtifact(project);
     notify('Deliverable generated and validated from the current canonical project spec.','success');
