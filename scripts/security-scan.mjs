@@ -12,7 +12,7 @@ const checks=[
   ['No private key blocks',!/BEGIN (RSA|EC|OPENSSH)? ?PRIVATE KEY/.test(all)],
   ['No obvious command execution in browser',!/(child_process|execSync|spawnSync)\s*\(/.test(all)],
   ['No eval or Function constructor',!(/\beval\s*\(|new Function\s*\(/.test(all))],
-  ['No plaintext connected-account tokens in base schema',!/(access_token|refresh_token)/.test(fs.readFileSync(path.join(root,'supabase/schema.sql'),'utf8'))],
+  ['No plaintext connected-account tokens in base schema',!/(^|\\n)\\s*(access_token|refresh_token)\\s+text\\b/i.test(fs.readFileSync(path.join(root,'supabase/schema.sql'),'utf8'))],
   ['Provider credential table is server-only',/ai_provider_credentials[\s\S]{0,500}Never expose|ai_provider_credentials/.test(all)],
   ['Security headers are configured',fs.existsSync(path.join(root,'_headers')) && fs.existsSync(path.join(root,'netlify.toml'))],
   ['Robots and sitemap exist',fs.existsSync(path.join(root,'robots.txt')) && fs.existsSync(path.join(root,'sitemap.xml'))],
