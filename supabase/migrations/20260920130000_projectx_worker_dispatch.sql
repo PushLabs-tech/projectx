@@ -35,12 +35,12 @@ returns text
 language sql
 security definer
 set search_path = ''
-as $
+as $$
   select decrypted_secret
   from vault.decrypted_secrets
   where name = 'projectx_worker_token'
   limit 1;
-$;
+$$;
 
 revoke all on function private.projectx_worker_token_get() from public, anon, authenticated;
 grant execute on function private.projectx_worker_token_get() to service_role;
