@@ -164,6 +164,73 @@ async function edge(action, payload = {}) {
   return data;
 }
 
+async function integrationEdge(functionName, action, payload = {}) {
+  const client = ensureSupabase();
+  if (!client || !session?.access_token) throw new Error('SIGN_IN_REQUIRED');
+  const { data, error } = await client.functions.invoke(functionName, { body: { action, ...payload } });
+  if (error) {
+    let message = error.message || `${functionName} service error`;
+    try { const body = await error.context?.json?.(); if (body?.error) message = body.error; } catch {}
+    throw new Error(message);
+  }
+  if (!data || data.ok === false) throw new Error(data?.error || `${functionName} service error`);
+  return data;
+}
+
+async function startGitHubConnection(workspaceId) {
+  const result = await integrationEdge('github', 'startOAuth', { workspaceId });
+  if (!result.url) throw new Error('GitHub OAuth URL missing');
+  window.location.assign(result.url);
+}
+
+async function githubListRepositories(workspaceId) { return integrationEdge('github', 'listRepos', { workspaceId }); }
+async function githubCreateRepository(workspaceId, name, options = {}) { return integrationEdge('github', 'createRepo', { workspaceId, name, ...options }); }
+async function githubPushFiles(workspaceId, fullName, files, options = {}) { return integrationEdge('github', 'pushFiles', { workspaceId, fullName, files, ...options }); }
+async function deployProject(projectId, provider = 'vercel', label = 'default') { return integrationEdge('deploy', 'deploy', { projectId, provider, label }); }
+async function deploymentStatus(projectId) { return integrationEdge('deploy', 'status', { projectId }); }
+async function saveDeploymentTarget(workspaceId, provider, token, options = {}) { return integrationEdge('deploy', 'saveTarget', { workspaceId, provider, token, ...options }); }
+async function inviteWorkspaceMember(workspaceId, email, role = 'editor') { return integrationEdge('collaboration', 'invite', { workspaceId, email, role }); }
+async function acceptWorkspaceInvite(token) { return integrationEdge('collaboration', 'accept', { token }); }
+async function listWorkspaceMembers(workspaceId) { return integrationEdge('collaboration', 'members', { workspaceId }); }
+async function ingestProjectResource(projectId, file) {
+  const data = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Unable to read file'));
+    reader.readAsDataURL(file);
+  });
+  return integrationEdge('resource-ingest', 'ingest', {
+    projectId,
+    fileName: file.name,
+    mimeType: file.type || 'application/octet-stream',
+    dataBase64: String(data).split(',').pop()
+  });
+}
+async function billingStatus() { return integrationEdge('payments', 'billingStatus'); }
+async function cancelBillingSubscription(subscriptionId, cancelAtCycleEnd = true) {
+  return integrationEdge('payments', 'cancelSubscription', { subscriptionId, cancelAtCycleEnd });
+}
+function collaborationChannel(workspaceId) {
+  const client = ensureSupabase();
+  if (!client || !session?.user?.id) throw new Error('SIGN_IN_REQUIRED');
+  const channel = client.channel(`workspace:${workspaceId}`, { config: { private: true, presence: { key: session.user.id } } });
+  return {
+    channel,
+    async connect(meta = {}) {
+      channel.on('presence', { event: 'sync' }, () => {});
+      return new Promise((resolve, reject) => {
+        channel.subscribe(async status => {
+          if (status !== 'SUBSCRIBED') { if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') reject(new Error(status)); return; }
+          const result = await channel.track({ userId: session.user.id, email: session.user.email || '', ...meta });
+          if (result !== 'ok') reject(new Error('Presence tracking failed')); else resolve(channel);
+        });
+      });
+    },
+    members() { return channel.presenceState(); },
+    async disconnect() { await client.removeChannel(channel); }
+  };
+}
+
 function discoveryBrainOperations(project,data,answers,workspace){
   const ops=[];
   const add=(path,value)=>{if(value!==undefined&&value!==null)ops.push({op:'replace',path,value});};
@@ -1964,5 +2031,7 @@ window.addEventListener('hashchange',()=>{
   if(route==='login'||route==='signup'||route==='workspace'||!location.hash)home();
 });
 async function boot(){installCss();installOptionalAnalytics();window.addEventListener('online',()=>{flushSyncOutbox().catch(()=>{});});await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();}
-window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot};
+window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot,
+  integrations:{startGitHubConnection,githubListRepositories,githubCreateRepository,githubPushFiles,deployProject,deploymentStatus,saveDeploymentTarget,
+    inviteWorkspaceMember,acceptWorkspaceInvite,listWorkspaceMembers,ingestProjectResource,billingStatus,cancelBillingSubscription,collaborationChannel}};
 boot();
