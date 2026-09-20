@@ -11,7 +11,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
 const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary"]);
-const MAX_BODY_BYTES = 180000;
+const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
 const MODEL_CACHE_TTL = 5 * 60 * 1000;
@@ -230,14 +230,16 @@ function systemFor(mode: string, p: any) {
   return `You are ProjectX. Be concrete and honest. ${guard}\n${ctx}`;
 }
 
-async function authorizeProject(user: any, projectId: string) {
+async function authorizeProject(user: any, projectId: string, requireWrite = false) {
   const { data: existing, error } = await admin.from("projects").select("id,owner_id,workspace_id,spec_version,updated_at").eq("id", projectId).maybeSingle();
   if (error) throw error;
   if (!existing) throw new Error("Project not found");
   if (existing.owner_id === user.id) return {...existing, role:"owner"};
   const { data: member } = await admin.from("workspace_members").select("role").eq("workspace_id", existing.workspace_id).eq("user_id", user.id).maybeSingle();
   if (!member || !["owner", "admin", "editor", "viewer"].includes(member.role)) throw new Error("Not authorized");
-  return {...existing, role:String(member.role)};
+  const role = String(member.role);
+  if (requireWrite && role === "viewer") throw new Error("Not authorized");
+  return {...existing, role};
 }
 
 async function persistProject(user: any, p: any) {
@@ -245,7 +247,7 @@ async function persistProject(user: any, p: any) {
   let workspaceId = String(p?.workspaceId || "") || null;
   let existing: any = null;
   if (projectId) {
-    existing = await authorizeProject(user, projectId);
+    existing = await authorizeProject(user, projectId, true);
     workspaceId = existing.workspace_id;
     const incomingVersion = Number(p?.specVersion || 1);
     const currentVersion = Number(existing.spec_version || 1);
@@ -339,26 +341,6 @@ async function persistProject(user: any, p: any) {
   if (messages.length) {
     const { error: me } = await admin.from("project_messages").insert(messages.map((m: any) => ({ project_id: saved.id, user_id: user.id, role: m.role === "assistant" ? "assistant" : "user", mode: "build", content: { text: limitText(m.text, 12000) } })));
     if (me) throw me;
-  }
-
-  if (Array.isArray(p?.research?.findings) && p.research.findings.length) {
-    const { error: rd } = await admin.from("research_findings").delete().eq("project_id", saved.id);
-    if (rd) throw rd;
-    const researchRows = p.research.findings.slice(-100).map((f: any) => ({
-      project_id: saved.id,
-      query: limitText(f.query || p.research?.queries?.slice(-1)?.[0] || "", 500),
-      finding: limitText(f.finding || "", 1800),
-      source_title: limitText(f.sourceTitle || f.source_title || "", 180),
-      source_url: limitText(f.sourceUrl || f.source_url || "", 2000),
-      source_date: /^\d{4}-\d{2}-\d{2}$/.test(String(f.sourceDate || f.source_date || "")) ? String(f.sourceDate || f.source_date) : null,
-      confidence: Math.max(0, Math.min(1, Number(f.confidence ?? 0))),
-      provider: limitText(f.provider || "", 80),
-      raw: f.raw && typeof f.raw === "object" ? f.raw : {}
-    })).filter((f: any) => f.finding);
-    if (researchRows.length) {
-      const { error: ri } = await admin.from("research_findings").insert(researchRows);
-      if (ri) throw ri;
-    }
   }
 
   if (Array.isArray(p?.versions) && p.versions.length) {
