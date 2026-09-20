@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, normalizeResources, projectArtifactKind, serializeForPersistence, assemblePreviewHtml, sanitizePath, applyBrainMutation, createProjectFromIntent, generateDiscoveryPoll, createPlan, startAgentRun, approveAction, createArtifactVersion, runVerification, getUsageSummary } from '../projectx-core.js';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
+const appShellCss = fs.readFileSync(new URL('../px-app.css', import.meta.url), 'utf8');
+const shellSource = runtime + appShellCss;
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const vite = fs.readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
 
@@ -146,7 +148,7 @@ assert.match(runtime, /renderOptimize/);
 assert.match(runtime, /renderTransform/);
 assert.match(runtime, /restoreProjectSnapshot/);
 assert.match(runtime, /Visual edit/);
-assert.match(runtime, /preview-mobile/);
+assert.match(shellSource, /preview-mobile/);
 assert.match(runtime, /preview-file/);
 assert.match(runtime, /resource-file/);
 assert.match(runtime, /Fork current project/);
@@ -162,7 +164,7 @@ assert.match(runtime, /listModels/);
 assert.match(runtime, /agentModels/);
 assert.match(runtime, /renderAgentSettings/);
 assert.match(runtime, /subscribeProjectRealtime/);
-assert.match(runtime, /classification:data\.classification/);
+assert.match(runtime, /classification=data\.classification/);
 assert.match(runtime, /specVersion/);
 assert.match(runtime, /Build with AI/);
 assert.match(runtime, /Open Settings/);
