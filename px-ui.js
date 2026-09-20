@@ -61,7 +61,10 @@ export const COMMANDS = [
   ['palette-security', 'Open security', 'security'],
   ['palette-integrations', 'Open integrations', 'integrations'],
   ['palette-git', 'Open versions', 'git'],
-  ['palette-build', 'Open build', 'build']
+  ['palette-build', 'Open build', 'build'],
+  ['palette-toggle-agent', 'Toggle assistant', 'toggle-assistant'],
+  ['palette-toggle-nav', 'Toggle navigation', 'toggle-nav'],
+  ['palette-toggle-output', 'Toggle output queue', 'toggle-bottom']
 ];
 
 export const CONTEXT_ACTIONS = {
@@ -157,23 +160,27 @@ export function publicMarkup() {
   </footer>`;
 }
 
-export function chrome({esc, session, recents, active, body, project, nav, right, status, email}) {
+export function chrome({esc, session, recents, active, body, project, nav, right, status, email, execNote}) {
   const tools = project ? navForProject(project) : APP_TOOLS;
   const left = tools.map(([id, name]) => {
     const on = (nav || active) === id;
-    if (project) return `<button class="px-tool ${on ? 'active' : ''}" data-project-tool="${esc(id)}">${esc(name)}</button>`;
-    return `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}">${esc(name)}</button>`;
+    if (project) return `<button class="px-tool ${on ? 'active' : ''}" data-project-tool="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`;
+    return `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`;
   }).join('');
   const recent = recents.map(p => `<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('') || '<div class="sub" style="padding:6px 10px">No projects yet</div>';
   const title = project ? esc(project.title) : 'ProjectX';
   const sync = project?.sync?.mode === 'cloud' ? 'Synced' : session ? 'Account' : 'Local';
   const rightPane = right != null ? right : `<div class="label">Assistant</div><div class="sub" style="padding:12px">Open Assistant to work on the current project, file, or selection.</div>`;
   const extra = project ? `<button class="ghost px-add-tool" data-cmd="add-tool">Add tool</button>` : '';
+  const queueNote = execNote || 'No isolated cloud workers are connected. Independent tasks can be queued; execution is sequential through the Assistant.';
   return `<div class="px-shell ${project ? '' : 'no-right'}" id="px-shell">
     <aside class="px-left side" id="px-left">
-      <div class="logo">ProjectX</div>
+      <button class="logo" data-nav="home" title="Home">ProjectX</button>
+      <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'Projects'} ▾</button>
+      <div class="px-switch-list" id="px-switch-list" hidden>${recent}</div>
       <button class="new" data-nav="home">New project</button>
-      <nav class="nav">${left}${extra}</nav>
+      <input class="input px-side-search" id="px-side-search" placeholder="Search tools and files" aria-label="Search project">
+      <nav class="nav" id="px-tool-nav">${left}${extra}</nav>
       <div class="divider"></div>
       <div class="label">Recent</div>
       <div class="recent">${recent}</div>
@@ -187,18 +194,32 @@ export function chrome({esc, session, recents, active, body, project, nav, right
       <span class="sub">${esc(sync)}</span>
       <span style="flex:1"></span>
       <button class="ghost" data-cmd="palette" title="Command palette">⌘K</button>
-      ${project ? '<button class="ghost" data-project-tool="preview">Preview</button><button class="ghost" data-project-tool="deploy">Deploy</button>' : ''}
+      ${project ? '<button class="ghost" data-cmd="toggle-assistant" title="Hide assistant">Agent</button><button class="ghost" data-cmd="share">Share</button><button class="ghost" data-project-tool="preview">Preview</button><button class="ghost" data-project-tool="deploy">Deploy</button>' : ''}
       ${session ? '<button data-action="signout">Sign out</button>' : '<button data-action="signin">Sign in</button>'}
     </header>
     <main class="px-center main">${body}</main>
     ${project ? '<div class="px-split" id="px-split-right" data-split="right" title="Resize assistant"></div>' : ''}
     <aside class="px-right" id="px-assistant-dock">${rightPane}</aside>
-    <footer class="px-statusbar">${status || 'Ready'} · ${session ? 'Signed in' : 'Guest'} · ${esc((project && project.status) || 'idle')}</footer>
+    <div class="px-bottom" id="px-bottom" hidden>
+      <div class="label">Queue</div>
+      <div class="sub" style="padding:8px 12px">${esc(queueNote)}</div>
+      <div id="px-bottom-log" class="conversation"></div>
+    </div>
+    <footer class="px-statusbar" id="px-statusbar"><button class="ghost" data-cmd="toggle-bottom" type="button">Output</button><span>${status || 'Ready'} · ${session ? 'Signed in' : 'Guest'} · ${esc((project && project.status) || 'idle')}</span><span style="flex:1"></span><span class="sub">⌘K command · ⌘S save · ⌘B nav · ⌘J output</span></footer>
   </div>
   <div class="px-palette" id="px-palette" hidden>
     <div class="px-palette-box">
       <input id="px-palette-input" placeholder="Search commands, projects, surfaces…" aria-label="Command palette">
       <div class="px-palette-list" id="px-palette-list"></div>
+    </div>
+  </div>
+  <div class="px-ctx" id="px-ctx" hidden></div>
+  <div class="px-share" id="px-share" hidden>
+    <div class="px-share-box">
+      <div class="label">Share</div>
+      <p class="sub">Copy the workspace URL. This does not publish hosting or create OAuth invites.</p>
+      <input class="input full" id="px-share-url" readonly>
+      <div class="actions"><button class="ghost" data-cmd="share-close">Close</button><button class="primary" data-cmd="share-copy">Copy link</button></div>
     </div>
   </div>`;
 }
@@ -242,11 +263,12 @@ export function interviewMarkup() {
 export function projectHead({esc, project}) {
   const category = project.category || project.understanding?.category || project.type || 'PROJECT';
   const summary = String(project.understanding?.summary || project.intent || '').trim();
-  return `<div class="project" style="width:auto;margin:0;padding:16px">
-    <div class="kicker">PROJECT · ${esc(category)}</div>
-    <h1 class="project-title" style="font-size:28px">${esc(project.title)}</h1>
-    <div class="project-context"><span>${esc(summary || 'Working from the current project brain.')}</span></div>
-    <div class="project-tools">${navForProject(project).slice(0, 8).map(([id, name]) => `<button class="tool-btn ${project.uiNav === id ? 'active' : ''}" data-project-tool="${esc(id)}">${esc(name)}</button>`).join('')}</div>
+  return `<div class="project px-work">
+    <div class="px-work-head">
+      <div class="kicker">PROJECT · ${esc(category)}</div>
+      <h1 class="project-title">${esc(project.title)}</h1>
+      <div class="project-context"><span>${esc(summary || 'Working from the current project brain.')}</span></div>
+    </div>
     <div class="sections">${project.sections.map(s => `<button class="tab ${project.selectedSection === s.id ? 'active' : ''}" data-section="${esc(s.id)}">${esc(s.name)}</button>`).join('')}</div>
     <div id="project-body" class="body"></div>
   </div>`;
@@ -263,6 +285,10 @@ export function assistantDock({esc, project, actions}) {
   <form id="assistant-dock-form" class="form">
     <textarea id="assistant-dock-input" placeholder="Ask about this project…"></textarea>
     <button class="primary" id="assistant-dock-send" type="submit">Send</button>
+  </form>
+  <form id="plan-dock-form" class="form" style="margin:0 8px 8px">
+    <textarea id="plan-dock-input" placeholder="Queue another task while work continues…"></textarea>
+    <button class="ghost" id="plan-dock-send" type="submit">Queue</button>
   </form>`;
 }
 

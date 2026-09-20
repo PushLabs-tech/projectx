@@ -48,7 +48,11 @@ const DEFAULT_SETTINGS = {
   agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], orchestrator: MODELS[0] },
   agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true },
   notifications: { build: true, test: true, deploy: true, credits: true, security: true },
-  skills: []
+  skills: [],
+  hideNav: false,
+  hideAssistant: false,
+  showBottom: false,
+  splitFiles: false
 };
 const ExecutionProvider = {
   kind: 'sequential-local',
@@ -388,11 +392,57 @@ function installOptionalAnalytics(){
 
 function installCss(){if($('#px-style'))return;const link=document.createElement('link');link.id='px-style';link.rel='stylesheet';link.href=appStylesheet;document.head.appendChild(link);}
 function ensureShell(){installCss();let root=$('#px-app');if(!root){root=document.createElement('div');root.id='px-app';document.body.appendChild(root);}return root;}
+function applyChromeLayout(){
+  const sh=$('#px-shell');if(!sh)return;
+  sh.classList.toggle('hide-left',Boolean(settingsState.hideNav));
+  sh.classList.toggle('hide-right',Boolean(settingsState.hideAssistant));
+  sh.classList.toggle('show-bottom',Boolean(settingsState.showBottom));
+  const bottom=$('#px-bottom');if(bottom)bottom.hidden=!settingsState.showBottom;
+}
+function showShare(){
+  const el=$('#px-share');if(!el)return;
+  el.hidden=false;
+  const input=$('#px-share-url');
+  if(input)input.value=location.href;
+}
+function hideShare(){const el=$('#px-share');if(el)el.hidden=true;}
+function copyShareLink(){
+  const value=$('#px-share-url')?.value||location.href;
+  (navigator.clipboard?.writeText(value)||Promise.reject()).then(()=>notify('Workspace link copied. This is not a published host.','success')).catch(()=>notify('Copy this URL: '+value,'info'));
+}
+function filterSideSearch(q){
+  const query=String(q||'').toLowerCase();
+  $$('#px-tool-nav [data-search], #px-tool-nav [data-project-tool]').forEach(btn=>{
+    const hay=(btn.dataset.search||btn.textContent||'').toLowerCase();
+    btn.hidden=Boolean(query)&&!hay.includes(query);
+  });
+  const p=activeProject();
+  const hits=p&&query?Object.keys(p.files||{}).filter(f=>f.toLowerCase().includes(query)).slice(0,8):[];
+  let extra=$('#px-file-hits');
+  if(!hits.length){extra?.remove();return;}
+  if(!extra){extra=document.createElement('div');extra.id='px-file-hits';extra.className='recent';$('#px-tool-nav')?.after(extra);}
+  extra.innerHTML=hits.map(f=>`<button data-project-tool="files" data-open-file="${esc(f)}">${esc(f)}</button>`).join('');
+}
 function bindChrome(root){
   root.onclick=async e=>{
+    const cmd=e.target.closest('[data-cmd]')?.dataset.cmd;
+    if(cmd==='palette')return openPalette();
+    if(cmd==='add-tool')return addProjectTool(activeProject());
+    if(cmd==='toggle-assistant'){settingsState.hideAssistant=!settingsState.hideAssistant;persistSettings();applyChromeLayout();return;}
+    if(cmd==='toggle-bottom'){settingsState.showBottom=!settingsState.showBottom;persistSettings();applyChromeLayout();return;}
+    if(cmd==='toggle-nav'){settingsState.hideNav=!settingsState.hideNav;persistSettings();applyChromeLayout();return;}
+    if(cmd==='share')return showShare();
+    if(cmd==='share-close')return hideShare();
+    if(cmd==='share-copy')return copyShareLink();
     if(e.target.closest('#px-nav-toggle')) return $('#px-shell')?.classList.toggle('nav-open');
-    if(e.target.closest('[data-cmd="palette"]')) return openPalette();
-    if(e.target.closest('[data-cmd="add-tool"]')) return addProjectTool(activeProject());
+    if(e.target.closest('#px-project-switch')){
+      const list=$('#px-switch-list');if(list)list.hidden=!list.hidden;return;
+    }
+    if(!e.target.closest('#px-switch-list')) {const list=$('#px-switch-list');if(list)list.hidden=true;}
+    if(!e.target.closest('#px-ctx')) {const ctx=$('#px-ctx');if(ctx)ctx.hidden=true;}
+    if(e.target.closest('#px-share')&&!e.target.closest('.px-share-box')) hideShare();
+    const openFile=e.target.closest('[data-open-file]')?.dataset.openFile;
+    if(openFile){const p=activeProject();if(p){p.uiFilePath=openFile;p.uiNav='files';saveProject(p);return renderProject(p);}}
     const nav=e.target.closest('[data-nav]')?.dataset.nav;if(nav)return navigate(nav);
     const open=e.target.closest('[data-open]')?.dataset.open;if(open)return openProject(open);
     const action=e.target.closest('[data-action]')?.dataset.action;
@@ -402,7 +452,10 @@ function bindChrome(root){
     const example=e.target.closest('[data-example]')?.dataset.example;
     if(example){try{sessionStorage.setItem('projectx_pending_intent',example);}catch{} state.forceWorkspace=true;workspaceHome();const input=$('#start-input');if(input)input.value=example;}
   };
+  const search=$('#px-side-search',root);
+  if(search&&!search.dataset.bound){search.dataset.bound='1';search.oninput=()=>filterSideSearch(search.value);}
   bindSplit(root);
+  applyChromeLayout();
 }
 function bindSplit(root){
   const split=$('#px-split-right',root);if(!split||split.dataset.bound)return;split.dataset.bound='1';
@@ -428,7 +481,7 @@ function shell(body, active='home', opts={}){
   const recents=state.projects.slice(0,6);
   const project=opts.project||null;
   const right=opts.right;
-  root.innerHTML=UI.chrome({esc,session,recents,active,body,project,nav:opts.nav||active,right,status:opts.status,email:session?.user?.email});
+  root.innerHTML=UI.chrome({esc,session,recents,active,body,project,nav:opts.nav||active,right,status:opts.status,email:session?.user?.email,execNote:ExecutionProvider.note});
   bindChrome(root);
   bindPalette();
   bindDock(opts.project);
@@ -438,6 +491,18 @@ function bindDock(project){
   if(!project)return;
   const form=$('#assistant-dock-form');
   if(form)form.onsubmit=async e=>{e.preventDefault();const text=$('#assistant-dock-input')?.value.trim();if(!text)return;$('#assistant-dock-input').value='';await sendProjectMessage(project,text);};
+  const plan=$('#plan-dock-form');
+  if(plan)plan.onsubmit=e=>{
+    e.preventDefault();
+    const text=$('#plan-dock-input')?.value.trim();
+    if(!text)return;
+    $('#plan-dock-input').value='';
+    const task=addTask(project,text,{status:'draft',description:text});
+    const log=$('#px-bottom-log');
+    if(log)log.insertAdjacentHTML('beforeend',`<div class="msg ai">Queued: ${esc(task.title)}. Execution is sequential through Assistant — no remote worker started.</div>`);
+    if(!settingsState.showBottom){settingsState.showBottom=true;persistSettings();applyChromeLayout();}
+    notify('Task queued. Work stays sequential.','info');
+  };
   $$('[data-assist-action]').forEach(btn=>btn.onclick=()=>{
     const a=btn.dataset.assistAction;
     const input=$('#assistant-dock-input')||$('#project-input');
@@ -1266,20 +1331,104 @@ function mountArtifact(project){
   window.addEventListener('message',onMessage);runtimeTestCleanup=()=>window.removeEventListener('message',onMessage);
   $$('[data-viewport]').forEach(btn=>btn.onclick=()=>{const value=btn.dataset.viewport;$$('[data-viewport]').forEach(x=>x.classList.toggle('active',x===btn));const artifact=$('.artifact');artifact.className='artifact preview-'+value;});
 }
+function fileTreeNodes(paths){
+  const root={};
+  for(const path of paths){
+    const parts=String(path).split('/').filter(Boolean);
+    let node=root;
+    parts.forEach((part,i)=>{
+      if(i===parts.length-1){node[part]={__file:path};return;}
+      if(!node[part]||node[part].__file)node[part]={};
+      node=node[part];
+    });
+  }
+  return root;
+}
+function fileTreeHtml(node,escFn,current){
+  return Object.keys(node).sort().map(key=>{
+    const val=node[key];
+    if(val&&val.__file){
+      const path=val.__file;
+      return `<button class="${path===current?'active':''}" data-file="${escFn(path)}">${escFn(key)}</button>`;
+    }
+    return `<details open class="px-folder"><summary>${escFn(key)}</summary>${fileTreeHtml(val,escFn,current)}</details>`;
+  }).join('');
+}
+function saveOpenFile(project){
+  const editor=$('#file-code-editor');
+  const path=project.uiFilePath;
+  if(!editor||!path||!Object.hasOwn(project.files||{},path))return false;
+  const content=editor.value;
+  if(project.files[path]===content)return false;
+  snapshot(project,'Before file edit');
+  const mutation=applyProjectMutation(project,{fileOperations:[{op:'write',path,content}]});
+  if(!mutation.changed)return false;
+  project.status='needs-build';
+  saveProject(project);
+  syncRemoteProject(project);
+  return true;
+}
+function refreshFilePreview(project){
+  const frame=$('#file-preview-frame');
+  if(!frame||!settingsState.splitFiles)return;
+  const draft={...(project.files||{})};
+  const editor=$('#file-code-editor');
+  if(project.uiFilePath&&editor)draft[project.uiFilePath]=editor.value;
+  frame.srcdoc=assemblePreviewHtml(draft);
+}
+function showFileCtx(x,y,path,project){
+  const el=$('#px-ctx');if(!el)return;
+  el.hidden=false;
+  el.style.left=Math.min(x,window.innerWidth-200)+'px';
+  el.style.top=Math.min(y,window.innerHeight-160)+'px';
+  el.innerHTML=`<button data-ctx="open">Open</button><button data-ctx="ask">Ask Assistant</button><button data-ctx="rename">Rename</button><button data-ctx="download">Download</button><button data-ctx="delete">Delete</button>`;
+  el.onclick=ev=>{
+    const act=ev.target.closest('[data-ctx]')?.dataset.ctx;if(!act)return;
+    el.hidden=true;
+    if(act==='open'){project.uiFilePath=path;renderFiles(project);}
+    if(act==='ask'){const dock=$('#assistant-dock-input');if(dock){dock.value='Explain '+path+': ';dock.focus();}settingsState.hideAssistant=false;persistSettings();applyChromeLayout();}
+    if(act==='rename')$('#rename-file')?.click();
+    if(act==='download')downloadText(path,project.files[path]||'');
+    if(act==='delete')$('#delete-file')?.click();
+  };
+}
 function renderFiles(project){
-  const paths=Object.keys(project.files||{}).sort(),first=paths[0]||null,body=$('#project-body');
-  body.innerHTML='<div class="box"><div class="files"><div class="file-list">'+(paths.map((path,i)=>'<button class="'+(i===0?'active':'')+'" data-file="'+esc(path)+'">'+esc(path)+'</button>').join('')||'<div class="sub">No generated files yet.</div>')+'<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div style="padding-left:14px"><div class="row"><b id="file-name">'+esc(first||'No file selected')+'</b><div class="actions">'+(first?'<button class="ghost" id="preview-file">Preview changes</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':'')+'</div></div><textarea id="file-code-editor" class="code-editor" spellcheck="false">'+esc(first?project.files[first]:'Build the project to create real files.')+'</textarea><div class="sub" id="file-dirty"></div></div></div></div>';
+  const paths=Object.keys(project.files||{}).sort();
+  const first=paths.includes(project.uiFilePath)?project.uiFilePath:(paths[0]||null);
+  project.uiFilePath=first;
+  project.uiFileTabs=Array.isArray(project.uiFileTabs)?project.uiFileTabs.filter(p=>paths.includes(p)):[];
+  if(first&&!project.uiFileTabs.includes(first))project.uiFileTabs.push(first);
+  const body=$('#project-body');
+  const tree=paths.length?fileTreeHtml(fileTreeNodes(paths),esc,first):'<div class="sub">No generated files yet. Build to create them, or New to add a path.</div>';
+  const tabs=project.uiFileTabs.map(p=>`<button class="${p===first?'active':''}" data-file-tab="${esc(p)}">${esc(p.split('/').pop())}</button>`).join('')||'<span class="sub" style="padding:8px">No open file</span>';
+  const split=Boolean(settingsState.splitFiles);
+  body.innerHTML=`<div class="box"><div class="px-ide" id="px-ide"><div class="px-ide-tree file-list">${tree}<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div class="px-ide-main"><div class="px-ide-tabs" id="px-file-tabs">${tabs}</div><div class="px-ide-work ${split?'split':''}"><textarea id="file-code-editor" class="code-editor" spellcheck="false">${esc(first?project.files[first]:'Build the project to create real files.')}</textarea><div class="px-ide-preview" ${split?'':'hidden'}><iframe id="file-preview-frame" sandbox="allow-scripts" title="File preview"></iframe></div></div><div class="row"><b id="file-name">${esc(first||'No file selected')}</b><div class="actions"><button class="ghost" id="split-files">${split?'Hide preview':'Split preview'}</button>${first?'<button class="ghost" id="preview-file">Diff hint</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':''}</div></div><div class="sub" id="file-dirty"></div></div></div></div>`;
   let currentPath=first;
-  const markDirty=()=>{$('#file-dirty').textContent=(currentPath&&project.files[currentPath]!==$('#file-code-editor').value)?'Unsaved changes in '+currentPath:'';};
-  const selectFile=path=>{$$('[data-file]',body).forEach(x=>x.classList.toggle('active',x.dataset.file===path));currentPath=path;$('#file-name').textContent=path;$('#file-code-editor').value=project.files[path]||'';markDirty();};
-  $$('[data-file]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.file));
-  $('#file-code-editor')?.addEventListener('input',markDirty);
+  const markDirty=()=>{const dirty=currentPath&&project.files[currentPath]!==$('#file-code-editor').value;$('#file-dirty').textContent=dirty?'Unsaved changes in '+currentPath+' · ⌘S to save':'';$('#file-dirty')?.classList.toggle('file-dirty',Boolean(dirty));$$('[data-file-tab]').forEach(t=>t.classList.toggle('file-dirty',t.dataset.fileTab===currentPath&&dirty));};
+  const selectFile=path=>{
+    if(!path||!Object.hasOwn(project.files,path))return;
+    currentPath=path;project.uiFilePath=path;
+    if(!project.uiFileTabs.includes(path))project.uiFileTabs.push(path);
+    $$('[data-file]',body).forEach(x=>x.classList.toggle('active',x.dataset.file===path));
+    $$('[data-file-tab]',body).forEach(x=>x.classList.toggle('active',x.dataset.fileTab===path));
+    $('#file-name').textContent=path;
+    $('#file-code-editor').value=project.files[path]||'';
+    markDirty();
+    refreshFilePreview(project);
+  };
+  $$('[data-file]',body).forEach(button=>{
+    button.onclick=()=>selectFile(button.dataset.file);
+    button.oncontextmenu=e=>{e.preventDefault();showFileCtx(e.clientX,e.clientY,button.dataset.file,project);};
+  });
+  $$('[data-file-tab]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.fileTab));
+  $('#file-code-editor')?.addEventListener('input',()=>{markDirty();if(settingsState.splitFiles)refreshFilePreview(project);});
+  $('#split-files')?.addEventListener('click',()=>{settingsState.splitFiles=!settingsState.splitFiles;persistSettings();renderFiles(project);});
   $('#new-file')?.addEventListener('click',()=>{
     const raw=prompt('New file path');const path=sanitizePath(raw||'');
     if(!path)return notify('That path is not allowed.','error');
     snapshot(project,'Before new file');
     applyProjectMutation(project,{fileOperations:[{op:'write',path,content:''}]});
-    saveProject(project);renderFiles(project);
+    project.uiFilePath=path;saveProject(project);renderFiles(project);
   });
   $('#preview-file')?.addEventListener('click',()=>{
     if(!currentPath||!Object.hasOwn(project.files,currentPath))return;
@@ -1288,21 +1437,17 @@ function renderFiles(project){
     notify(before===after?'No changes pending.':currentPath+' · '+Math.abs(afterLines-beforeLines)+' line count delta pending save.','info');
   });
   $('#save-file')?.addEventListener('click',async()=>{
-    if(!currentPath||!Object.hasOwn(project.files,currentPath))return;
-    const content=$('#file-code-editor').value;
-    if(project.files[currentPath]===content)return notify('No file changes to save.','info');
-    snapshot(project,'Before file edit');
-    const mutation=applyProjectMutation(project,{fileOperations:[{op:'write',path:currentPath,content}]});
-    if(!mutation.changed)return;
-    project.status='needs-build';saveProject(project);await syncRemoteProject(project);notify('File saved. Generated output is now stale until rebuilt and verified.','success');markDirty();
+    if(!saveOpenFile(project))return notify('No file changes to save.','info');
+    notify('File saved. Generated output is now stale until rebuilt and verified.','success');markDirty();
   });
   $('#rename-file')?.addEventListener('click',async()=>{
     if(!currentPath)return;
     const next=sanitizePath(prompt('Rename to',currentPath)||'');
     if(!next||next===currentPath)return;
     snapshot(project,'Before rename');
-    const content=project.files[currentPath];
+    const content=$('#file-code-editor')?.value??project.files[currentPath];
     applyProjectMutation(project,{fileOperations:[{op:'write',path:next,content},{op:'delete',path:currentPath}]});
+    project.uiFilePath=next;project.uiFileTabs=(project.uiFileTabs||[]).map(p=>p===currentPath?next:p);
     saveProject(project);await syncRemoteProject(project);renderFiles(project);
   });
   $('#delete-file')?.addEventListener('click',async()=>{
@@ -1310,9 +1455,12 @@ function renderFiles(project){
     if(settingsState.confirmDelete&&!confirm('Delete '+currentPath+'?'))return;
     snapshot(project,'Before delete');
     applyProjectMutation(project,{fileOperations:[{op:'delete',path:currentPath}]});
+    project.uiFileTabs=(project.uiFileTabs||[]).filter(p=>p!==currentPath);
+    project.uiFilePath=project.uiFileTabs[0]||null;
     saveProject(project);await syncRemoteProject(project);renderFiles(project);
   });
   $('#download-file')?.addEventListener('click',()=>currentPath&&downloadText(currentPath,project.files[currentPath]));
+  if(split)refreshFilePreview(project);
 }
 function downloadText(name,content,type='text/plain'){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name.split('/').pop();a.click();setTimeout(()=>URL.revokeObjectURL(url),500);}
 async function renderTests(project){
@@ -1699,7 +1847,7 @@ function drawPalette(q){
     +files.map(f=>`<button data-cmd-go="files">${esc(f)}</button>`).join('')
     +tasks.map(t=>`<button data-cmd-go="tasks">${esc(t.title)}</button>`).join('')
     +(brain.length?`<button data-cmd-go="brain">Brain match</button>`:'');
-  $$('[data-cmd-go]',list).forEach(b=>b.onclick=()=>{closePalette();const id=b.dataset.cmdGo;const cur=activeProject();if(cur&&UI.PROJECT_NAV.some(n=>n[0]===id)){cur.uiNav=id;saveProject(cur);return renderProjectTool(cur,id);}navigate(id);});
+  $$('[data-cmd-go]',list).forEach(b=>b.onclick=()=>{closePalette();const id=b.dataset.cmdGo;if(id==='toggle-assistant'||id==='toggle-nav'||id==='toggle-bottom'){if(id==='toggle-assistant')settingsState.hideAssistant=!settingsState.hideAssistant;if(id==='toggle-nav')settingsState.hideNav=!settingsState.hideNav;if(id==='toggle-bottom')settingsState.showBottom=!settingsState.showBottom;persistSettings();applyChromeLayout();return;}const cur=activeProject();if(cur&&UI.PROJECT_NAV.some(n=>n[0]===id)){cur.uiNav=id;saveProject(cur);return renderProjectTool(cur,id);}navigate(id);});
 }
 function closePalette(){$('#px-palette')&&($('#px-palette').hidden=true);}
 function bindPalette(){
@@ -1711,8 +1859,16 @@ function bindPalette(){
 function navigate(route){if(route==='home')home();else if(route==='projects')projectsPage();else if(route==='analytics')analyticsPage();else if(route==='assistant'){const p=activeProject();if(p){p.uiNav='assistant';return renderProjectTool(p,'assistant');}assistantPage();}else if(route==='settings')settingsPage('general');else if(UI.PROJECT_NAV.some(n=>n[0]===route)){const p=activeProject();if(p){p.uiNav=route;saveProject(p);return renderProjectTool(p,route);}projectsPage();}}
 window.addEventListener('beforeunload',()=>runtimeTestCleanup?.());
 window.addEventListener('keydown',e=>{
-  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}
-  if(e.key==='Escape')closePalette();
+  const key=e.key.toLowerCase();
+  if((e.metaKey||e.ctrlKey)&&key==='k'){e.preventDefault();openPalette();}
+  if((e.metaKey||e.ctrlKey)&&key==='b'){e.preventDefault();settingsState.hideNav=!settingsState.hideNav;persistSettings();applyChromeLayout();}
+  if((e.metaKey||e.ctrlKey)&&key==='j'){e.preventDefault();settingsState.showBottom=!settingsState.showBottom;persistSettings();applyChromeLayout();}
+  if((e.metaKey||e.ctrlKey)&&key==='\\'){e.preventDefault();settingsState.hideAssistant=!settingsState.hideAssistant;persistSettings();applyChromeLayout();}
+  if((e.metaKey||e.ctrlKey)&&key==='s'){
+    const p=activeProject();
+    if(p&&$('#file-code-editor')){e.preventDefault();if(saveOpenFile(p))notify('File saved.','success');else notify('No file changes to save.','info');}
+  }
+  if(e.key==='Escape'){closePalette();hideShare();const ctx=$('#px-ctx');if(ctx)ctx.hidden=true;}
 });
 async function boot(){installCss();installOptionalAnalytics();await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();const wantsSignin=location.hash==='#signin'||new URLSearchParams(location.search).get('auth')==='signin';if(wantsSignin){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>authModal('signin'),0);}const wantsSignup=location.hash==='#signup'||new URLSearchParams(location.search).get('auth')==='signup';if(wantsSignup){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>authModal('signup'),0);}}
 window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot};

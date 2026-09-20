@@ -12,7 +12,24 @@ const vite = fs.readFileSync(new URL('../vite.config.js', import.meta.url), 'utf
 assert.match(index, /config\.js/);
 assert.match(index, /@supabase\/supabase-js@2/);
 assert.match(index, /px-final\.js/);
+assert.doesNotMatch(index, /styles\.css/);
 assert.doesNotMatch(index, /dashboard-clean\.js|projectx-adaptive\.js|projectx-output\.js|px-runtime-patches\.js/);
+assert.match(ui, /id="px-project-switch"/);
+assert.match(ui, /id="px-bottom"/);
+assert.match(ui, /id="px-share"/);
+assert.match(ui, /execNote/);
+assert.doesNotMatch(ui, /ExecutionProvider/);
+assert.match(runtime, /function applyChromeLayout\(/);
+assert.match(runtime, /function renderFiles\(/);
+assert.match(runtime, /id="px-ide"|px-ide/);
+assert.match(runtime, /saveOpenFile/);
+assert.match(runtime, /key==='s'/);
+assert.match(runtime, /key==='b'/);
+assert.match(runtime, /plan-dock-form/);
+assert.match(appShellCss, /\.project\.px-work/);
+assert.match(appShellCss, /\.px-ide/);
+assert.match(appShellCss, /\.px-shell\.hide-right/);
+assert.match(appShellCss, /\.px-shell\.show-bottom/);
 assert.match(vite, /base:\s*['"]\/projectx\//);
 
 const game = createProject({

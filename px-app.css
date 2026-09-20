@@ -59,14 +59,28 @@
 .px-shell { display: grid; grid-template-columns: var(--px-left) minmax(0,1fr) 5px var(--px-right); grid-template-rows: var(--px-top) minmax(0,1fr) var(--px-bottom); height: 100%; }
 .px-shell.no-right { grid-template-columns: var(--px-left) minmax(0,1fr); }
 .px-shell.no-right .px-right, .px-shell.no-right .px-split { display: none; }
+.px-shell.hide-right { grid-template-columns: var(--px-left) minmax(0,1fr) 0 0; }
+.px-shell.hide-right .px-right, .px-shell.hide-right .px-split { display: none; }
+.px-shell.hide-left { grid-template-columns: 0 minmax(0,1fr) 5px var(--px-right); }
+.px-shell.hide-left .px-left { display: none; }
+.px-shell.hide-left.hide-right { grid-template-columns: 0 minmax(0,1fr) 0 0; }
+.px-shell.show-bottom { grid-template-rows: var(--px-top) minmax(0,1fr) 168px 28px; }
 .px-left { grid-column: 1; grid-row: 1 / -1; background: var(--px-bg-raised); border-right: 1px solid var(--px-line); display: flex; flex-direction: column; overflow: auto; }
 .px-topbar { grid-column: 2 / -1; grid-row: 1; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--px-line); background: var(--px-bg-raised); min-width: 0; }
 .px-center { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow: auto; background: var(--px-bg); }
 .px-split { grid-column: 3; grid-row: 2; width: 5px; cursor: col-resize; background: transparent; z-index: 2; margin: 0; }
 .px-split:hover { background: var(--px-accent); }
 .px-right { grid-column: 4; grid-row: 2; border-left: 1px solid var(--px-line); background: var(--px-surface); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.px-bottom { display: none; grid-column: 2 / -1; grid-row: 3; border-top: 1px solid var(--px-line); background: var(--px-bg-raised); flex-direction: column; min-height: 0; overflow: hidden; }
+.px-shell.show-bottom .px-bottom { display: flex; }
+.px-shell.show-bottom .px-statusbar { grid-row: 4; }
 .px-statusbar { grid-column: 2 / -1; grid-row: 3; border-top: 1px solid var(--px-line); display: flex; align-items: center; gap: 12px; padding: 0 14px; color: var(--px-muted); font-size: 11px; background: var(--px-bg-raised); }
 .px-nav-toggle { display: none; }
+.px-switcher { margin: 0 12px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.px-switch-list { margin: 0 12px 8px; border: 1px solid var(--px-line); border-radius: 8px; background: var(--px-surface); }
+.px-switch-list button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; color: var(--px-text); cursor: pointer; }
+.px-switch-list button:hover { background: var(--px-hover); }
+.px-side-search { margin: 0 12px 8px; width: calc(100% - 24px); }
 
 .logo { font-size: 15px; font-weight: 700; letter-spacing: -.03em; padding: 14px 14px 10px; }
 .new, .primary, .px-btn-primary {
@@ -92,6 +106,12 @@
   border: 1px solid var(--px-line-strong); background: var(--px-surface); color: var(--px-text); border-radius: 7px; padding: 7px 10px; font-size: 12px; cursor: pointer;
 }
 .wrap, .interview, .panel, .project { width: min(1120px, calc(100% - 40px)); margin: auto; padding: 28px 0 48px; }
+.project.px-work { width: 100%; max-width: none; margin: 0; padding: 0; min-height: 100%; display: flex; flex-direction: column; }
+.px-work-head { padding: 14px 18px 6px; }
+.px-work .project-title { font-size: 22px; margin: 4px 0 2px; }
+.px-work .sections { padding: 0 8px; }
+.px-work .body { flex: 1; min-height: 0; padding: 0; display: flex; flex-direction: column; }
+.px-work .body > .box { border: 0; border-radius: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .center { text-align: center; }
 .kicker { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--px-soft); }
 .hero-title, .project-title { font-size: clamp(28px, 4vw, 44px); line-height: 1.08; letter-spacing: -.04em; margin: 10px 0; font-weight: 680; }
@@ -254,6 +274,25 @@
 .px-dot.warn { background: var(--px-warn); }
 .px-dot.bad { background: var(--px-bad); }
 .px-dot.off { background: var(--px-soft); }
+.px-ide { display: grid; grid-template-columns: 220px minmax(0,1fr); min-height: calc(100vh - 160px); flex: 1; }
+.px-ide-tree { border-right: 1px solid var(--px-line); overflow: auto; padding: 8px; }
+.px-ide-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.px-ide-tabs { display: flex; overflow: auto; border-bottom: 1px solid var(--px-line); min-height: 36px; }
+.px-ide-tabs button { border: 0; background: transparent; color: var(--px-muted); padding: 9px 12px; cursor: pointer; white-space: nowrap; }
+.px-ide-tabs button.active { color: var(--px-text); border-bottom: 2px solid var(--px-accent); }
+.px-ide-work { display: grid; grid-template-columns: minmax(0,1fr); flex: 1; min-height: 0; }
+.px-ide-work.split { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+.px-ide-work .code-editor { min-height: 0; height: 100%; margin: 0; border: 0; border-radius: 0; }
+.px-ide-preview { border-left: 1px solid var(--px-line); min-width: 0; background: #fff; }
+.px-ide-preview iframe { width: 100%; height: 100%; border: 0; }
+.px-folder { margin: 0 0 4px; }
+.px-folder summary { cursor: pointer; color: var(--px-muted); font-size: 11px; padding: 4px 6px; }
+.px-ctx { position: fixed; z-index: 2147483660; min-width: 180px; background: var(--px-surface); border: 1px solid var(--px-line-strong); border-radius: 8px; box-shadow: var(--px-shadow); padding: 4px; }
+.px-ctx[hidden], .px-share[hidden] { display: none; }
+.px-ctx button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; color: var(--px-text); cursor: pointer; border-radius: 6px; }
+.px-ctx button:hover { background: var(--px-hover); }
+.px-share { position: fixed; inset: 0; z-index: 2147483655; display: grid; place-items: center; background: rgba(6,8,12,.5); }
+.px-share-box { width: min(420px, calc(100vw - 32px)); background: var(--px-surface); border: 1px solid var(--px-line); border-radius: 12px; padding: 16px; box-shadow: var(--px-shadow); }
 
 @media (max-width: 980px) {
   .px-shell { grid-template-columns: minmax(0,1fr); grid-template-rows: var(--px-top) minmax(0,1fr) auto; }

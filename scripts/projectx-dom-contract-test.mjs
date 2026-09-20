@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
 const ui = fs.readFileSync(new URL('../px-ui.js', import.meta.url), 'utf8');
+const appCss = fs.readFileSync(new URL('../px-app.css', import.meta.url), 'utf8');
 const edge = fs.readFileSync(new URL('../supabase/functions/ai/index.ts', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const surface = runtime + ui;
@@ -30,6 +31,15 @@ assert.match(surface, /id="interview-poll"/);
 assert.match(surface, /id="interview-status"/);
 assert.match(surface, /id="project-body"/);
 assert.match(surface, /id="project-frame"/);
+
+assert.match(ui, /id="px-project-switch"/);
+assert.match(ui, /id="px-bottom"/);
+assert.match(ui, /id="assistant-dock-form"/);
+assert.match(ui, /id="plan-dock-form"/);
+assert.doesNotMatch(ui, /ExecutionProvider/);
+assert.match(runtime, /applyChromeLayout/);
+assert.match(runtime, /px-ide/);
+assert.match(appCss, /\.project\.px-work/);
 
 assert.match(runtime, /function validDiscoveryPollLocal/);
 assert.match(runtime, /Describe in your own words/);
@@ -74,7 +84,6 @@ assert.doesNotMatch(index, /styles\.css/);
 assert.match(index, /px-final\.js/);
 
 assert.ok(fs.existsSync(fileURLToPath(new URL('../px-app.css', import.meta.url))), 'px-app.css must exist');
-const appCss = fs.readFileSync(new URL('../px-app.css', import.meta.url), 'utf8');
 assert.match(appCss, /#px-app\{/, 'px-app.css must contain live shell rules');
 assert.match(runtime, /px-app\.css/);
 assert.doesNotMatch(runtime, /const CSS = `/);
