@@ -141,7 +141,7 @@ export function publicMarkup() {
 export function chrome({esc, session, recents, active, body, project, nav, right, status, email}) {
   const tools = project ? navForProject(project) : APP_TOOLS;
   const left = tools.map(([id, name]) => {
-    const on = (nav || active) === id || (active === 'projects' && id === 'overview' && project);
+    const on = (nav || active) === id;
     if (project) return `<button class="px-tool ${on ? 'active' : ''}" data-project-tool="${esc(id)}">${esc(name)}</button>`;
     return `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}">${esc(name)}</button>`;
   }).join('');

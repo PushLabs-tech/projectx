@@ -541,7 +541,7 @@ async function regenerateDiscoveryPoll(history,meta={}){
 async function submitDiscoveryChoice(value,history,meta){
   const text=String(value||'').trim();
   if(!text)return;
-  $('#interview-poll .poll-option').forEach(x=>x.disabled=true);
+  $$('#interview-poll .poll-option').forEach(x=>x.disabled=true);
   $('#poll-custom-send')?.setAttribute('disabled','disabled');
 
   history.push({role:'user',text});
@@ -551,7 +551,7 @@ async function submitDiscoveryChoice(value,history,meta){
   catch(error){
     const status=$('#interview-status');
     if(status)status.textContent='Could not update the poll: '+String(error?.message||error);
-    $('#interview-poll .poll-option').forEach(x=>x.disabled=false);
+    $$('#interview-poll .poll-option').forEach(x=>x.disabled=false);
     $('#poll-custom-send')?.removeAttribute('disabled');
   }
 }
@@ -903,7 +903,7 @@ function renderVersions(project){
   toolShell('VERSIONS','Project history','Restore or fork earlier project states while preserving the current state as a new version.', '<form id="fork-form" class="form"><input id="fork-name" class="input full" maxlength="80" placeholder="Fork name, e.g. mobile direction"><button class="ghost">Fork current project</button></form><div style="margin-top:12px">'+(versions.length?versions.map((v,i)=>'<div class="version-row"><div><b>v'+esc(v.version||'?')+' · '+esc(v.label||'Snapshot')+'</b><div class="sub">'+esc(v.at||'')+'</div></div><div class="actions"><button class="ghost" data-compare="'+i+'">Compare</button><button class="ghost" data-restore="'+i+'">Restore</button></div></div>').join(''):'<div class="placeholder">No snapshots yet.</div>')+'</div>');
 
   $('#fork-form').onsubmit=async e=>{e.preventDefault();const label=$('#fork-name').value.trim()||'Alternative';const raw=serializeForPersistence(project);delete raw.id;raw.title=project.title+' ('+label+')';raw.status='ready';const fork=migrateProject(raw);fork.sync={remoteId:null,lastSyncedAt:null,baseUpdatedAt:null,mode:'local'};saveProject(fork,true);await syncRemoteProject(fork);openProject(fork.id);notify('Project fork created.','success');};
-  $('[data-compare]','#project-body').forEach(btn=>btn.onclick=()=>{const v=versions[Number(btn.dataset.compare)];if(!v)return;showVersionCompare(project,v);});
+  $$('[data-compare]','#project-body').forEach(btn=>btn.onclick=()=>{const v=versions[Number(btn.dataset.compare)];if(!v)return;showVersionCompare(project,v);});
   $$('[data-restore]','#project-body').forEach(btn=>btn.onclick=async()=>{const v=versions[Number(btn.dataset.restore)];if(!v)return;if(!confirm('Restore snapshot v'+(v.version||'?')+'? The current state will be saved first.'))return;snapshot(project,'Before restore');const result=restoreProjectSnapshot(project,v);if(result.changed){saveProject(project);await syncRemoteProject(project);notify('Previous project state restored.','success');renderProjectTool(project,'versions');}});
 }
 function showVersionCompare(project,version){
@@ -1197,7 +1197,7 @@ function mountArtifact(project){
   const frame=$('#project-frame');frame.srcdoc=assemblePreviewHtml(project.files||{});runtimeTestCleanup?.();
   const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')notify('Project runtime error: '+String(e.data.message||'Runtime error'),'error');};
   window.addEventListener('message',onMessage);runtimeTestCleanup=()=>window.removeEventListener('message',onMessage);
-  $('[data-viewport]').forEach(btn=>btn.onclick=()=>{const value=btn.dataset.viewport;$('[data-viewport]').forEach(x=>x.classList.toggle('active',x===btn));const artifact=$('.artifact');artifact.className='artifact preview-'+value;});
+  $$('[data-viewport]').forEach(btn=>btn.onclick=()=>{const value=btn.dataset.viewport;$$('[data-viewport]').forEach(x=>x.classList.toggle('active',x===btn));const artifact=$('.artifact');artifact.className='artifact preview-'+value;});
 }
 function renderFiles(project){
   const paths=Object.keys(project.files||{}).sort(),first=paths[0]||null,body=$('#project-body');
@@ -1205,7 +1205,7 @@ function renderFiles(project){
   let currentPath=first;
   const markDirty=()=>{$('#file-dirty').textContent=(currentPath&&project.files[currentPath]!==$('#file-code-editor').value)?'Unsaved changes in '+currentPath:'';};
   const selectFile=path=>{$$('[data-file]',body).forEach(x=>x.classList.toggle('active',x.dataset.file===path));currentPath=path;$('#file-name').textContent=path;$('#file-code-editor').value=project.files[path]||'';markDirty();};
-  $('[data-file]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.file));
+  $$('[data-file]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.file));
   $('#file-code-editor')?.addEventListener('input',markDirty);
   $('#new-file')?.addEventListener('click',()=>{
     const raw=prompt('New file path');const path=sanitizePath(raw||'');
@@ -1366,8 +1366,8 @@ async function renderAgentSettings(body){
   const container=$('#agent-settings');
   const optionList=(id)=>models.slice(0,250).map(m=>`<option value="${esc(m.id)}" ${String(settingsState.agentModels?.[id]||settingsState.model)===String(m.id)?'selected':''}>${esc(m.name||m.id)}${m.provider?' · '+esc(m.provider):''}</option>`).join('');
   container.innerHTML=Object.entries(roles).map(([id,purpose])=>`<div class="row"><div><b>${esc(id)}</b><div class="sub">${esc(purpose)}</div></div><div class="actions"><select class="select" data-agent-model="${id}">${optionList(id)}</select><button class="ghost" data-agent-toggle="${id}">${settingsState.agents?.[id]?'Enabled':'Disabled'}</button></div></div>`).join('');
-  $('[data-agent-model]').forEach(select=>select.onchange=e=>{const id=select.dataset.agentModel;settingsState.agentModels={...(settingsState.agentModels||{}),[id]:e.target.value};persistSettings();notify(id+' model preference saved.','success');});
-  $('[data-agent-toggle]').forEach(btn=>btn.onclick=()=>{const id=btn.dataset.agentToggle;settingsState.agents={...settingsState.agents,[id]:!settingsState.agents[id]};persistSettings();renderAgentSettings(body);});
+  $$('[data-agent-model]').forEach(select=>select.onchange=e=>{const id=select.dataset.agentModel;settingsState.agentModels={...(settingsState.agentModels||{}),[id]:e.target.value};persistSettings();notify(id+' model preference saved.','success');});
+  $$('[data-agent-toggle]').forEach(btn=>btn.onclick=()=>{const id=btn.dataset.agentToggle;settingsState.agents={...settingsState.agents,[id]:!settingsState.agents[id]};persistSettings();renderAgentSettings(body);});
 }
 async function renderAiSettings(body){
   let server=[];
