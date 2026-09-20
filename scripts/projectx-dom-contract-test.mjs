@@ -36,6 +36,8 @@ assert.match(ui, /id="px-project-switch"/);
 assert.match(ui, /id="px-bottom"/);
 assert.match(ui, /id="assistant-dock-form"/);
 assert.match(ui, /id="plan-dock-form"/);
+assert.match(ui, /id="start-input"/);
+assert.match(ui, /px-dash/);
 assert.doesNotMatch(ui, /ExecutionProvider/);
 assert.match(runtime, /applyChromeLayout/);
 assert.match(runtime, /px-ide/);
