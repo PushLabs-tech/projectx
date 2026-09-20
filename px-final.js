@@ -448,7 +448,7 @@ function bindChrome(root){
     const action=e.target.closest('[data-action]')?.dataset.action;
     if(action==='signin')return authModal('signin');
     if(action==='signup')return authModal('signup');
-    if(action==='signout'){await signOut();home();}
+    if(action==='signout'){await signOut();state.forceWorkspace=false;history.replaceState(null,'',location.pathname);publicHome();}
     const example=e.target.closest('[data-example]')?.dataset.example;
     if(example){try{sessionStorage.setItem('projectx_pending_intent',example);}catch{} state.forceWorkspace=true;workspaceHome();const input=$('#start-input');if(input)input.value=example;}
   };
@@ -525,16 +525,37 @@ function workspaceHome(){
 function publicHome(){
   const root=ensureShell();
   root.classList.add('px-public');
+  root.classList.remove('px-auth-page');
   root.innerHTML=UI.publicMarkup();
-  $('#public-signin').onclick=()=>authModal('signin');
-  $('#public-signup').onclick=()=>authModal('signup');
-  $('#public-start').onclick=()=>{state.forceWorkspace=true;workspaceHome();};
-  $('#public-workspace').onclick=()=>{state.forceWorkspace=true;workspaceHome();};
-  $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
+  const goLogin=()=>{history.replaceState(null,'',location.pathname+'#login');authScreen('signin');};
+  const goSignup=()=>{history.replaceState(null,'',location.pathname+'#signup');authScreen('signup');};
+  $('#public-signin').onclick=goLogin;
+  $('#public-signup').onclick=goSignup;
+  $('#public-signup-hero')?.addEventListener('click',goSignup);
+  $('#public-start')?.addEventListener('click',goSignup);
+  $('#public-workspace').onclick=()=>{state.forceWorkspace=true;history.replaceState(null,'',location.pathname+'#workspace');workspaceHome();};
+  $('#public-examples')?.addEventListener('click',()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'}));
+  $$('[data-example]').forEach(btn=>btn.onclick=()=>{
+    try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example);}catch{}
+    state.forceWorkspace=true;
+    history.replaceState(null,'',location.pathname+'#workspace');
+    workspaceHome();
+  });
 }
-
+function routeFromLocation(){
+  const hash=String(location.hash||'').replace(/^#/,'').split('?')[0];
+  const auth=new URLSearchParams(location.search).get('auth');
+  if(hash==='login'||hash==='signin'||auth==='signin')return 'login';
+  if(hash==='signup'||auth==='signup')return 'signup';
+  if(hash==='workspace')return 'workspace';
+  return 'home';
+}
 function home(){
-  if(session||state.forceWorkspace||state.projects.length)return workspaceHome();
+  const route=routeFromLocation();
+  if(session&&(route==='login'||route==='signup'))return workspaceHome();
+  if(route==='login')return authScreen('signin');
+  if(route==='signup')return authScreen('signup');
+  if(session||route==='workspace'||state.forceWorkspace)return workspaceHome();
   publicHome();
 }
 async function beginCreation(text){
@@ -1667,7 +1688,47 @@ function bindSettings(which){
   });
   if(which==='billing'&&session)loadUsagePanel();$('#open-billing')?.addEventListener('click',()=>{location.href='./billing.html';});
   $('#execution-mode')?.addEventListener('change',e=>{settingsState.executionMode=e.target.value;persistSettings();});$('#toggle-autosave')?.addEventListener('click',()=>{settingsState.autoSave=!settingsState.autoSave;persistSettings();renderSettings(which)});$('#toggle-confirm')?.addEventListener('click',()=>{settingsState.confirmDelete=!settingsState.confirmDelete;persistSettings();renderSettings(which)});$('#language')?.addEventListener('change',e=>{settingsState.language=e.target.value;persistSettings()});$('#timezone')?.addEventListener('change',e=>{settingsState.timezone=e.target.value;persistSettings()});$('#default-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$('#ai-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$$('[data-agent]').forEach(button=>button.onclick=()=>{const id=button.dataset.agent;settingsState.agents[id]=!settingsState.agents[id];persistSettings();renderSettings('agents')});$$('[data-notification]').forEach(button=>button.onclick=()=>{const id=button.dataset.notification;settingsState.notifications[id]=!settingsState.notifications[id];persistSettings();renderSettings('notifications')});$('#security-signin')?.addEventListener('click',authModal);$('#security-signout')?.addEventListener('click',()=>signOut().then(()=>settingsPage('security')));$('#export-state')?.addEventListener('click',()=>downloadText('projectx-state.json',JSON.stringify(state,null,2),'application/json'));$('#clear-state')?.addEventListener('click',()=>{if(settingsState.confirmDelete&&!confirm('Clear local project cache? Cloud projects remain in your account.'))return;state={version:6,projects:[],active:null};persistLocal();home();});}
-function authModal(initialMode='signin'){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">PROJECT X ACCOUNT</div><h2>Use secure project storage</h2><p class="sub">Sign in to sync projects and store AI credentials in the encrypted server-side vault.</p><div style="display:flex;gap:7px;margin:12px 0"><button class="ghost" id="auth-signin-mode">Sign in</button><button class="ghost" id="auth-signup-mode">Create account</button></div><input id="auth-email" class="input full" type="email" placeholder="Email" autocomplete="username"><input id="auth-password" class="input full" type="password" placeholder="Password" style="margin-top:7px" autocomplete="current-password"><div id="auth-status" class="sub" style="margin-top:8px"></div><div class="actions"><button class="ghost" id="auth-recover">Recover</button><button class="ghost" id="auth-cancel">Cancel</button><button class="primary" id="auth-submit">Continue</button></div></div>`;document.body.appendChild(modal);currentModal=modal;let mode=initialMode==='signup'?'signup':'signin';const setMode=m=>{mode=m;$('#auth-signin-mode').classList.toggle('active',m==='signin');$('#auth-signup-mode').classList.toggle('active',m==='signup');$('#auth-submit').textContent=m==='signup'?'Create account':'Sign in';};setMode(mode);$('#auth-signin-mode').onclick=()=>setMode('signin');$('#auth-signup-mode').onclick=()=>setMode('signup');$('#auth-cancel').onclick=closeModal;$('#auth-recover').onclick=async()=>{const email=$('#auth-email').value.trim();if(!email){$('#auth-status').textContent='Enter your email to send a recovery link.';return;}try{const client=ensureSupabase();if(!client)throw new Error('Auth is not configured.');const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.href.split('#')[0]});if(error)throw error;$('#auth-status').textContent='If that account exists, a recovery email was sent.';}catch(error){$('#auth-status').textContent=error.message;}};$('#auth-submit').onclick=async()=>{const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<6){$('#auth-status').textContent='Enter an email and a password with at least 6 characters.';return;}const button=$('#auth-submit');button.disabled=true;try{await authAction(mode,email,password);closeModal();await syncRemoteProjects();home();notify('Secure account connected.','success');}catch(error){$('#auth-status').textContent=error.message;}finally{button.disabled=false;}};}
+function authScreen(initialMode='signin'){
+  closeModal();
+  const root=ensureShell();
+  root.classList.add('px-public','px-auth-page');
+  let mode=initialMode==='signup'?'signup':'signin';
+  const draw=()=>{
+    history.replaceState(null,'',location.pathname+(mode==='signup'?'#signup':'#login'));
+    root.innerHTML=UI.authMarkup({mode});
+    $('#auth-signin-mode').onclick=()=>{mode='signin';draw();};
+    $('#auth-signup-mode').onclick=()=>{mode='signup';draw();};
+    $('#auth-home').onclick=e=>{e.preventDefault();history.replaceState(null,'',location.pathname);publicHome();};
+    $('#auth-guest').onclick=()=>{state.forceWorkspace=true;history.replaceState(null,'',location.pathname+'#workspace');workspaceHome();};
+    $('#auth-recover').onclick=async()=>{
+      const email=$('#auth-email').value.trim();
+      if(!email){$('#auth-status').textContent='Enter your email to send a recovery link.';return;}
+      try{
+        const client=ensureSupabase();
+        if(!client)throw new Error('Auth is not configured.');
+        const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.href.split('#')[0]});
+        if(error)throw error;
+        $('#auth-status').textContent='If that account exists, a recovery email was sent.';
+      }catch(error){$('#auth-status').textContent=error.message;}
+    };
+    $('#auth-submit').onclick=async()=>{
+      const email=$('#auth-email').value.trim(),password=$('#auth-password').value;
+      if(!email||password.length<6){$('#auth-status').textContent='Enter an email and a password with at least 6 characters.';return;}
+      const button=$('#auth-submit');button.disabled=true;
+      try{
+        await authAction(mode,email,password);
+        await syncRemoteProjects();
+        history.replaceState(null,'',location.pathname+'#workspace');
+        workspaceHome();
+        notify('Account connected.','success');
+      }catch(error){$('#auth-status').textContent=error.message;}
+      finally{button.disabled=false;}
+    };
+    $('#auth-password').onkeydown=e=>{if(e.key==='Enter')$('#auth-submit').click();};
+  };
+  draw();
+}
+function authModal(initialMode='signin'){authScreen(initialMode);}
 function closeModal(){currentModal?.remove();currentModal=null;}
 function aiRequiredModal(message){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">AI CONNECTION REQUIRED</div><h2>Connect your AI</h2><p class="sub">${esc(message)}</p><p class="sub" style="margin-top:10px"><a href="${GEMINI_KEY_URL}" target="_blank" rel="noopener noreferrer">Create a free-tier Gemini API key</a> in Google AI Studio, then paste it into Settings → AI.</p><div class="actions"><button class="ghost" id="ai-close">Cancel</button><button class="primary" id="ai-settings">Open Settings</button></div></div>`;document.body.appendChild(modal);currentModal=modal;$('#ai-close').onclick=closeModal;$('#ai-settings').onclick=()=>{closeModal();settingsPage('ai');};}
 function ensureTasks(project){
@@ -1870,6 +1931,7 @@ window.addEventListener('keydown',e=>{
   }
   if(e.key==='Escape'){closePalette();hideShare();const ctx=$('#px-ctx');if(ctx)ctx.hidden=true;}
 });
-async function boot(){installCss();installOptionalAnalytics();await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();const wantsSignin=location.hash==='#signin'||new URLSearchParams(location.search).get('auth')==='signin';if(wantsSignin){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>authModal('signin'),0);}const wantsSignup=location.hash==='#signup'||new URLSearchParams(location.search).get('auth')==='signup';if(wantsSignup){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>authModal('signup'),0);}}
+window.addEventListener('hashchange',()=>home());
+async function boot(){installCss();installOptionalAnalytics();await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();}
 window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot};
 boot();

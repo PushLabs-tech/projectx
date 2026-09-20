@@ -48,10 +48,15 @@ assert.match(runtime, /Describe in your own words/);
 assert.match(runtime, /options\.length!==4/);
 assert.match(runtime, /renderedOptions=\[\.\.\.options,'Describe in your own words'\]/);
 
+assert.match(ui, /export function authMarkup/);
+assert.match(ui, /id="auth-email"/);
+assert.match(ui, /id="auth-submit"/);
+assert.match(ui, /Create a project/);
 assert.match(runtime, /function publicHome\(/);
 assert.match(runtime, /function workspaceHome\(/);
-assert.match(runtime, /if\(session\|\|state\.forceWorkspace\|\|state\.projects\.length\)return workspaceHome\(\)/);
-assert.match(runtime, /authModal\('signup'\)/);
+assert.match(runtime, /function authScreen\(/);
+assert.match(runtime, /if\(session\|\|route==='workspace'\|\|state\.forceWorkspace\)return workspaceHome\(\)/);
+assert.match(runtime, /authScreen\('signup'\)/);
 
 assert.match(runtime, /window\.ProjectX=\{/);
 assert.match(runtime, /state:\(\)=>state/);
