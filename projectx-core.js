@@ -505,7 +505,7 @@ export function assemblePreviewHtml(files = {}) {
   html = html.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi,(tag,href) => { const path = sanitizePath(href.replace(/^\.\//,'')); const css = path && safeFiles[path]; return css != null ? `<style data-projectx-file="${path}">${css}</style>` : tag; });
   html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi,(tag,src) => { const path = sanitizePath(src.replace(/^\.\//,'')); const js = path && safeFiles[path]; return js != null ? `<script data-projectx-file="${path}">${js.replace(/<\/script/gi,'<\\/script')}</script>` : tag; });
   if (!/<meta[^>]+name=["']viewport["']/i.test(html)) html = html.replace(/<head>/i,'<head><meta name="viewport" content="width=device-width,initial-scale=1">');
-  const guard = `<script>(function(){window.addEventListener('error',function(e){parent.postMessage({type:'PROJECTX_RUNTIME_ERROR',message:String(e.message||'Runtime error')},'*')});window.addEventListener('unhandledrejection',function(e){parent.postMessage({type:'PROJECTX_RUNTIME_ERROR',message:String(e.reason?.message||e.reason||'Unhandled rejection')},'*')})();<\/script>`;
+  const guard = `<script>(function(){window.addEventListener('error',function(e){parent.postMessage({type:'PROJECTX_RUNTIME_ERROR',message:String(e.message||'Runtime error')},'*');});window.addEventListener('unhandledrejection',function(e){var r=e.reason;parent.postMessage({type:'PROJECTX_RUNTIME_ERROR',message:String((r&&r.message)||r||'Unhandled rejection')},'*');});})();<\/script>`;
   return html.replace(/<head>/i,`<head>${guard}`);
 }
 
