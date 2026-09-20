@@ -47,10 +47,6 @@ grant execute on function private.projectx_worker_token_get() to service_role;
 
 -- The worker endpoint is invoked by pg_cron/pg_net. The token is read from Vault
 -- at execution time, so no credential is stored in the cron definition.
-select cron.unschedule(jobid)
-from cron.job
-where jobname = 'projectx-worker-dispatch';
-
 select cron.schedule(
   'projectx-worker-dispatch',
   '* * * * *',
