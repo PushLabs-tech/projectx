@@ -1039,6 +1039,7 @@ async function sendProjectMessage(project,userText){
   refreshConversationViews(project);
   const send=$('#project-send')||$('#assistant-dock-send');
   if(send)send.disabled=true;
+  setAgentStatus('Working');
   try{
     const data=await aiJson('discuss',{project,history:messages,message:text,system:projectAgentSystem+skillContext()},5500);if(!data)throw new Error('The AI returned invalid project action data.');
     const wantsMutation=Boolean(data.changed||(data.specPatch&&typeof data.specPatch==='object'&&Object.keys(data.specPatch).length)||(Array.isArray(data.plan)&&data.plan.length)||(Array.isArray(data.workspaceSections)&&data.workspaceSections.length)||(Array.isArray(data.fileOperations)&&data.fileOperations.length)||(Array.isArray(data.agents)&&data.agents.length));
@@ -1638,8 +1639,17 @@ function renderDatabase(){
     }catch(error){out.textContent='Query failed: '+(error.message||error)+'. No rows were invented.';}
   });
 }
-function renderStorage(){
-  toolShell('STORAGE','Assets','Supabase Storage buckets are account-level. Upload is enabled only with an authenticated session and configured bucket.','<div class="placeholder">'+(session?'No storage bucket is linked to this project yet.':'Sign in to manage stored assets.')+'</div>');
+async function renderStorage(){
+  const client=ensureSupabase();
+  toolShell('STORAGE','Assets','Lists buckets from the signed-in Supabase client. Upload requires a bucket you already control.','<div id="storage-list" class="placeholder">Checking storage…</div>');
+  const out=$('#storage-list');
+  if(!session||!client){out.textContent=session?'Supabase client is not configured.':'Sign in to list storage buckets.';return;}
+  try{
+    const {data,error}=await client.storage.listBuckets();
+    if(error)throw error;
+    if(!data?.length){out.innerHTML='<div class="placeholder">No buckets returned. Create a bucket in the Supabase dashboard, then refresh.</div>';return;}
+    out.innerHTML=data.map(b=>`<div class="row"><b>${esc(b.name)}</b><span class="sub">${b.public?'public':'private'}</span></div>`).join('');
+  }catch(error){out.textContent='Storage list failed: '+(error.message||error)+'. No files were invented.';}
 }
 function renderIntegrations(){
   toolShell('INTEGRATIONS','Connectors','Only mark a connector connected after a real OAuth or credential handshake.','<div class="box"><div class="row"><b>GitHub</b><span class="status warn">Not connected</span></div><div class="row"><b>Supabase</b><span class="status '+(ensureSupabase()?'ok':'warn')+'">'+(ensureSupabase()?'Client ready':'Not configured')+'</span></div><div class="row"><b>Stripe</b><span class="status warn">Not connected</span></div></div>');
