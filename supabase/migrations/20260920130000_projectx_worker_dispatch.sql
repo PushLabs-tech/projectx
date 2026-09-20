@@ -30,6 +30,21 @@ $$;
 revoke all on function private.projectx_worker_token_valid(text) from public, anon, authenticated;
 grant execute on function private.projectx_worker_token_valid(text) to service_role;
 
+create or replace function private.projectx_worker_token_get()
+returns text
+language sql
+security definer
+set search_path = ''
+as $
+  select decrypted_secret
+  from vault.decrypted_secrets
+  where name = 'projectx_worker_token'
+  limit 1;
+$;
+
+revoke all on function private.projectx_worker_token_get() from public, anon, authenticated;
+grant execute on function private.projectx_worker_token_get() to service_role;
+
 -- The worker endpoint is invoked by pg_cron/pg_net. The token is read from Vault
 -- at execution time, so no credential is stored in the cron definition.
 select cron.unschedule(jobid)
