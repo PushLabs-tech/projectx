@@ -10,7 +10,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUB
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
-const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary"]);
+const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary", "enqueueJob", "getJob"]);
 const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
@@ -732,6 +732,33 @@ async function getUsageSummary(user:any, body:any) {
   return {ok:true,usage:u,credits:credits||[],projectId:body?.projectId || null};
 }
 
+async function enqueueJob(user:any, body:any) {
+  const projectId=String(body?.projectId || "").trim() || null;
+  if(projectId) await authorizeProject(user,projectId,true);
+  const kind=String(body?.kind || "").trim().slice(0,80);
+  if(!kind) throw new Error("Job kind is required.");
+  const payload=body?.payload && typeof body.payload==="object" ? body.payload : {};
+  const {data,error}=await admin.from("job_queue").insert({
+    project_id:projectId,user_id:user.id,kind,payload,
+    max_attempts:Math.max(1,Math.min(10,Number(body?.maxAttempts || 3)))
+  }).select("id,project_id,kind,status,attempts,max_attempts,available_at,created_at").single();
+  if(error) throw error;
+  return {ok:true,job:data};
+}
+
+async function getJob(user:any, body:any) {
+  const id=String(body?.jobId || "").trim();
+  if(!id) throw new Error("Job ID is required.");
+  const {data,error}=await admin.from("job_queue").select("id,project_id,user_id,kind,status,attempts,max_attempts,available_at,locked_at,result,error,created_at,updated_at").eq("id",id).maybeSingle();
+  if(error) throw error;
+  if(!data) throw new Error("Job not found");
+  if(data.user_id!==user.id) {
+    if(!data.project_id) throw new Error("Not authorized");
+    await authorizeProject(user,String(data.project_id));
+  }
+  return {ok:true,job:data};
+}
+
 async function authoritativeProjectForChat(user: any, supplied: any) {
   const id = String(supplied?.id || "");
   if (!id) return supplied || {};
@@ -808,6 +835,8 @@ Deno.serve(async req => {
     if (action === "createArtifactVersion") return json(await createArtifactVersion(user, body));
     if (action === "runVerification") return json(await runVerification(user, body));
     if (action === "getUsageSummary") return json(await getUsageSummary(user, body));
+    if (action === "enqueueJob") return json(await enqueueJob(user, body));
+    if (action === "getJob") return json(await getJob(user, body));
     if (action === "persistProject") return json(await persistProject(user, body.project || {}));
     if (action === "listProjects") return json(await listProjects(user));
     if (action === "getProject") return json({ ok: true, project: await getProject(user, String(body.projectId || "")) });
