@@ -1548,7 +1548,11 @@ function renderOverview(project){
 function renderTasks(project){
   const root=$('#project-body');if(!root)return;
   const tasks=ensureTasks(project);
-  toolShell('TASKS','Work board',ExecutionProvider.note,'<form id="task-form" class="form"><input id="task-title" class="input full" placeholder="New task, e.g. Authentication"><button class="primary">Add task</button></form>'+UI.taskBoard(tasks,esc)+'<div id="task-detail"></div>');
+  const view=project.uiTaskView||'kanban';
+  const list=tasks.map(t=>`<div class="item" data-task="${esc(t.id)}"><b>${esc(t.title)}</b><div class="sub">${esc(t.status)} · ${esc(t.agent||'orchestrator')} · ${esc((t.affectedFiles||[]).join(', ')||'no files yet')}</div></div>`).join('')||'<div class="px-empty">No tasks yet. Add one here or ask the Assistant to start work.</div>';
+  toolShell('TASKS','Work board',ExecutionProvider.note,'<div class="actions"><button class="ghost" id="task-view-kanban">Kanban</button><button class="ghost" id="task-view-list">List</button></div><form id="task-form" class="form"><input id="task-title" class="input full" placeholder="New task, e.g. Authentication"><button class="primary">Add task</button></form>'+(view==='list'?list:UI.taskBoard(tasks,esc))+'<div id="task-detail"></div>');
+  $('#task-view-kanban').onclick=()=>{project.uiTaskView='kanban';saveProject(project);renderTasks(project);};
+  $('#task-view-list').onclick=()=>{project.uiTaskView='list';saveProject(project);renderTasks(project);};
   $('#task-form').onsubmit=e=>{e.preventDefault();const title=$('#task-title').value.trim();if(!title)return;addTask(project,title,{status:'draft'});renderTasks(project);};
   const drawDetail=t=>{
     $('#task-detail').innerHTML=`<div class="box px-task-detail" style="margin-top:12px"><b>${esc(t.title)}</b><div class="sub">${esc(t.status)} · ${esc(t.agent||'orchestrator')} · ${esc(t.updatedAt||'')}</div><p class="sub">${esc(t.description||'No description.')}</p><div class="sub">Files: ${esc((t.affectedFiles||[]).join(', ')||'None')}</div><div class="placeholder">${ExecutionProvider.isolatedWorkers?'Worker attached.':'Queued work runs sequentially through Assistant. This task does not start a remote shell.'}</div><div class="actions"><button class="ghost" data-task-status="active">Start</button><button class="ghost" data-task-status="ready">Mark ready</button><button class="primary" data-task-status="done">Approve / done</button><button class="ghost" data-task-status="cancelled">Cancel</button></div></div>`;
