@@ -1,5 +1,6 @@
 import {
   createProject,
+  createProjectFromIntent,
   migrateProject,
   normalizeSections,
   mergeSpec,
@@ -23,6 +24,7 @@ const LOCAL_SETTINGS = 'projectx_settings_v6';
 const GEMINI_KEY_URL = 'https://aistudio.google.com/app/apikey';
 const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 const MAX_HISTORY = 80;
+const LOCAL_AI_BUDGET = 'projectx_ai_budget_v1';
 const GEMINI_MODEL_MIGRATIONS = new Map([
   ['gemini-2.0-flash', 'gemini-3.8-flash'],
   ['gemini-2.0-flash-lite', 'gemini-3.5-flash-lite'],
@@ -52,6 +54,11 @@ const ExecutionProvider = {
   kind: 'sequential-local',
   isolatedWorkers: false,
   note: 'No isolated cloud workers are connected. Independent tasks can be queued; execution is sequential through the Assistant.'
+};
+const DeploymentProvider = {
+  kind: 'github-pages-export',
+  liveHosting: false,
+  note: 'This workspace exports artifacts. GitHub Pages hosts the ProjectX app itself. Project publishing waits for a connected host.'
 };
 
 let state = read(STORE, { version: 7, projects: [], active: null });
@@ -236,9 +243,48 @@ const parseJson = text => {
 
 function effectiveMaxTokens(max){
   const mode=String(settingsState.executionMode||'Mostly Automatic');
-  if(mode==='Fast')return Math.min(max,2200);
-  if(mode==='Powerful')return Math.min(Math.max(max,4200),12000);
+  if(mode==='Fast')return Math.min(max,1800);
+  if(mode==='Powerful')return Math.min(Math.max(max,4200),8000);
   return max;
+}
+function compactHistory(history){
+  const mode=String(settingsState.executionMode||'Mostly Automatic');
+  const cap=mode==='Fast'?8:mode==='Powerful'?24:12;
+  return (Array.isArray(history)?history:[]).filter(m=>m&&m.text).slice(-cap).map(m=>({role:m.role,text:String(m.text).slice(0,mode==='Fast'?2500:6000)}));
+}
+function compactProject(project, extra={}){
+  if(!project||typeof project!=='object')return {};
+  const files=project.files&&typeof project.files==='object'?project.files:{};
+  const paths=Object.keys(files).slice(0,80);
+  const focus=extra.file&&files[extra.file]?{[extra.file]:String(files[extra.file]).slice(0,8000)}:{};
+  if(!Object.keys(focus).length){
+    for(const k of ['index.html','README.md','brief.md']) if(files[k]) focus[k]=String(files[k]).slice(0,6000);
+  }
+  const s=project.spec||{};
+  const u=project.understanding||{};
+  return {
+    id:project.id,title:project.title,type:project.type,status:project.status,specVersion:project.specVersion,
+    intent:String(project.intent||s.goal||'').slice(0,2000),
+    spec:{goal:s.goal,requirements:(s.requirements||[]).slice(0,24),constraints:(s.constraints||[]).slice(0,16),decisions:(s.decisions||[]).slice(0,16),deliverables:(s.deliverables||[]).slice(0,12),platform:s.platform},
+    understanding:{summary:u.summary,category:u.category,confidence:u.confidence,group:u.group},
+    plan:Array.isArray(project.plan)?project.plan.slice(0,12):[],
+    filePaths:paths,
+    files:focus,
+    tests:project.tests?{status:project.tests.status,specVersion:project.tests.specVersion}:null,
+    tasks:(project.executionState?.tasks||[]).slice(0,16).map(t=>({id:t.id,title:t.title,status:t.status,agent:t.agent})),
+    uiNav:project.uiNav||extra.nav||null,
+    currentFile:extra.file||null
+  };
+}
+function consumeGuestBudget(){
+  const hour=Math.floor(Date.now()/3600000);
+  const rec=read(LOCAL_AI_BUDGET,{hour:0,count:0});
+  const next=rec.hour===hour?{hour,count:rec.count+1}:{hour,count:1};
+  write(LOCAL_AI_BUDGET,next);
+  return next.count;
+}
+function setAgentStatus(text){
+  const el=$('#px-agent-status');if(el)el.textContent=text;
 }
 const AGENT_FOR_MODE = { understand:'interviewer', plan:'planner', artifact:'builder', discuss:'orchestrator' };
 async function repairDiscoveryPoll(payload, parsed, maxTokens = 2600){
@@ -272,8 +318,12 @@ async function aiJson(mode, payload, max = 3500) {
   max=effectiveMaxTokens(max);
   const agent=String(payload.agent || AGENT_FOR_MODE[mode] || 'orchestrator');
   const preferred=String(settingsState.agentModels?.[agent] || settingsState.model || MODELS[0]);
+  const packed=compactProject(payload.project||{},{file:payload.currentFile,nav:payload.project?.uiNav});
+  const history=compactHistory(payload.history||[]);
+  setAgentStatus('Thinking');
   if (session?.access_token) {
-    const result = await edge('chat', { mode, agent, project: serializeForPersistence(payload.project || {}), message: payload.message || '', history: payload.history || [], model: preferred });
+    const result = await edge('chat', { mode, agent, project: packed, message: payload.message || '', history, model: preferred, currentPath: payload.currentFile || null });
+    setAgentStatus('Ready');
     if (result.result && typeof result.result === 'object') return result.result;
     const parsed = parseJson(result.text || '');
     if (parsed && typeof parsed === 'object') return parsed;
@@ -299,7 +349,10 @@ async function aiJson(mode, payload, max = 3500) {
     }
     return null;
   }
-  const result = await directGemini(payload.history || [{ role: 'user', text: payload.message || JSON.stringify(payload) }], payload.system || 'You are ProjectX.', true, max);
+  if(consumeGuestBudget()>40) throw Object.assign(new Error('Demo / guest AI usage is temporarily exhausted for this hour. Connect a provider in Settings, or wait and retry.'), { code: 'BUDGET' });
+  const compactSystem=(payload.system||'You are ProjectX.')+'\n[PROJECT BRAIN]\n'+JSON.stringify(packed).slice(0,18000)+'\n[/PROJECT BRAIN]'+skillContext();
+  const result = await directGemini(history.length?history:[{ role: 'user', text: payload.message || JSON.stringify(payload) }], compactSystem, true, max);
+  setAgentStatus('Ready');
   const parsed=parseJson(result.text);
   if(mode==='understand'){
     if(parsed&&parsed.project&&validDiscoveryPollLocal(parsed.poll)) return parsed;
@@ -397,6 +450,12 @@ function workspaceHome(){
   try{const pending=sessionStorage.getItem('projectx_pending_intent');if(pending&&input&&!input.value){input.value=pending;sessionStorage.removeItem('projectx_pending_intent');}}catch{}
   $('#start-send').onclick=()=>beginCreation(input.value);
   input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#start-send').click();}};
+  $$('[data-template]').forEach(btn=>btn.onclick=()=>{
+    const t=UI.TEMPLATES.find(x=>x.id===btn.dataset.template);if(!t)return;
+    const p=createProjectFromIntent({title:t.title,type:t.type,goal:t.intent,deliverables:t.deliverables});
+    p.understanding={summary:t.intent,category:t.type,confidence:0.5};
+    saveProject(p);openProject(p.id);
+  });
 }
 function publicHome(){
   const root=ensureShell();
@@ -416,7 +475,14 @@ function home(){
 async function beginCreation(text){
   const intent=String(text||'').trim();
   if(!intent)return;
-  if(!session&&!localGuestKey())return aiRequiredModal('ProjectX needs an AI connection. You can use a free-tier Gemini key in this browser, or sign in and use a server-side provider connection.');
+  if(!session&&!localGuestKey()){
+    const draft=createProjectFromIntent({title:intent.length>72?intent.slice(0,72).trim()+'…':intent,type:'Other',goal:intent,deliverables:['Project outcome']});
+    draft.status='needs-ai';
+    draft.understanding={summary:'Local draft. Connect AI to continue discovery.',confidence:0.2};
+    saveProject(draft);
+    notify('Project created locally. Connect AI in Settings to run discovery.','info');
+    return openProject(draft.id);
+  }
   const history=[{role:'user',text:intent}];
   const meta={answers:[],brain:null,initialIntent:intent};
   try{
@@ -1195,7 +1261,7 @@ function mountArtifact(project){
   const area=$('#output-area');if(!area)return;
   area.innerHTML='<div class="preview-toolbar"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" title="Project output"></iframe></div>';
   const frame=$('#project-frame');frame.srcdoc=assemblePreviewHtml(project.files||{});runtimeTestCleanup?.();
-  const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')notify('Project runtime error: '+String(e.data.message||'Runtime error'),'error');};
+  const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR'){const msg=String(e.data.message||'Runtime error');notify('Preview failed to load. '+msg+'. Open Assistant to diagnose.','error');setAgentStatus('Failed');const dock=$('#assistant-dock-input');if(dock)dock.value='Fix preview runtime error: '+msg;}};
   window.addEventListener('message',onMessage);runtimeTestCleanup=()=>window.removeEventListener('message',onMessage);
   $$('[data-viewport]').forEach(btn=>btn.onclick=()=>{const value=btn.dataset.viewport;$$('[data-viewport]').forEach(x=>x.classList.toggle('active',x===btn));const artifact=$('.artifact');artifact.className='artifact preview-'+value;});
 }
@@ -1555,7 +1621,22 @@ function renderArtifacts(project){
   $('#new-artifact')?.addEventListener('click',()=>{project.artifacts={...(project.artifacts||{}),['note-'+Date.now()]:{kind:'note',specVersion:project.specVersion,summary:'Workspace note',stale:false,updatedAt:now()}};saveProject(project);renderArtifacts(project);});
 }
 function renderDatabase(){
-  toolShell('DATABASE','Project data','Uses your Supabase project when connected. No rows are invented.','<div class="placeholder">Schema explorer is available when this account has authorized table access. Connect Supabase in Settings → Integrations. Destructive queries require confirmation.</div><div class="sub" style="margin-top:10px">Current session: '+(ensureSupabase()?'client configured':'not configured')+'</div>');
+  const client=ensureSupabase();
+  toolShell('DATABASE','Project data','Reads live rows from your signed-in Supabase client. Table names you type are queried; nothing is invented. Destructive SQL is not run from this panel.','<form id="db-form" class="form"><input id="db-table" class="input full" placeholder="Table name you are allowed to read"><button class="primary">Load rows</button></form><div id="db-results" class="placeholder" style="margin-top:12px">'+(session?(client?'Enter a table name. Results come from Supabase.':'Supabase client is not configured.'):'Sign in to query your project database.')+'</div>');
+  $('#db-form')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const table=String($('#db-table').value||'').trim().replace(/[^a-zA-Z0-9_]/g,'').slice(0,64);
+    const out=$('#db-results');if(!table){out.textContent='Enter a table name.';return;}
+    if(!session||!client){out.textContent='Sign in with a configured Supabase client first.';return;}
+    out.textContent='Loading…';
+    try{
+      const {data,error}=await client.from(table).select('*').limit(50);
+      if(error)throw error;
+      if(!Array.isArray(data)||!data.length){out.innerHTML='<div class="placeholder">No rows returned. The table may be empty or RLS blocked the read.</div>';return;}
+      const keys=Object.keys(data[0]).slice(0,12);
+      out.innerHTML='<div class="sub">'+data.length+' row(s)</div><div style="overflow:auto;margin-top:8px"><table class="px-table"><thead><tr>'+keys.map(k=>'<th>'+esc(k)+'</th>').join('')+'</tr></thead><tbody>'+data.slice(0,50).map(row=>'<tr>'+keys.map(k=>'<td>'+esc(row[k]==null?'':typeof row[k]==='object'?JSON.stringify(row[k]):row[k])+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+    }catch(error){out.textContent='Query failed: '+(error.message||error)+'. No rows were invented.';}
+  });
 }
 function renderStorage(){
   toolShell('STORAGE','Assets','Supabase Storage buckets are account-level. Upload is enabled only with an authenticated session and configured bucket.','<div class="placeholder">'+(session?'No storage bucket is linked to this project yet.':'Sign in to manage stored assets.')+'</div>');
@@ -1581,7 +1662,10 @@ function renderCollab(){
   toolShell('MEMBERS','Collaboration','Presence uses Supabase Realtime when signed in. Additional members appear only after they exist on the project.','<div class="box"><div class="row"><b>'+(session?.user?.email||'Guest')+'</b><span class="sub">Owner</span></div></div>'+(session?'<div class="sub" style="margin-top:8px">Realtime channel is attached while this project is open.</div>':'<div class="placeholder">Sign in to sync collaboration events.</div>'));
 }
 function renderDeploy(project){
-  toolShell('DEPLOY','Publish','ProjectX does not invent a production URL. Configure a real host to go live.','<div class="grid"><div class="box"><b>Status</b><div class="sub">Not deployed</div></div><div class="box"><b>Environment</b><div class="sub">Development (local/cloud project files)</div></div><div class="box"><b>Domain</b><div class="sub">Add a domain after a host is connected.</div></div></div><div class="actions"><button class="ghost" id="export-deploy">Export artifact</button></div>');
+  toolShell('DEPLOY','Publish',DeploymentProvider.note,'<div class="grid"><div class="box"><b>Status</b><div class="sub">Not deployed</div></div><div class="box"><b>Provider</b><div class="sub">'+esc(DeploymentProvider.kind)+'</div></div><div class="box"><b>Domain</b><div class="sub">Add a domain after a host is connected. DNS is not applied automatically.</div></div></div><form id="domain-form" class="form" style="margin-top:12px"><input id="domain-host" class="input full" placeholder="example.com"><button class="ghost">Record domain</button></form><div id="domain-list"></div><div class="actions"><button class="ghost" id="export-deploy">Export artifact</button></div>');
+  const names=Array.isArray(project.executionState?.domains)?project.executionState.domains:[];
+  $('#domain-list').innerHTML=names.map(d=>`<div class="row"><b>${esc(d.host)}</b><span class="status warn">${esc(d.status)}</span></div>`).join('')||'<div class="placeholder">No domains recorded.</div>';
+  $('#domain-form')?.addEventListener('submit',e=>{e.preventDefault();const host=String($('#domain-host').value||'').trim().toLowerCase();if(!host||!/^[a-z0-9.-]+$/.test(host))return notify('Enter a hostname. Verification is manual.','info');const next=[...names.filter(x=>x.host!==host),{host,status:'awaiting DNS'}];applyProjectMutation(project,{executionStatePatch:{domains:next}});saveProject(project);renderDeploy(project);});
   $('#export-deploy')?.addEventListener('click',()=>renderDelivery(project));
 }
 function openPalette(){
@@ -1591,9 +1675,17 @@ function drawPalette(q){
   const list=$('#px-palette-list');if(!list)return;
   const query=String(q||'').toLowerCase();
   const cmds=UI.COMMANDS.filter(c=>c[1].toLowerCase().includes(query));
-  const projects=state.projects.filter(p=>p.title.toLowerCase().includes(query)).slice(0,8);
-  list.innerHTML=cmds.map(c=>`<button data-cmd-go="${esc(c[2])}">${esc(c[1])}</button>`).join('')+projects.map(p=>`<button data-open="${esc(p.id)}">Open ${esc(p.title)}</button>`).join('');
-  $$('[data-cmd-go]',list).forEach(b=>b.onclick=()=>{closePalette();const id=b.dataset.cmdGo;const p=activeProject();if(p&&UI.PROJECT_NAV.some(n=>n[0]===id)){p.uiNav=id;saveProject(p);return renderProjectTool(p,id);}navigate(id);});
+  const projects=state.projects.filter(p=>p.title.toLowerCase().includes(query)||String(p.intent||'').toLowerCase().includes(query)).slice(0,8);
+  const p=activeProject();
+  const files=p?Object.keys(p.files||{}).filter(f=>f.toLowerCase().includes(query)).slice(0,8):[];
+  const tasks=p?(p.executionState?.tasks||[]).filter(t=>String(t.title||'').toLowerCase().includes(query)).slice(0,8):[];
+  const brain=p&&query?[p.spec?.goal,p.understanding?.summary].filter(Boolean).filter(x=>String(x).toLowerCase().includes(query)):[];
+  list.innerHTML=cmds.map(c=>`<button data-cmd-go="${esc(c[2])}">${esc(c[1])}</button>`).join('')
+    +projects.map(x=>`<button data-open="${esc(x.id)}">Open ${esc(x.title)}</button>`).join('')
+    +files.map(f=>`<button data-cmd-go="files">${esc(f)}</button>`).join('')
+    +tasks.map(t=>`<button data-cmd-go="tasks">${esc(t.title)}</button>`).join('')
+    +(brain.length?`<button data-cmd-go="brain">Brain match</button>`:'');
+  $$('[data-cmd-go]',list).forEach(b=>b.onclick=()=>{closePalette();const id=b.dataset.cmdGo;const cur=activeProject();if(cur&&UI.PROJECT_NAV.some(n=>n[0]===id)){cur.uiNav=id;saveProject(cur);return renderProjectTool(cur,id);}navigate(id);});
 }
 function closePalette(){$('#px-palette')&&($('#px-palette').hidden=true);}
 function bindPalette(){

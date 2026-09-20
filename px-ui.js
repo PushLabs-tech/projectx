@@ -33,6 +33,15 @@ export const PROJECT_NAV = [
 
 export const CORE_NAV = ['overview', 'assistant', 'build', 'design', 'files', 'preview', 'tasks', 'artifacts', 'brain', 'settings'];
 
+export const TEMPLATES = [
+  {id:'website',title:'Website',intent:'Build a polished landing page for a local service business.',type:'Website',deliverables:['Working website']},
+  {id:'app',title:'Web app',intent:'Build a polished expense tracker web app.',type:'Website',deliverables:['Working web app']},
+  {id:'game',title:'Game',intent:'Build a mobile horror game with progression, enemies, and a shop.',type:'Game',deliverables:['Playable game']},
+  {id:'research',title:'Research',intent:'Create a research report comparing battery technologies for a solar prototype.',type:'Research',deliverables:['Research brief']},
+  {id:'business',title:'Business',intent:'Help me launch a sneaker cleaning business.',type:'Business',deliverables:['Launch plan']},
+  {id:'deck',title:'Pitch',intent:'Create a pitch deck for a student startup.',type:'Presentation',deliverables:['Pitch deck']}
+];
+
 export const COMMANDS = [
   ['home', 'Go home', 'home'],
   ['projects', 'Open projects', 'projects'],
@@ -91,7 +100,7 @@ export function publicMarkup() {
   return `<div class="px-public-nav">
     <a href="./" class="logo">ProjectX</a>
     <div class="px-cta">
-      <a class="ghost" href="#examples">Examples</a>
+      <a class="ghost" href="#px-examples">Examples</a>
       <button class="ghost" id="public-workspace">Open workspace</button>
       <button class="ghost" id="public-signin">Sign in</button>
       <button class="primary" id="public-signup">Create account</button>
@@ -130,6 +139,16 @@ export function publicMarkup() {
     <button data-example="Create a pitch deck for a student startup."><b>Creative</b><span class="sub">Student startup pitch</span></button>
     <button data-example="Research a market, design a landing page, build it, and prepare a pitch."><b>Hybrid</b><span class="sub">Market, page, and pitch</span></button>
   </div>
+  <section class="px-faq" id="px-faq">
+    <div class="kicker">FAQ</div>
+    <details open><summary>What happens after I describe an outcome?</summary><p>ProjectX opens discovery: one contextual decision at a time, four AI options plus “Describe in your own words.” A project brain is written only after valid discovery.</p></details>
+    <details><summary>Do I need an AI key?</summary><p>No, to open the workspace. Discovery and Agent work need a connected provider, a guest Gemini key in this browser, or a signed-in vault. Without AI you can still create a local draft project and inspect files.</p></details>
+    <details><summary>Does ProjectX run my app on a cloud VM?</summary><p>Browser-safe previews run in a sandboxed iframe. Isolated workers are not claimed. Export is available until a host is connected.</p></details>
+  </section>
+  <section class="px-how">
+    <div class="kicker">FREE STACK</div>
+    <p class="lead" style="max-width:62ch">ProjectX is built to run on GitHub Pages, Supabase, Edge Functions, and bring-your-own keys. Demo AI, when configured server-side, is rate-limited and never exposed in the browser.</p>
+  </section>
   <footer class="px-footer">
     <a href="./privacy.html">Privacy</a>
     <a href="./terms.html">Terms</a>
@@ -198,6 +217,8 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
         <button class="send" id="start-send" aria-label="Start project">→</button>
       </div>
     </div>
+    <div class="label">Templates</div>
+    <div class="grid" id="home-templates">${TEMPLATES.map(t=>`<button class="box" data-template="${t.id}" style="text-align:left;cursor:pointer"><b>${esc(t.title)}</b><div class="sub">${esc(t.intent)}</div></button>`).join('')}</div>
     <div class="label">Projects</div>
     <div class="grid" id="home-projects">${cards}</div>
     <div class="grid" style="margin-top:12px">
@@ -210,6 +231,9 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
 
 export function interviewMarkup() {
   return `<div class="interview poll-interview">
+    <div class="kicker">DISCOVERY</div>
+    <div id="px-agent-status" class="sub">Thinking</div>
+    <div id="interview-understanding" class="understanding"></div>
     <div id="interview-poll" class="discovery-poll" aria-live="polite"></div>
     <div id="interview-status" class="poll-status" aria-live="polite"></div>
   </div>`;
@@ -232,7 +256,7 @@ export function assistantDock({esc, project, actions}) {
   const status = project?.pendingMutation ? 'Awaiting approval' : (project?.status || 'Ready');
   return `<div class="px-assist-head">
     <div class="label">Assistant</div>
-    <div class="sub">${esc(status)} · ${esc(settingsSafe(project))}</div>
+    <div class="sub" id="px-agent-status">${esc(status)} · ${esc(settingsSafe(project))}</div>
   </div>
   <div id="assistant-dock-log" class="conversation" role="log" aria-live="polite"></div>
   <div class="px-assist-actions">${(actions || CONTEXT_ACTIONS.default).map(a => `<button type="button" class="chip" data-assist-action="${esc(a)}">${esc(a)}</button>`).join('')}</div>

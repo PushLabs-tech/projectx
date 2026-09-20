@@ -210,7 +210,13 @@
 .px-examples { width: min(1080px, calc(100% - 40px)); margin: 0 auto 48px; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
 .px-examples button { text-align: left; border: 1px solid #d8d3c8; background: #fff; border-radius: 12px; padding: 14px; cursor: pointer; }
 .px-examples b { display: block; margin-bottom: 6px; }
-.px-footer { width: min(1080px, calc(100% - 40px)); margin: 0 auto 32px; display: flex; gap: 16px; flex-wrap: wrap; color: var(--px-public-muted); font-size: 12px; }
+.px-faq { width: min(1080px, calc(100% - 40px)); margin: 0 auto 36px; }
+.px-faq details { border: 1px solid #d8d3c8; background: #fff; border-radius: 10px; padding: 12px 14px; margin-top: 8px; }
+.px-faq summary { cursor: pointer; font-weight: 650; }
+.px-faq p { margin: 8px 0 0; color: var(--px-public-muted); }
+.px-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.px-table th, .px-table td { border: 1px solid var(--px-line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.px-table th { color: var(--px-muted); font-weight: 650; }
 .px-footer a { color: inherit; }
 .px-how { width: min(1080px, calc(100% - 40px)); margin: 0 auto 36px; }
 .px-how ol { margin: 12px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
