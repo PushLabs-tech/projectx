@@ -279,3 +279,55 @@ using ((select private.is_project_member(project_id)));
 revoke all on public.ai_provider_credentials from anon, authenticated;
 revoke all on public.payment_events from anon, authenticated;
 revoke all on all tables in schema public from anon;
+
+-- Secondary project-scoped table: chunks inherit authorization from their resource.
+drop policy if exists "resource chunks project members" on public.resource_chunks;
+drop policy if exists "resource chunks members read" on public.resource_chunks;
+create policy "resource chunks members read" on public.resource_chunks
+for select to authenticated
+using (exists (
+  select 1 from public.project_resources r
+  where r.id=resource_chunks.resource_id
+    and (select private.is_project_member(r.project_id))
+));
+create policy "resource chunks editors insert" on public.resource_chunks
+for insert to authenticated
+with check (exists (
+  select 1 from public.project_resources r
+  where r.id=resource_chunks.resource_id
+    and (select private.is_project_editor(r.project_id))
+));
+create policy "resource chunks editors update" on public.resource_chunks
+for update to authenticated
+using (exists (
+  select 1 from public.project_resources r
+  where r.id=resource_chunks.resource_id
+    and (select private.is_project_editor(r.project_id))
+))
+with check (exists (
+  select 1 from public.project_resources r
+  where r.id=resource_chunks.resource_id
+    and (select private.is_project_editor(r.project_id))
+));
+create policy "resource chunks editors delete" on public.resource_chunks
+for delete to authenticated
+using (exists (
+  select 1 from public.project_resources r
+  where r.id=resource_chunks.resource_id
+    and (select private.is_project_editor(r.project_id))
+));
+
+-- Keep profile access explicitly authenticated-only.
+drop policy if exists "profiles own" on public.profiles;
+create policy "profiles own" on public.profiles
+for all to authenticated
+using ((select auth.uid()) = id)
+with check ((select auth.uid()) = id);
+
+-- Analytics are server-written; signed-in users can read only their own events.
+drop policy if exists "analytics" on public.analytics_events;
+drop policy if exists "analytics own read" on public.analytics_events;
+create policy "analytics own read" on public.analytics_events
+for select to authenticated
+using (user_id is null or (select auth.uid()) = user_id);
+revoke insert, update, delete on public.analytics_events from anon, authenticated;
