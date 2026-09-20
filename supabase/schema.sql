@@ -205,3 +205,53 @@ for all to authenticated using (false) with check (false);
 drop policy if exists "payment events no direct client access" on public.payment_events;
 create policy "payment events no direct client access" on public.payment_events
 for all to authenticated using (false) with check (false);
+
+
+-- ProjectX platform integrations
+create table if not exists public.workspace_invitations (
+  id uuid primary key default gen_random_uuid(), workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  email text not null, role text not null default 'editor' check(role in ('admin','editor','viewer')),
+  token_hash text not null unique, invited_by uuid not null references auth.users(id) on delete cascade,
+  expires_at timestamptz not null, accepted_at timestamptz, accepted_by uuid references auth.users(id) on delete set null, created_at timestamptz not null default now()
+);
+create table if not exists public.workspace_presence (
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid references public.projects(id) on delete set null,
+  cursor jsonb not null default '{}'::jsonb, status text not null default 'online', last_seen_at timestamptz not null default now(),
+  primary key(workspace_id,user_id)
+);
+create table if not exists public.github_connections (
+  id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
+  workspace_id uuid references public.workspaces(id) on delete cascade, github_user_id text not null, github_login text not null,
+  access_token_ciphertext text not null, scope text, expires_at timestamptz, metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(user_id,workspace_id)
+);
+create table if not exists public.github_repositories (
+  id uuid primary key default gen_random_uuid(), connection_id uuid not null references public.github_connections(id) on delete cascade,
+  workspace_id uuid not null references public.workspaces(id) on delete cascade, owner_login text not null, repo_name text not null,
+  full_name text not null, default_branch text not null default 'main', private boolean not null default false, html_url text,
+  metadata jsonb not null default '{}'::jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  unique(connection_id,full_name)
+);
+create table if not exists public.deployment_targets (
+  id uuid primary key default gen_random_uuid(), workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  provider text not null, label text not null, credential_ciphertext text not null, metadata jsonb not null default '{}'::jsonb,
+  enabled boolean not null default true, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  unique(workspace_id,provider,label)
+);
+create table if not exists public.project_resources (
+  id uuid primary key default gen_random_uuid(), project_id uuid not null references public.projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade, storage_bucket text, storage_path text, original_name text not null,
+  mime_type text, size_bytes bigint not null default 0, sha256 text, extraction_status text not null default 'queued',
+  extracted_text text, metadata jsonb not null default '{}'::jsonb, error text, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create table if not exists public.github_oauth_states (
+  state_hash text primary key, user_id uuid not null references auth.users(id) on delete cascade,
+  workspace_id uuid references public.workspaces(id) on delete cascade, expires_at timestamptz not null, created_at timestamptz not null default now()
+);
+create table if not exists public.billing_entitlements (
+  user_id uuid primary key references auth.users(id) on delete cascade, plan_key text not null default 'free',
+  status text not null default 'active', monthly_credits integer not null default 20, credits_used integer not null default 0,
+  period_start timestamptz not null default now(), period_end timestamptz, provider text, provider_subscription_id text, updated_at timestamptz not null default now()
+);
