@@ -6,14 +6,14 @@ test("public shell renders", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/ProjectX/);
   await expect(page.getByText("Tell ProjectX what you want to accomplish")).toBeVisible();
-  await expect(page.locator("#start-input")).toBeVisible();
+  await expect(page.locator("#public-start")).toBeVisible();
   await expect(page.locator("#px-app")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test("auth screen exposes login and signup controls", async ({ page }) => {
   await page.goto("/");
-  const signup = page.getByRole("button", { name: /sign up/i }).first();
+  const signup = page.locator("#public-signup");
   await expect(signup).toBeVisible();
   await signup.click();
   await expect(page.locator("#auth-email")).toBeVisible();
