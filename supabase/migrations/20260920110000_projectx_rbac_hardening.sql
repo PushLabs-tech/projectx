@@ -331,3 +331,11 @@ create policy "analytics own read" on public.analytics_events
 for select to authenticated
 using (user_id is null or (select auth.uid()) = user_id);
 revoke insert, update, delete on public.analytics_events from anon, authenticated;
+
+-- Backend-only tables use authenticated deny policies for defense in depth.
+drop policy if exists "ai credentials no direct client access" on public.ai_provider_credentials;
+create policy "ai credentials no direct client access" on public.ai_provider_credentials
+for all to authenticated using (false) with check (false);
+drop policy if exists "payment events no direct client access" on public.payment_events;
+create policy "payment events no direct client access" on public.payment_events
+for all to authenticated using (false) with check (false);
