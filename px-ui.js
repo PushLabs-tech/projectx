@@ -34,12 +34,12 @@ export const PROJECT_NAV = [
 export const CORE_NAV = ['overview', 'assistant', 'build', 'design', 'files', 'preview', 'tasks', 'artifacts', 'brain', 'settings'];
 
 export const TEMPLATES = [
-  {id:'website',title:'Website',intent:'Build a polished landing page for a local service business.',type:'Website',deliverables:['Working website']},
-  {id:'app',title:'Web app',intent:'Build a polished expense tracker web app.',type:'Website',deliverables:['Working web app']},
-  {id:'game',title:'Game',intent:'Build a mobile horror game with progression, enemies, and a shop.',type:'Game',deliverables:['Playable game']},
-  {id:'research',title:'Research',intent:'Create a research report comparing battery technologies for a solar prototype.',type:'Research',deliverables:['Research brief']},
-  {id:'business',title:'Business',intent:'Help me launch a sneaker cleaning business.',type:'Business',deliverables:['Launch plan']},
-  {id:'deck',title:'Pitch',intent:'Create a pitch deck for a student startup.',type:'Presentation',deliverables:['Pitch deck']}
+  {id:'website',title:'Website',icon:'▣',intent:'Build a polished landing page for a local service business.',type:'Website',deliverables:['Working website']},
+  {id:'app',title:'App',icon:'▣',intent:'Build a polished expense tracker web app.',type:'Website',deliverables:['Working web app']},
+  {id:'design',title:'Design',icon:'◇',intent:'Design a clean product page with a simple visual system.',type:'Website',deliverables:['Design mock']},
+  {id:'deck',title:'Slides',icon:'▤',intent:'Create a pitch deck for a student startup.',type:'Presentation',deliverables:['Pitch deck']},
+  {id:'research',title:'Research',icon:'◎',intent:'Create a research report comparing battery technologies for a solar prototype.',type:'Research',deliverables:['Research brief']},
+  {id:'game',title:'Game',icon:'▸',intent:'Build a mobile horror game with progression, enemies, and a shop.',type:'Game',deliverables:['Playable game']}
 ];
 
 export const COMMANDS = [
@@ -105,20 +105,24 @@ export function publicMarkup() {
       <a href="./" class="logo px-mark"><span class="px-mark-badge">X</span> ProjectX</a>
       <nav class="px-cta">
         <button class="ghost" id="public-signin">Log in</button>
-        <button class="ghost" id="public-signup" aria-label="Open menu">Sign up</button>
+        <button class="ghost px-menu-btn" id="public-menu" type="button" aria-label="Open menu" aria-expanded="false">☰</button>
       </nav>
     </header>
+    <div class="px-public-menu" id="public-menu-panel" hidden>
+      <button type="button" id="public-signup">Sign up</button>
+      <button type="button" id="public-signin-alt">Log in</button>
+    </div>
     <main class="px-landing-main">
       <h1>What should we make?</h1>
       <p class="lead">Describe an outcome. ProjectX keeps a project brain while it works.</p>
       <div class="px-composer-lg">
-        <textarea id="start-input" placeholder="Describe the outcome you want…"></textarea>
+        <textarea id="start-input" placeholder="Describe your idea…"></textarea>
         <div class="px-composer-lg-foot">
-          <span class="sub">+</span>
+          <span class="px-plus">+</span>
           <button class="send" id="start-send" aria-label="Start">→</button>
         </div>
       </div>
-      <div class="px-type-row" id="home-templates">${TEMPLATES.map(t=>`<button type="button" data-template="${t.id}"><span class="px-type-icon">${t.title.charAt(0)}</span>${t.title}</button>`).join('')}</div>
+      <div class="px-type-row" id="home-templates">${TEMPLATES.map(t=>`<button type="button" data-template="${t.id}"><span class="px-type-icon">${t.icon || t.title.charAt(0)}</span>${t.title}</button>`).join('')}</div>
     </main>
   </div>`;
 }
@@ -220,19 +224,26 @@ export function launcherMarkup({esc, session, projects, guestReady, name}) {
     ['Create a pitch deck for a student startup.', 'Draft a pitch'],
     ['Help me launch a sneaker cleaning business.', 'Plan a small business']
   ];
+  const recent = projects.slice(0, 4).map(p => `<button class="px-mini-project" data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('');
   return `<div class="px-home-stage">
-    <h1>${esc(who)}, what's next?</h1>
-    <div class="px-suggest">${suggestions.map(([intent,label])=>`<button type="button" class="chip" data-example="${esc(intent)}">${esc(label)}</button>`).join('')}</div>
+    <div class="px-home-hero">
+      <h1>${esc(who)}, what's next?</h1>
+      <p class="px-suggest-label">A few starting points</p>
+      <div class="px-suggest">${suggestions.map(([intent,label])=>`<button type="button" class="chip" data-example="${esc(intent)}">${esc(label)}</button>`).join('')}</div>
+    </div>
     <div class="px-home-dock">
       <div class="px-composer-lg">
         <textarea id="start-input" placeholder="Start chatting or describe a task…"></textarea>
         <div class="px-composer-lg-foot">
-          <span class="sub">${session ? 'Signed in' : guestReady ? 'Guest key ready' : 'Connect AI in Settings when you need the Agent'}</span>
-          <button class="send" id="start-send" aria-label="Start">→</button>
+          <span class="px-plus">+</span>
+          <div class="px-dock-meta">
+            <span class="sub">${session ? 'Workspace' : guestReady ? 'Guest' : 'Local'}</span>
+            <button class="send" id="start-send" aria-label="Start">→</button>
+          </div>
         </div>
       </div>
     </div>
-    <div class="px-home-recent" id="home-projects">${projects.slice(0,6).map(p=>`<button class="px-mini-project" data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('')}</div>
+    <div class="px-home-recent" id="home-projects">${recent}</div>
   </div>`;
 }
 

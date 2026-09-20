@@ -540,7 +540,15 @@ function publicHome(){
   const goLogin=()=>{history.replaceState(null,'',location.pathname+'#login');authScreen('signin');};
   const goSignup=()=>{history.replaceState(null,'',location.pathname+'#signup');authScreen('signup');};
   $('#public-signin').onclick=goLogin;
-  $('#public-signup').onclick=goSignup;
+  $('#public-signin-alt')?.addEventListener('click',goLogin);
+  $('#public-signup')?.addEventListener('click',goSignup);
+  const menu=$('#public-menu');
+  const panel=$('#public-menu-panel');
+  menu?.addEventListener('click',()=>{
+    if(!panel)return;
+    if(panel.hasAttribute('hidden')){panel.removeAttribute('hidden');menu.setAttribute('aria-expanded','true');}
+    else{panel.setAttribute('hidden','');menu.setAttribute('aria-expanded','false');}
+  });
   bindStartComposer();
 }
 function routeFromLocation(){
