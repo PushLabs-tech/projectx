@@ -343,11 +343,8 @@ async function persistProject(user: any, p: any) {
     if (me) throw me;
   }
 
-  if (Array.isArray(p?.versions) && p.versions.length) {
-    await admin.from("project_versions").delete().eq("project_id", saved.id);
-    const { error: ve } = await admin.from("project_versions").insert(p.versions.slice(-20).map((v: any) => ({ project_id: saved.id, version_number: Number(v.version || 1), label: limitText(v.label || `Version ${v.version}`, 120), snapshot: v, created_by: user.id })));
-    if (ve) throw ve;
-  }
+  // Server-side version history is append-only. Never replace or delete it from a client snapshot.
+  // The canonical Brain mutation RPC owns authoritative version creation.
   await admin.from("audit_logs").insert({ user_id: user.id, action: "project.persist", metadata: { project_id: saved.id, spec_version: Number(p?.specVersion || 1) } });
   return { ok: true, projectId: saved.id, workspaceId: saved.workspace_id, updatedAt: saved.updated_at };
 }
@@ -441,7 +438,7 @@ async function readResearchSource(rawUrl: string) {
 async function research(user: any, body: any) {
   const projectId = String(body.projectId || "");
   if (!projectId) throw new Error("Project not found");
-  await authorizeProject(user, projectId);
+  await authorizeProject(user, projectId, true);
   const query = limitText(body.query, 500).trim();
   if (!query) throw new Error("A research question is required.");
   const urls = [...new Set((Array.isArray(body.urls) ? body.urls : []).map((u: any) => String(u || "").trim()).filter(Boolean))].slice(0,5);
@@ -506,7 +503,11 @@ async function securityEvents(user: any) {
 }
 
 async function listProjects(user: any) {
-  const { data, error } = await admin.from("projects").select("id,title,project_type,intention,project_spec,understanding,plan,workspace_config,spec_version,selected_section,status,settings,updated_at").eq("owner_id", user.id).order("updated_at", { ascending: false });
+  const { data: memberships, error: membershipError } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id);
+  if (membershipError) throw membershipError;
+  const workspaceIds = [...new Set((memberships || []).map((m: any) => String(m.workspace_id)).filter(Boolean))];
+  if (!workspaceIds.length) return { ok: true, projects: [] };
+  const { data, error } = await admin.from("projects").select("id,title,project_type,intention,project_spec,understanding,plan,workspace_config,spec_version,selected_section,status,settings,updated_at,workspace_id").in("workspace_id", workspaceIds).order("updated_at", { ascending: false });
   if (error) throw error;
   return { ok: true, projects: (data || []).map((p: any) => ({
     id: p.id, title: p.title, type: p.project_type, intent: p.intention, specVersion: p.spec_version || 1, spec: p.project_spec || {}, understanding: p.understanding || {}, plan: p.plan || [],
@@ -704,7 +705,7 @@ async function runVerification(user:any, body:any) {
   const projectId=String(body?.projectId || "");
   if(!projectId) throw new Error("Project ID is required.");
   const current=await getProject(user,projectId);
-  const authz=await authorizeProject(user,projectId);
+  const authz=await authorizeProject(user,projectId,true);
   const checks=Array.isArray(body?.checks)?body.checks.slice(0,100):[];
   const results=checks.map((c:any)=>({
     subject_type:String(c?.subjectType || "artifact").slice(0,60),
