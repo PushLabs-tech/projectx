@@ -100,63 +100,26 @@ export function navForProject(project) {
 }
 
 export function publicMarkup() {
-  return `<div class="px-site">
+  return `<div class="px-site px-landing">
     <header class="px-public-nav">
       <a href="./" class="logo px-mark"><span class="px-mark-badge">X</span> ProjectX</a>
       <nav class="px-cta">
-        <a class="ghost" href="#px-how">How it works</a>
-        <a class="ghost" href="#px-examples">Examples</a>
         <button class="ghost" id="public-signin">Log in</button>
-        <button class="primary" id="public-signup">Sign up</button>
+        <button class="ghost" id="public-signup" aria-label="Open menu">Sign up</button>
       </nav>
     </header>
-    <section class="px-hero">
-      <div>
-        <div class="kicker">PROJECTX</div>
-        <h1>An AI workspace that keeps the project, not just the chat.</h1>
-        <p class="lead">Describe an outcome. ProjectX builds a durable brain, files, preview, and tasks you can inspect — then you approve what lands.</p>
-        <div class="px-cta">
-          <button class="primary" id="public-signup-hero">Create a free account</button>
-          <button class="ghost" id="public-workspace">Open workspace</button>
+    <main class="px-landing-main">
+      <h1>What should we make?</h1>
+      <p class="lead">Describe an outcome. ProjectX keeps a project brain while it works.</p>
+      <div class="px-composer-lg">
+        <textarea id="start-input" placeholder="Describe the outcome you want…"></textarea>
+        <div class="px-composer-lg-foot">
+          <span class="sub">+</span>
+          <button class="send" id="start-send" aria-label="Start">→</button>
         </div>
-        <p class="sub">Email sign-in via Supabase. Google login is not connected. Isolated cloud VMs are not claimed.</p>
       </div>
-      <div class="px-product-shot" aria-hidden="true">
-        <div class="px-shot-col">Files<br><span class="sub">index.html</span><br><span class="sub">app.js</span><br><span class="sub">styles.css</span></div>
-        <div class="px-shot-col px-shot-main"><b>Preview</b><div class="sub">Sandboxed iframe</div><div class="px-shot-status">Agent · Working on homepage</div></div>
-        <div class="px-shot-col">Agent<br><span class="sub">Plan</span><br><span class="sub">Build</span><br><span class="sub">Awaiting approval</span></div>
-      </div>
-    </section>
-    <section class="px-how" id="px-how">
-      <div class="kicker">HOW IT WORKS</div>
-      <ol>
-        <li><b>Describe</b> the outcome in your own words.</li>
-        <li><b>Discover</b> one decision at a time (4 options + your own words).</li>
-        <li><b>Work</b> in files, preview, and tasks while the brain stays canonical.</li>
-        <li><b>Approve</b> before anything replaces the main project.</li>
-      </ol>
-    </section>
-    <div class="px-examples" id="px-examples">
-      <button data-example="Build a polished expense tracker web app."><b>Software</b><span class="sub">Expense tracker web app</span></button>
-      <button data-example="Build a mobile horror game with progression, enemies, and a shop."><b>Game</b><span class="sub">Mobile horror game</span></button>
-      <button data-example="Help me launch a sneaker cleaning business."><b>Business</b><span class="sub">Sneaker cleaning launch</span></button>
-      <button data-example="Create a research report comparing battery technologies for a solar prototype."><b>Research</b><span class="sub">Battery technology brief</span></button>
-      <button data-example="Create a pitch deck for a student startup."><b>Creative</b><span class="sub">Student startup pitch</span></button>
-      <button data-example="Research a market, design a landing page, build it, and prepare a pitch."><b>Hybrid</b><span class="sub">Market, page, and pitch</span></button>
-    </div>
-    <section class="px-faq" id="px-faq">
-      <div class="kicker">FAQ</div>
-      <details open><summary>Is this Replit?</summary><p>No. ProjectX is a separate product. It is an AI workspace with a project brain, files, and a sandboxed preview. It does not copy Replit’s product, branding, or hosting.</p></details>
-      <details><summary>How do I log in?</summary><p>Use email and password on the Log in screen. Accounts are stored in your Supabase project. Social OAuth is not enabled.</p></details>
-      <details><summary>Do I need an AI key?</summary><p>You can browse the workspace without one. Discovery and Agent need a connected provider, a guest Gemini key in this browser, or a signed-in vault. One key is enough for testing.</p></details>
-      <details><summary>Does ProjectX run a cloud VM?</summary><p>No. Previews run in a sandboxed iframe in your browser. Export is available until a host is connected.</p></details>
-    </section>
-    <footer class="px-footer">
-      <a href="./privacy.html">Privacy</a>
-      <a href="./terms.html">Terms</a>
-      <a href="./billing.html">Plans</a>
-      <span>ProjectX · keep the context</span>
-    </footer>
+      <div class="px-type-row" id="home-templates">${TEMPLATES.map(t=>`<button type="button" data-template="${t.id}"><span class="px-type-icon">${t.title.charAt(0)}</span>${t.title}</button>`).join('')}</div>
+    </main>
   </div>`;
 }
 
@@ -188,7 +151,7 @@ export function authMarkup({mode}) {
 }
 
 export function chrome({esc, session, recents, active, body, project, nav, right, status, email, execNote}) {
-  const tools = project ? navForProject(project) : APP_TOOLS;
+  const tools = project ? navForProject(project) : [['home', 'Home'], ['projects', 'Projects'], ['settings', 'Settings']];
   const left = tools.map(([id, name]) => {
     const on = (nav || active) === id;
     if (project) return `<button class="px-tool ${on ? 'active' : ''}" data-project-tool="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`;
@@ -201,28 +164,26 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   const extra = project ? `<button class="ghost px-add-tool" data-cmd="add-tool">Add tool</button>` : '';
   const queueNote = execNote || 'No isolated cloud workers are connected. Independent tasks can be queued; execution is sequential through the Assistant.';
   const initial = esc(String(email || 'G').trim().charAt(0).toUpperCase() || 'G');
+  const who = email ? esc(String(email).split('@')[0]) : 'Guest';
   return `<div class="px-shell ${project ? '' : 'no-right px-dash-shell'}" id="px-shell">
     <aside class="px-left side" id="px-left">
-      <button class="logo px-mark" data-nav="home" title="Home"><span class="px-mark-badge">X</span> ProjectX</button>
-      <button class="new" data-nav="home" id="px-create">+ Create</button>
-      <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'My projects'} ▾</button>
+      <button class="logo px-mark" data-nav="home" title="Home"><span class="px-mark-badge">X</span></button>
+      <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'My workspace'} ▾</button>
       <div class="px-switch-list" id="px-switch-list" hidden>${recent}</div>
-      <input class="input px-side-search" id="px-side-search" placeholder="Search" aria-label="Search project">
-      <nav class="nav" id="px-tool-nav">${left}${extra}</nav>
+      <button class="new" data-nav="home" id="px-create">+ New</button>
+      ${project ? `<input class="input px-side-search" id="px-side-search" placeholder="Search" aria-label="Search project"><nav class="nav" id="px-tool-nav">${left}${extra}</nav>` : `<nav class="nav" id="px-tool-nav">${left}</nav>`}
       <div class="divider"></div>
-      <div class="label">Projects</div>
+      <div class="label">Recent</div>
       <div class="recent px-repl-list">${recent}</div>
-      <div class="acct"><span class="px-avatar">${initial}</span><div><div>${email ? esc(String(email).split('@')[0]) : 'Guest'}</div><div class="sub">${session ? 'Cloud' : 'Local'} · ${esc(sync)}</div></div></div>
+      <div class="acct"><span class="px-avatar">${initial}</span><div><div>${who}</div><div class="sub">${session ? 'Signed in' : 'Guest'}</div></div></div>
     </aside>
     <header class="px-topbar top">
       <button class="ghost px-nav-toggle" id="px-nav-toggle" aria-label="Open navigation">Menu</button>
       <strong class="px-top-title">${title}</strong>
       ${project ? `<span class="px-pill">${esc(project.type || 'project')}</span>` : ''}
-      <span class="px-dot ${session ? '' : 'warn'}" title="${esc(sync)}"></span>
       <span style="flex:1"></span>
-      <button class="ghost" data-cmd="palette" title="Command palette">Search</button>
-      ${project ? '<button class="ghost" data-project-tool="preview">Run</button><button class="ghost" data-cmd="toggle-assistant">Agent</button><button class="ghost" data-cmd="share">Invite</button><button class="primary" data-project-tool="deploy">Deploy</button>' : ''}
-      ${session ? '<button class="ghost" data-action="signout">Sign out</button>' : '<button class="primary" data-action="signin">Sign in</button>'}
+      ${project ? '<button class="ghost" data-project-tool="preview">Preview</button><button class="ghost" data-cmd="toggle-assistant">Agent</button>' : ''}
+      ${session ? '<button class="ghost" data-action="signout">Log out</button>' : '<button class="ghost" data-action="signin">Log in</button>'}
     </header>
     <main class="px-center main">${body}</main>
     ${project ? '<div class="px-split" id="px-split-right" data-split="right" title="Resize assistant"></div>' : ''}
@@ -232,11 +193,11 @@ export function chrome({esc, session, recents, active, body, project, nav, right
       <div class="sub" style="padding:8px 12px">${esc(queueNote)}</div>
       <div id="px-bottom-log" class="conversation"></div>
     </div>
-    <footer class="px-statusbar" id="px-statusbar"><button class="ghost" data-cmd="toggle-bottom" type="button">Console</button><span>${status || 'Ready'} · ${session ? 'Signed in' : 'Guest'} · ${esc((project && project.status) || 'idle')}</span><span style="flex:1"></span><span class="sub">⌘K · ⌘S · ⌘B · ⌘J</span></footer>
+    <footer class="px-statusbar" id="px-statusbar"><button class="ghost" data-cmd="toggle-bottom" type="button">Console</button><span>${status || 'Ready'}</span></footer>
   </div>
   <div class="px-palette" id="px-palette" hidden>
     <div class="px-palette-box">
-      <input id="px-palette-input" placeholder="Search commands, projects, surfaces…" aria-label="Command palette">
+      <input id="px-palette-input" placeholder="Search commands, projects, files…" aria-label="Command palette">
       <div class="px-palette-list" id="px-palette-list"></div>
     </div>
   </div>
@@ -251,28 +212,27 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   </div>`;
 }
 
-export function launcherMarkup({esc, session, projects, guestReady}) {
-  const rows = projects.map(p => {
-    const files = Object.keys(p.files || {}).length;
-    const updated = String(p.updatedAt || p.createdAt || '').slice(0, 10);
-    return `<button class="px-repl-row" data-open="${esc(p.id)}"><span class="px-repl-icon">${esc((p.title || 'P').charAt(0).toUpperCase())}</span><span class="px-repl-meta"><b>${esc(p.title)}</b><span class="sub">${esc(p.type)} · ${files} files · ${esc(p.status || 'idle')}</span></span><span class="sub px-repl-when">${esc(updated)}</span></button>`;
-  }).join('') || '<div class="px-empty">No projects yet. Create one above.</div>';
-  return `<div class="px-dash">
-    <div class="px-dash-create">
-      <div class="px-dash-create-head">
-        <b>Create a project</b>
-        <span class="sub">${session ? 'AI connected' : guestReady ? 'Guest Gemini ready' : 'Connect AI in Settings to run Agent'}</span>
+export function launcherMarkup({esc, session, projects, guestReady, name}) {
+  const who = String(name || (session ? 'there' : 'there')).replace(/[<>]/g, '');
+  const suggestions = [
+    ['Build a polished landing page for a local service business.', 'Build a landing page'],
+    ['Build a polished expense tracker web app.', 'Start a simple web app'],
+    ['Create a pitch deck for a student startup.', 'Draft a pitch'],
+    ['Help me launch a sneaker cleaning business.', 'Plan a small business']
+  ];
+  return `<div class="px-home-stage">
+    <h1>${esc(who)}, what's next?</h1>
+    <div class="px-suggest">${suggestions.map(([intent,label])=>`<button type="button" class="chip" data-example="${esc(intent)}">${esc(label)}</button>`).join('')}</div>
+    <div class="px-home-dock">
+      <div class="px-composer-lg">
+        <textarea id="start-input" placeholder="Start chatting or describe a task…"></textarea>
+        <div class="px-composer-lg-foot">
+          <span class="sub">${session ? 'Signed in' : guestReady ? 'Guest key ready' : 'Connect AI in Settings when you need the Agent'}</span>
+          <button class="send" id="start-send" aria-label="Start">→</button>
+        </div>
       </div>
-      <div class="px-create-box">
-        <textarea id="start-input" placeholder="Describe what you want built…"></textarea>
-        <button class="primary" id="start-send">Create</button>
-      </div>
-      <div class="px-template-row" id="home-templates">${TEMPLATES.map(t=>`<button type="button" class="chip" data-template="${t.id}">${esc(t.title)}</button>`).join('')}</div>
     </div>
-    <div class="px-dash-list">
-      <div class="px-dash-list-head"><b>My projects</b><span class="sub">${projects.length}</span></div>
-      <div id="home-projects">${rows}</div>
-    </div>
+    <div class="px-home-recent" id="home-projects">${projects.slice(0,6).map(p=>`<button class="px-mini-project" data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('')}</div>
   </div>`;
 }
 

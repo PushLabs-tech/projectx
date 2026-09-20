@@ -509,18 +509,28 @@ function bindDock(project){
     if(input){input.value=(input.value?input.value+' ':'')+a+': ';input.focus();}
   });
 }
-function workspaceHome(){
-  shell(UI.launcherMarkup({esc,session,projects:state.projects,guestReady:Boolean(localGuestKey())}),'home');
+function bindStartComposer(){
   const input=$('#start-input');
-  try{const pending=sessionStorage.getItem('projectx_pending_intent');if(pending&&input&&!input.value){input.value=pending;sessionStorage.removeItem('projectx_pending_intent');}}catch{}
-  $('#start-send').onclick=()=>beginCreation(input.value);
-  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#start-send').click();}};
+  const send=$('#start-send');
+  if(!input||!send)return;
+  try{const pending=sessionStorage.getItem('projectx_pending_intent');if(pending&&!input.value){input.value=pending;sessionStorage.removeItem('projectx_pending_intent');}}catch{}
+  send.onclick=()=>beginCreation(input.value);
+  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send.click();}};
   $$('[data-template]').forEach(btn=>btn.onclick=()=>{
     const t=UI.TEMPLATES.find(x=>x.id===btn.dataset.template);if(!t)return;
     const p=createProjectFromIntent({title:t.title,type:t.type,goal:t.intent,deliverables:t.deliverables});
     p.understanding={summary:t.intent,category:t.type,confidence:0.5};
     saveProject(p);openProject(p.id);
   });
+  $$('[data-example]').forEach(btn=>btn.onclick=()=>{
+    input.value=btn.dataset.example||'';
+    input.focus();
+  });
+}
+function workspaceHome(){
+  const name=String(session?.user?.email||'').split('@')[0]||'there';
+  shell(UI.launcherMarkup({esc,session,projects:state.projects,guestReady:Boolean(localGuestKey()),name}),'home');
+  bindStartComposer();
 }
 function publicHome(){
   const root=ensureShell();
@@ -531,16 +541,7 @@ function publicHome(){
   const goSignup=()=>{history.replaceState(null,'',location.pathname+'#signup');authScreen('signup');};
   $('#public-signin').onclick=goLogin;
   $('#public-signup').onclick=goSignup;
-  $('#public-signup-hero')?.addEventListener('click',goSignup);
-  $('#public-start')?.addEventListener('click',goSignup);
-  $('#public-workspace').onclick=()=>{state.forceWorkspace=true;history.replaceState(null,'',location.pathname+'#workspace');workspaceHome();};
-  $('#public-examples')?.addEventListener('click',()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'}));
-  $$('[data-example]').forEach(btn=>btn.onclick=()=>{
-    try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example);}catch{}
-    state.forceWorkspace=true;
-    history.replaceState(null,'',location.pathname+'#workspace');
-    workspaceHome();
-  });
+  bindStartComposer();
 }
 function routeFromLocation(){
   const hash=String(location.hash||'').replace(/^#/,'').split('?')[0];
