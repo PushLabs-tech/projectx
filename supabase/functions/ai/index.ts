@@ -10,8 +10,8 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUB
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
-const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary"]);
-const MAX_BODY_BYTES = 180000;
+const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary", "enqueueJob", "getJob"]);
+const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
 const MODEL_CACHE_TTL = 5 * 60 * 1000;
@@ -230,14 +230,16 @@ function systemFor(mode: string, p: any) {
   return `You are ProjectX. Be concrete and honest. ${guard}\n${ctx}`;
 }
 
-async function authorizeProject(user: any, projectId: string) {
+async function authorizeProject(user: any, projectId: string, requireWrite = false) {
   const { data: existing, error } = await admin.from("projects").select("id,owner_id,workspace_id,spec_version,updated_at").eq("id", projectId).maybeSingle();
   if (error) throw error;
   if (!existing) throw new Error("Project not found");
   if (existing.owner_id === user.id) return {...existing, role:"owner"};
   const { data: member } = await admin.from("workspace_members").select("role").eq("workspace_id", existing.workspace_id).eq("user_id", user.id).maybeSingle();
   if (!member || !["owner", "admin", "editor", "viewer"].includes(member.role)) throw new Error("Not authorized");
-  return {...existing, role:String(member.role)};
+  const role = String(member.role);
+  if (requireWrite && role === "viewer") throw new Error("Not authorized");
+  return {...existing, role};
 }
 
 async function persistProject(user: any, p: any) {
@@ -245,7 +247,7 @@ async function persistProject(user: any, p: any) {
   let workspaceId = String(p?.workspaceId || "") || null;
   let existing: any = null;
   if (projectId) {
-    existing = await authorizeProject(user, projectId);
+    existing = await authorizeProject(user, projectId, true);
     workspaceId = existing.workspace_id;
     const incomingVersion = Number(p?.specVersion || 1);
     const currentVersion = Number(existing.spec_version || 1);
@@ -341,31 +343,8 @@ async function persistProject(user: any, p: any) {
     if (me) throw me;
   }
 
-  if (Array.isArray(p?.research?.findings) && p.research.findings.length) {
-    const { error: rd } = await admin.from("research_findings").delete().eq("project_id", saved.id);
-    if (rd) throw rd;
-    const researchRows = p.research.findings.slice(-100).map((f: any) => ({
-      project_id: saved.id,
-      query: limitText(f.query || p.research?.queries?.slice(-1)?.[0] || "", 500),
-      finding: limitText(f.finding || "", 1800),
-      source_title: limitText(f.sourceTitle || f.source_title || "", 180),
-      source_url: limitText(f.sourceUrl || f.source_url || "", 2000),
-      source_date: /^\d{4}-\d{2}-\d{2}$/.test(String(f.sourceDate || f.source_date || "")) ? String(f.sourceDate || f.source_date) : null,
-      confidence: Math.max(0, Math.min(1, Number(f.confidence ?? 0))),
-      provider: limitText(f.provider || "", 80),
-      raw: f.raw && typeof f.raw === "object" ? f.raw : {}
-    })).filter((f: any) => f.finding);
-    if (researchRows.length) {
-      const { error: ri } = await admin.from("research_findings").insert(researchRows);
-      if (ri) throw ri;
-    }
-  }
-
-  if (Array.isArray(p?.versions) && p.versions.length) {
-    await admin.from("project_versions").delete().eq("project_id", saved.id);
-    const { error: ve } = await admin.from("project_versions").insert(p.versions.slice(-20).map((v: any) => ({ project_id: saved.id, version_number: Number(v.version || 1), label: limitText(v.label || `Version ${v.version}`, 120), snapshot: v, created_by: user.id })));
-    if (ve) throw ve;
-  }
+  // Server-side version history is append-only. Never replace or delete it from a client snapshot.
+  // The canonical Brain mutation RPC owns authoritative version creation.
   await admin.from("audit_logs").insert({ user_id: user.id, action: "project.persist", metadata: { project_id: saved.id, spec_version: Number(p?.specVersion || 1) } });
   return { ok: true, projectId: saved.id, workspaceId: saved.workspace_id, updatedAt: saved.updated_at };
 }
@@ -459,7 +438,7 @@ async function readResearchSource(rawUrl: string) {
 async function research(user: any, body: any) {
   const projectId = String(body.projectId || "");
   if (!projectId) throw new Error("Project not found");
-  await authorizeProject(user, projectId);
+  await authorizeProject(user, projectId, true);
   const query = limitText(body.query, 500).trim();
   if (!query) throw new Error("A research question is required.");
   const urls = [...new Set((Array.isArray(body.urls) ? body.urls : []).map((u: any) => String(u || "").trim()).filter(Boolean))].slice(0,5);
@@ -524,7 +503,11 @@ async function securityEvents(user: any) {
 }
 
 async function listProjects(user: any) {
-  const { data, error } = await admin.from("projects").select("id,title,project_type,intention,project_spec,understanding,plan,workspace_config,spec_version,selected_section,status,settings,updated_at").eq("owner_id", user.id).order("updated_at", { ascending: false });
+  const { data: memberships, error: membershipError } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id);
+  if (membershipError) throw membershipError;
+  const workspaceIds = [...new Set((memberships || []).map((m: any) => String(m.workspace_id)).filter(Boolean))];
+  if (!workspaceIds.length) return { ok: true, projects: [] };
+  const { data, error } = await admin.from("projects").select("id,title,project_type,intention,project_spec,understanding,plan,workspace_config,spec_version,selected_section,status,settings,updated_at,workspace_id").in("workspace_id", workspaceIds).order("updated_at", { ascending: false });
   if (error) throw error;
   return { ok: true, projects: (data || []).map((p: any) => ({
     id: p.id, title: p.title, type: p.project_type, intent: p.intention, specVersion: p.spec_version || 1, spec: p.project_spec || {}, understanding: p.understanding || {}, plan: p.plan || [],
@@ -722,7 +705,7 @@ async function runVerification(user:any, body:any) {
   const projectId=String(body?.projectId || "");
   if(!projectId) throw new Error("Project ID is required.");
   const current=await getProject(user,projectId);
-  const authz=await authorizeProject(user,projectId);
+  const authz=await authorizeProject(user,projectId,true);
   const checks=Array.isArray(body?.checks)?body.checks.slice(0,100):[];
   const results=checks.map((c:any)=>({
     subject_type:String(c?.subjectType || "artifact").slice(0,60),
@@ -747,6 +730,33 @@ async function getUsageSummary(user:any, body:any) {
   const since=new Date(Date.now()-30*24*60*60*1000).toISOString();
   const {data:credits}=await admin.from("credit_transactions").select("amount,kind,created_at").eq("user_id",user.id).gte("created_at",since).order("created_at",{ascending:false}).limit(200);
   return {ok:true,usage:u,credits:credits||[],projectId:body?.projectId || null};
+}
+
+async function enqueueJob(user:any, body:any) {
+  const projectId=String(body?.projectId || "").trim() || null;
+  if(projectId) await authorizeProject(user,projectId,true);
+  const kind=String(body?.kind || "").trim().slice(0,80);
+  if(!kind) throw new Error("Job kind is required.");
+  const payload=body?.payload && typeof body.payload==="object" ? body.payload : {};
+  const {data,error}=await admin.from("job_queue").insert({
+    project_id:projectId,user_id:user.id,kind,payload,
+    max_attempts:Math.max(1,Math.min(10,Number(body?.maxAttempts || 3)))
+  }).select("id,project_id,kind,status,attempts,max_attempts,available_at,created_at").single();
+  if(error) throw error;
+  return {ok:true,job:data};
+}
+
+async function getJob(user:any, body:any) {
+  const id=String(body?.jobId || "").trim();
+  if(!id) throw new Error("Job ID is required.");
+  const {data,error}=await admin.from("job_queue").select("id,project_id,user_id,kind,status,attempts,max_attempts,available_at,locked_at,result,error,created_at,updated_at").eq("id",id).maybeSingle();
+  if(error) throw error;
+  if(!data) throw new Error("Job not found");
+  if(data.user_id!==user.id) {
+    if(!data.project_id) throw new Error("Not authorized");
+    await authorizeProject(user,String(data.project_id));
+  }
+  return {ok:true,job:data};
 }
 
 async function authoritativeProjectForChat(user: any, supplied: any) {
@@ -825,6 +835,8 @@ Deno.serve(async req => {
     if (action === "createArtifactVersion") return json(await createArtifactVersion(user, body));
     if (action === "runVerification") return json(await runVerification(user, body));
     if (action === "getUsageSummary") return json(await getUsageSummary(user, body));
+    if (action === "enqueueJob") return json(await enqueueJob(user, body));
+    if (action === "getJob") return json(await getJob(user, body));
     if (action === "persistProject") return json(await persistProject(user, body.project || {}));
     if (action === "listProjects") return json(await listProjects(user));
     if (action === "getProject") return json({ ok: true, project: await getProject(user, String(body.projectId || "")) });
