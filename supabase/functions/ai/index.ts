@@ -77,6 +77,23 @@ async function requireUser(req: Request) {
   return user;
 }
 
+async function requireWorkerUser(req: Request, userId: string) {
+  const token = req.headers.get("X-ProjectX-Worker-Token") || "";
+  if (!token || !userId) throw new Error("Invalid worker request");
+  const { data, error } = await admin.rpc("projectx_worker_token_valid", { p_token: token });
+  if (error || data !== true) throw new Error("Invalid worker request");
+  return { id: userId };
+}
+
+async function runQueuedJob(req: Request, body: any) {
+  const user = await requireWorkerUser(req, String(body?.userId || ""));
+  const kind = String(body?.kind || "").trim();
+  const payload = body?.payload && typeof body.payload === "object" ? body.payload : {};
+  if (kind === "research") return { ok: true, kind, result: await research(user, payload) };
+  if (kind === "verification") return { ok: true, kind, result: await runVerification(user, payload) };
+  throw new Error("Unsupported queued job kind");
+}
+
 async function modelsForCredentials(creds: Credential[], task = "chat"): Promise<any[]> {
   const all: any[] = [];
   for (const c of creds) {
@@ -837,6 +854,7 @@ Deno.serve(async req => {
     if (action === "getUsageSummary") return json(await getUsageSummary(user, body));
     if (action === "enqueueJob") return json(await enqueueJob(user, body));
     if (action === "getJob") return json(await getJob(user, body));
+    if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
     if (action === "persistProject") return json(await persistProject(user, body.project || {}));
     if (action === "listProjects") return json(await listProjects(user));
     if (action === "getProject") return json({ ok: true, project: await getProject(user, String(body.projectId || "")) });
