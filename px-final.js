@@ -1931,7 +1931,10 @@ window.addEventListener('keydown',e=>{
   }
   if(e.key==='Escape'){closePalette();hideShare();const ctx=$('#px-ctx');if(ctx)ctx.hidden=true;}
 });
-window.addEventListener('hashchange',()=>home());
+window.addEventListener('hashchange',()=>{
+  const route=routeFromLocation();
+  if(route==='login'||route==='signup'||route==='workspace'||!location.hash)home();
+});
 async function boot(){installCss();installOptionalAnalytics();await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();}
 window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot};
 boot();
