@@ -1963,6 +1963,6 @@ window.addEventListener('hashchange',()=>{
   const route=routeFromLocation();
   if(route==='login'||route==='signup'||route==='workspace'||!location.hash)home();
 });
-async function boot(){installCss();installOptionalAnalytics();await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();}
+async function boot(){installCss();installOptionalAnalytics();window.addEventListener('online',()=>{flushSyncOutbox().catch(()=>{});});await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();}
 window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot};
 boot();
