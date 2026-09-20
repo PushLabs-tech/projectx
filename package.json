@@ -9,9 +9,12 @@
     "check": "node --check px-final.js && node --check projectx-core.js && node --check px-ui.js && node scripts/projectx-dom-contract-test.mjs && node scripts/projectx-runtime-test.mjs && node scripts/projectx-forensic-regression.mjs && node scripts/backend-contract-test.mjs",
     "security:scan": "node scripts/security-scan.mjs",
     "test": "npm run check && npm run security:scan",
-    "serve": "npx serve ."
+    "serve": "npx serve .",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed"
   },
   "devDependencies": {
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "@playwright/test": "^1.55.0"
   }
 }
