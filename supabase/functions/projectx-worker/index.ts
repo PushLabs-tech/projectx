@@ -7,14 +7,6 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
-const admin = (() => {
-  const createClient = (url: string, key: string) =>
-    (globalThis as any).__supabaseCreateClient
-      ? (globalThis as any).__supabaseCreateClient(url, key)
-      : null;
-  return createClient;
-})();
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -100,17 +92,11 @@ Deno.serve(async (req) => {
     // The worker token is only fetched inside the function process; it is never
     // committed to source control. This lets the worker authenticate to the AI
     // function without exposing a user session.
-    const { data: secret, error: secretError } = await db
-      .from("vault.decrypted_secrets")
-      .select("decrypted_secret")
-      .eq("name", "projectx_worker_token")
-      .maybeSingle();
-    if (secretError || !secret?.decrypted_secret) throw new Error("Worker secret unavailable");
-    Deno.env.set("PROJECTX_WORKER_TOKEN", secret.decrypted_secret);
+    const { data: secret, error: secretError } = await db.rpc("projectx_worker_token_get");\n    if (secretError || !secret) throw new Error("Worker secret unavailable");\n    Deno.env.set("PROJECTX_WORKER_TOKEN", String(secret));
 
     const body = await req.json().catch(() => ({}));
     const limit = Math.max(1, Math.min(10, Number(body?.limit || 10)));
-    const result = await run();
+    const result = await run(limit);
     return json({ ...result, requestedLimit: limit });
   } catch (error) {
     return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
