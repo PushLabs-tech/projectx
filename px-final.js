@@ -165,15 +165,24 @@ async function edge(action, payload = {}) {
 }
 
 async function integrationEdge(functionName, action, payload = {}) {
-  const client = ensureSupabase();
-  if (!client || !session?.access_token) throw new Error('SIGN_IN_REQUIRED');
-  const { data, error } = await client.functions.invoke(functionName, { body: { action, ...payload } });
-  if (error) {
-    let message = error.message || `${functionName} service error`;
-    try { const body = await error.context?.json?.(); if (body?.error) message = body.error; } catch {}
-    throw new Error(message);
-  }
-  if (!data || data.ok === false) throw new Error(data?.error || `${functionName} service error`);
+  if (!session?.access_token) throw new Error('SIGN_IN_REQUIRED');
+  const cfg = globalThis.BUILDER_CONFIG || {};
+  const base = String(cfg.SUPABASE_URL || '').replace(/\/$/, '');
+  const key = String(cfg.SUPABASE_PUBLISHABLE_KEY || cfg.SUPABASE_ANON_KEY || '');
+  if (!base || !key) throw new Error('Supabase is not configured');
+  const response = await fetch(base + '/functions/v1/' + encodeURIComponent(functionName), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': key,
+      'Authorization': 'Bearer ' + session.access_token
+    },
+    body: JSON.stringify({ action, ...payload })
+  });
+  const text = await response.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text || 'Invalid service response' }; }
+  if (!response.ok || data.ok === false) throw new Error(data?.error || ('HTTP ' + response.status + ' from ' + functionName));
   return data;
 }
 
