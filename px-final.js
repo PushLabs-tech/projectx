@@ -14,8 +14,8 @@ import {
   projectArtifactKind,
   normalizeProjectType,
 } from './projectx-core.js';
-import appStylesheet from './px-app.css?url';
 import * as UI from './px-ui.js';
+const appStylesheet = new URL('./px-app.css', import.meta.url).href;
 
 const STORE = 'projectx_runtime_v7';
 const LOCAL_KEY = 'projectx_guest_gemini_key';
@@ -44,7 +44,7 @@ const now = () => new Date().toISOString();
 
 const DEFAULT_SETTINGS = {
   model: MODELS[0], responseStyle: 'balanced', executionMode: 'Mostly Automatic', autoSave: true, confirmDelete: true,
-  theme: 'light', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  theme: 'dark', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], orchestrator: MODELS[0] },
   agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true },
   notifications: { build: true, test: true, deploy: true, credits: true, security: true },
@@ -848,7 +848,7 @@ async function subscribeProjectRealtime(projectId){
 }
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{} await subscribeProjectRealtime(id);}}
 function renderProject(project){
-  project.uiNav=project.uiNav||'overview';
+  project.uiNav=project.uiNav||(Object.keys(project.files||{}).length?'files':'assistant');
   const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default;
   const assistantDock=UI.assistantDock({esc,project,actions});
   shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});

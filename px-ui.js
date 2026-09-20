@@ -167,45 +167,45 @@ export function chrome({esc, session, recents, active, body, project, nav, right
     if (project) return `<button class="px-tool ${on ? 'active' : ''}" data-project-tool="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`;
     return `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`;
   }).join('');
-  const recent = recents.map(p => `<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('') || '<div class="sub" style="padding:6px 10px">No projects yet</div>';
+  const recent = recents.map(p => `<button data-open="${esc(p.id)}"><span class="px-repl-dot"></span>${esc(p.title)}</button>`).join('') || '<div class="sub" style="padding:6px 10px">No projects yet</div>';
   const title = project ? esc(project.title) : 'ProjectX';
   const sync = project?.sync?.mode === 'cloud' ? 'Synced' : session ? 'Account' : 'Local';
-  const rightPane = right != null ? right : `<div class="label">Assistant</div><div class="sub" style="padding:12px">Open Assistant to work on the current project, file, or selection.</div>`;
+  const rightPane = right != null ? right : `<div class="label">Agent</div><div class="sub" style="padding:12px">Open a project to work with the Agent.</div>`;
   const extra = project ? `<button class="ghost px-add-tool" data-cmd="add-tool">Add tool</button>` : '';
   const queueNote = execNote || 'No isolated cloud workers are connected. Independent tasks can be queued; execution is sequential through the Assistant.';
-  return `<div class="px-shell ${project ? '' : 'no-right'}" id="px-shell">
+  const initial = esc(String(email || 'G').trim().charAt(0).toUpperCase() || 'G');
+  return `<div class="px-shell ${project ? '' : 'no-right px-dash-shell'}" id="px-shell">
     <aside class="px-left side" id="px-left">
-      <button class="logo" data-nav="home" title="Home">ProjectX</button>
-      <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'Projects'} ▾</button>
+      <button class="logo px-mark" data-nav="home" title="Home"><span class="px-mark-badge">X</span> ProjectX</button>
+      <button class="new" data-nav="home" id="px-create">+ Create</button>
+      <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'My projects'} ▾</button>
       <div class="px-switch-list" id="px-switch-list" hidden>${recent}</div>
-      <button class="new" data-nav="home">New project</button>
-      <input class="input px-side-search" id="px-side-search" placeholder="Search tools and files" aria-label="Search project">
+      <input class="input px-side-search" id="px-side-search" placeholder="Search" aria-label="Search project">
       <nav class="nav" id="px-tool-nav">${left}${extra}</nav>
       <div class="divider"></div>
-      <div class="label">Recent</div>
-      <div class="recent">${recent}</div>
-      <div class="acct">${email ? `Signed in as ${esc(email)}` : 'Guest workspace'}<div class="sub">${session ? 'Cloud vault available' : 'Local session'}</div></div>
+      <div class="label">Repls</div>
+      <div class="recent px-repl-list">${recent}</div>
+      <div class="acct"><span class="px-avatar">${initial}</span><div><div>${email ? esc(String(email).split('@')[0]) : 'Guest'}</div><div class="sub">${session ? 'Cloud' : 'Local'} · ${esc(sync)}</div></div></div>
     </aside>
     <header class="px-topbar top">
       <button class="ghost px-nav-toggle" id="px-nav-toggle" aria-label="Open navigation">Menu</button>
-      <strong style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${title}</strong>
-      <span class="sub">${esc(project?.type || '')}</span>
+      <strong class="px-top-title">${title}</strong>
+      ${project ? `<span class="px-pill">${esc(project.type || 'repl')}</span>` : ''}
       <span class="px-dot ${session ? '' : 'warn'}" title="${esc(sync)}"></span>
-      <span class="sub">${esc(sync)}</span>
       <span style="flex:1"></span>
-      <button class="ghost" data-cmd="palette" title="Command palette">⌘K</button>
-      ${project ? '<button class="ghost" data-cmd="toggle-assistant" title="Hide assistant">Agent</button><button class="ghost" data-cmd="share">Share</button><button class="ghost" data-project-tool="preview">Preview</button><button class="ghost" data-project-tool="deploy">Deploy</button>' : ''}
-      ${session ? '<button data-action="signout">Sign out</button>' : '<button data-action="signin">Sign in</button>'}
+      <button class="ghost" data-cmd="palette" title="Command palette">Search</button>
+      ${project ? '<button class="ghost" data-project-tool="preview">Run</button><button class="ghost" data-cmd="toggle-assistant">Agent</button><button class="ghost" data-cmd="share">Invite</button><button class="primary" data-project-tool="deploy">Deploy</button>' : ''}
+      ${session ? '<button class="ghost" data-action="signout">Sign out</button>' : '<button class="primary" data-action="signin">Sign in</button>'}
     </header>
     <main class="px-center main">${body}</main>
     ${project ? '<div class="px-split" id="px-split-right" data-split="right" title="Resize assistant"></div>' : ''}
     <aside class="px-right" id="px-assistant-dock">${rightPane}</aside>
     <div class="px-bottom" id="px-bottom" hidden>
-      <div class="label">Queue</div>
+      <div class="label">Console</div>
       <div class="sub" style="padding:8px 12px">${esc(queueNote)}</div>
       <div id="px-bottom-log" class="conversation"></div>
     </div>
-    <footer class="px-statusbar" id="px-statusbar"><button class="ghost" data-cmd="toggle-bottom" type="button">Output</button><span>${status || 'Ready'} · ${session ? 'Signed in' : 'Guest'} · ${esc((project && project.status) || 'idle')}</span><span style="flex:1"></span><span class="sub">⌘K command · ⌘S save · ⌘B nav · ⌘J output</span></footer>
+    <footer class="px-statusbar" id="px-statusbar"><button class="ghost" data-cmd="toggle-bottom" type="button">Console</button><span>${status || 'Ready'} · ${session ? 'Signed in' : 'Guest'} · ${esc((project && project.status) || 'idle')}</span><span style="flex:1"></span><span class="sub">⌘K · ⌘S · ⌘B · ⌘J</span></footer>
   </div>
   <div class="px-palette" id="px-palette" hidden>
     <div class="px-palette-box">
@@ -216,7 +216,7 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   <div class="px-ctx" id="px-ctx" hidden></div>
   <div class="px-share" id="px-share" hidden>
     <div class="px-share-box">
-      <div class="label">Share</div>
+      <div class="label">Invite</div>
       <p class="sub">Copy the workspace URL. This does not publish hosting or create OAuth invites.</p>
       <input class="input full" id="px-share-url" readonly>
       <div class="actions"><button class="ghost" data-cmd="share-close">Close</button><button class="primary" data-cmd="share-copy">Copy link</button></div>
@@ -225,27 +225,26 @@ export function chrome({esc, session, recents, active, body, project, nav, right
 }
 
 export function launcherMarkup({esc, session, projects, guestReady}) {
-  const cards = projects.slice(0, 8).map(p => `<button class="box" data-open="${esc(p.id)}" style="text-align:left;cursor:pointer"><b>${esc(p.title)}</b><div class="sub">${esc(p.type)} · ${esc(p.status)}</div><div class="sub">${esc(String(p.intent || p.spec?.goal || '').slice(0,140))}</div></button>`).join('') || '<div class="px-empty">No projects yet. Describe an outcome to create one.</div>';
-  const recentFiles = projects.flatMap(p => Object.keys(p.files || {}).slice(0, 2).map(f => `${p.title} · ${f}`)).slice(0, 4);
-  return `<div class="panel">
-    <div class="kicker">WORKSPACE</div>
-    <h1 class="hero-title" style="font-size:36px">Continue the work.</h1>
-    <p class="sub">Describe a new outcome, or open a project that already has a brain.</p>
-    <div class="composer">
-      <textarea id="start-input" placeholder="Example: Build a landing page for my sneaker-cleaning business…"></textarea>
-      <div class="composer-foot">
-        <span class="sub">${session ? 'Signed in · AI connection available' : guestReady ? 'Free Gemini key ready' : 'AI connection needed to begin'}</span>
-        <button class="send" id="start-send" aria-label="Start project">→</button>
+  const rows = projects.map(p => {
+    const files = Object.keys(p.files || {}).length;
+    const updated = String(p.updatedAt || p.createdAt || '').slice(0, 10);
+    return `<button class="px-repl-row" data-open="${esc(p.id)}"><span class="px-repl-icon">${esc((p.title || 'P').charAt(0).toUpperCase())}</span><span class="px-repl-meta"><b>${esc(p.title)}</b><span class="sub">${esc(p.type)} · ${files} files · ${esc(p.status || 'idle')}</span></span><span class="sub px-repl-when">${esc(updated)}</span></button>`;
+  }).join('') || '<div class="px-empty">No repls yet. Create one above.</div>';
+  return `<div class="px-dash">
+    <div class="px-dash-create">
+      <div class="px-dash-create-head">
+        <b>Create a repl</b>
+        <span class="sub">${session ? 'AI connected' : guestReady ? 'Guest Gemini ready' : 'Connect AI in Settings to run Agent'}</span>
       </div>
+      <div class="px-create-box">
+        <textarea id="start-input" placeholder="Describe what you want built…"></textarea>
+        <button class="primary" id="start-send">Create</button>
+      </div>
+      <div class="px-template-row" id="home-templates">${TEMPLATES.map(t=>`<button type="button" class="chip" data-template="${t.id}">${esc(t.title)}</button>`).join('')}</div>
     </div>
-    <div class="label">Templates</div>
-    <div class="grid" id="home-templates">${TEMPLATES.map(t=>`<button class="box" data-template="${t.id}" style="text-align:left;cursor:pointer"><b>${esc(t.title)}</b><div class="sub">${esc(t.intent)}</div></button>`).join('')}</div>
-    <div class="label">Projects</div>
-    <div class="grid" id="home-projects">${cards}</div>
-    <div class="grid" style="margin-top:12px">
-      <div class="box"><b>Recent artifacts</b><div class="sub">${projects.filter(p=>p.artifacts?.output).length ? projects.filter(p=>p.artifacts?.output).slice(0,3).map(p=>esc(p.title)).join(' · ') : 'None yet — build from a project.'}</div></div>
-      <div class="box"><b>Agent activity</b><div class="sub">${projects.reduce((n,p)=>n+(p.executionState?.tasks||[]).length,0)} tasks across projects</div></div>
-      <div class="box"><b>Files</b><div class="sub">${recentFiles.length ? esc(recentFiles.join(' · ')) : 'No generated files yet.'}</div></div>
+    <div class="px-dash-list">
+      <div class="px-dash-list-head"><b>My repls</b><span class="sub">${projects.length}</span></div>
+      <div id="home-projects">${rows}</div>
     </div>
   </div>`;
 }
@@ -261,15 +260,8 @@ export function interviewMarkup() {
 }
 
 export function projectHead({esc, project}) {
-  const category = project.category || project.understanding?.category || project.type || 'PROJECT';
-  const summary = String(project.understanding?.summary || project.intent || '').trim();
   return `<div class="project px-work">
-    <div class="px-work-head">
-      <div class="kicker">PROJECT · ${esc(category)}</div>
-      <h1 class="project-title">${esc(project.title)}</h1>
-      <div class="project-context"><span>${esc(summary || 'Working from the current project brain.')}</span></div>
-    </div>
-    <div class="sections">${project.sections.map(s => `<button class="tab ${project.selectedSection === s.id ? 'active' : ''}" data-section="${esc(s.id)}">${esc(s.name)}</button>`).join('')}</div>
+    <div class="px-work-tabs sections">${project.sections.map(s => `<button class="tab ${project.selectedSection === s.id ? 'active' : ''}" data-section="${esc(s.id)}">${esc(s.name)}</button>`).join('')}</div>
     <div id="project-body" class="body"></div>
   </div>`;
 }
@@ -277,7 +269,7 @@ export function projectHead({esc, project}) {
 export function assistantDock({esc, project, actions}) {
   const status = project?.pendingMutation ? 'Awaiting approval' : (project?.status || 'Ready');
   return `<div class="px-assist-head">
-    <div class="label">Assistant</div>
+    <div class="label">Agent</div>
     <div class="sub" id="px-agent-status">${esc(status)} · ${esc(settingsSafe(project))}</div>
   </div>
   <div id="assistant-dock-log" class="conversation" role="log" aria-live="polite"></div>
