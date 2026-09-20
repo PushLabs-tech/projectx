@@ -190,6 +190,9 @@ function integrationWorkspaceId() {
   try {
     const fromUrl = new URLSearchParams(location.search).get('workspace');
     if (fromUrl) { localStorage.setItem('projectx_workspace_id', fromUrl); return fromUrl; }
+    const p = activeProject();
+    const derived = p?.sync?.workspaceId || p?.workspaceId || p?.sync?.remoteWorkspaceId || '';
+    if (derived) { localStorage.setItem('projectx_workspace_id', derived); return derived; }
     return localStorage.getItem('projectx_workspace_id') || '';
   } catch { return ''; }
 }
@@ -208,7 +211,7 @@ async function githubCreateRepository(workspaceId, name, options = {}) { return 
 async function githubPushFiles(workspaceId, fullName, files, options = {}) { return integrationEdge('github', 'pushFiles', { workspaceId, fullName, files, ...options }); }
 async function deployProject(projectId, provider = 'vercel', label = 'default') { return integrationEdge('deploy', 'deploy', { projectId, provider, label }); }
 async function deploymentStatus(projectId) { return integrationEdge('deploy', 'status', { projectId }); }
-async function saveDeploymentTarget(workspaceId, provider, token, options = {}) { return integrationEdge('deploy', 'saveTarget', { workspaceId, provider, token, ...options }); }
+async function saveDeploymentTarget(workspaceId, provider, token, options = {}) { return integrationEdge('deploy', 'saveTarget', { workspaceId, provider, token, projectId: integrationProjectId(), ...options }); }
 async function inviteWorkspaceMember(workspaceId, email, role = 'editor') { return integrationEdge('collaboration', 'invite', { workspaceId, email, role }); }
 async function acceptWorkspaceInvite(token) { return integrationEdge('collaboration', 'accept', { token }); }
 async function listWorkspaceMembers(workspaceId) { return integrationEdge('collaboration', 'members', { workspaceId }); }
@@ -1698,7 +1701,7 @@ else if(which==='defaults')body.innerHTML=`<h2>Project Defaults</h2><div class="
 else if(which==='appearance')body.innerHTML=`<h2>Appearance</h2><div class="box"><div class="row"><b>Theme</b><span class="sub">Workspace uses the ProjectX dark technical theme. The public homepage is light.</span></div></div>`;
 else if(which==='notifications')body.innerHTML=`<h2>Notifications</h2><div class="box">${Object.entries(p.notifications).map(([id,on])=>`<div class="row"><b>${esc(id)}</b><button class="ghost" data-notification="${id}">${on?'On':'Off'}</button></div>`).join('')}</div>`;
 else if(which==='security')body.innerHTML=`<h2>Security & Privacy</h2><div class="box"><div class="row"><div><b>AI credential storage</b><div class="sub">${session?'Server-side encrypted vault':'Local browser session'}</div></div><span class="status ${session?'ok':'warn'}">${session?'SECURE':'LOCAL'}</span></div><div class="row"><div><b>Account</b><div class="sub">${session?esc(session.user?.email||'Signed in'):'Not signed in'}</div></div>${session?'<button class="ghost" id="security-signout">Sign out</button>':'<button class="ghost" id="security-signin">Sign in</button>'}</div><div class="placeholder">Client-side guest mode never syncs credentials to ProjectX. Sign in to use the encrypted server-side vault.</div></div><div class="box" style="margin-top:10px"><div class="row"><div><b>Security events</b><div class="sub">Recent security events recorded for this account.</div></div><button class="ghost" id="load-security-events">${session?'Load':'Sign in'}</button></div><div id="security-events" class="sub" style="margin-top:10px">No events loaded.</div></div>`;
-else if(which==='git')body.innerHTML=`<h2>Git & Deployment</h2><div class="box"><div class="placeholder">GitHub OAuth, repository automation, branch creation, and deployment are placeholders until their real account-level integrations are configured.</div></div>`;
+else if(which==='git')body.innerHTML=`<h2>Git & Deployment</h2><p class="sub">GitHub and hosting connections are managed from Integrations. Nothing is exposed to the browser except connection status.</p><div class="box"><div class="row"><div><b>GitHub</b><div class="sub">Connect a GitHub account, browse repositories, and push generated files.</div></div><button class="primary" id="open-integrations">Open Integrations</button></div><div class="row"><div><b>Deployment</b><div class="sub">Connect Vercel or Netlify with a server-encrypted token, then deploy from a project.</div></div></div></div>`;
 else if(which==='storage')body.innerHTML=`<h2>Storage</h2><div class="box"><div class="row"><b>Projects</b><span class="sub">${state.projects.length}</span></div><div class="row"><b>Generated files</b><span class="sub">${state.projects.reduce((count,project)=>count+Object.keys(project.files||{}).length,0)}</span></div></div>`;
 else if(which==='billing')body.innerHTML=`<h2>Billing & Usage</h2><div class="box"><div class="row"><div><b>Plan & checkout</b><div class="sub">Manage Pro and Max subscriptions from the billing page. Checkout becomes active when Razorpay merchant settings are configured.</div></div><button class="ghost" id="open-billing">Open billing</button></div><div class="grid" style="margin-top:10px"><div class="box"><b>30-day requests</b><div id="usage-total" class="hero-title" style="font-size:28px;margin:6px 0">—</div></div><div class="box"><b>30-day units</b><div id="usage-units" class="hero-title" style="font-size:28px;margin:6px 0">—</div></div><div class="box"><b>Top actions</b><div id="usage-actions" class="sub" style="margin-top:7px">Loading…</div></div></div><div class="box" style="margin-top:10px"><b>Recent AI usage</b><div id="usage-recent" style="margin-top:8px">Loading…</div></div></div>`;
 else body.innerHTML=`<h2>Advanced</h2><div class="box"><button class="ghost" id="export-state">Export local state</button><button class="ghost" id="clear-state" style="margin-left:7px">Clear local cache</button></div><div class="box" style="margin-top:10px"><b>Skills</b><p class="sub">Only enabled skill names are added to Assistant context.</p><form id="skill-form" class="form"><input id="skill-name" class="input full" placeholder="Skill name"><button class="primary">Add</button></form><div id="skill-list"></div></div>`;bindSettings(which);
@@ -1802,9 +1805,11 @@ function bindSettings(which){
     try{const result=await edge('securityEvents');const events=Array.isArray(result.events)?result.events:[];node.innerHTML=events.length?events.map(e=>'<div class="brain-row"><b>'+esc(e.severity||'info')+' · '+esc(e.event_type||'event')+'</b><div class="sub">'+esc(e.created_at||'')+'</div></div>').join(''):'No security events recorded.';}catch(error){node.textContent=error.message;}
   });
   if(which==='billing'&&session)loadUsagePanel();$('#open-billing')?.addEventListener('click',()=>{location.href='./billing.html';});
+  $('#open-integrations')?.addEventListener('click',()=>settingsPage('integrations'));
   if(which==='integrations'){
-    const workspaceId=integrationWorkspaceId();
+    let workspaceId=integrationWorkspaceId();
     const statusNode=$('#github-connection-status'),copyNode=$('#github-connection-copy'),repoNode=$('#github-repositories');
+    const deploymentStatusNodes={vercel:document.querySelector('#vercel-status'),netlify:document.querySelector('#netlify-status')};
     const showRepos=async()=>{
       if(!session){repoNode.innerHTML='<div class="placeholder">Sign in to access GitHub repositories.</div>';return;}
       const ws=integrationWorkspaceId();
@@ -1815,7 +1820,16 @@ function bindSettings(which){
         repoNode.innerHTML=repos.length?'<div class="sub" style="margin-bottom:6px">'+repos.length+' repositories available</div>'+repos.slice(0,20).map(r=>'<div class="row"><div><b>'+esc(r.full_name)+'</b><div class="sub">'+(r.private?'Private':'Public')+' · '+esc(r.default_branch||'main')+'</div></div><a class="ghost" href="'+esc(r.html_url||'#')+'" target="_blank" rel="noreferrer">Open</a></div>').join(''):'<div class="placeholder">No repositories returned. Create one after connecting GitHub.</div>';
       }catch(error){repoNode.innerHTML='<div class="placeholder">Repository access failed: '+esc(error.message||error)+'</div>';}
     };
+    const refreshDeployments=async()=>{
+      workspaceId=integrationWorkspaceId();
+      if(!session){for(const n of Object.values(deploymentStatusNodes))if(n){n.textContent='SIGN IN';n.className='status warn';}return;}
+      try{
+        const result=await integrationEdge('deploy','statusTargets',{workspaceId,projectId:integrationProjectId()});
+        for(const provider of ['vercel','netlify']){const n=deploymentStatusNodes[provider];if(n){const connected=!!result?.targets?.[provider]?.connected;n.textContent=connected?'CONNECTED':'NOT CONNECTED';n.className='status '+(connected?'ok':'warn');}}
+      }catch(error){for(const n of Object.values(deploymentStatusNodes))if(n){n.textContent='UNAVAILABLE';n.className='status warn';}}
+    };
     const refreshGithub=async()=>{
+      workspaceId=integrationWorkspaceId();
       if(!session){statusNode.textContent='SIGN IN';statusNode.className='status warn';copyNode.textContent='Sign in before connecting GitHub.';return;}
       try{
         const result=await githubStatus(workspaceId);
@@ -1826,10 +1840,10 @@ function bindSettings(which){
     $('#github-connect')?.addEventListener('click',()=>{if(!session){authModal();return;}startGitHubConnection(integrationWorkspaceId(),integrationProjectId()).catch(error=>notify(error.message||error,'error'));});
     $('#github-refresh')?.addEventListener('click',refreshGithub);
     $('#github-disconnect')?.addEventListener('click',async()=>{try{await integrationEdge('github','disconnect',{workspaceId:integrationWorkspaceId()});notify('GitHub disconnected.','success');await refreshGithub();}catch(error){notify(error.message||error,'error');}});
-    const saveTarget=(provider,inputId)=>async e=>{e.preventDefault();if(!session){authModal();return;}const token=String($(inputId)?.value||'').trim();if(!token){notify('Enter the provider token first.','info');return;}try{await saveDeploymentTarget(integrationWorkspaceId(),provider,token);$(inputId).value='';notify(provider+' connected. The token was sent directly to the server for encrypted storage.','success');}catch(error){notify(error.message||error,'error');}};
+    const saveTarget=(provider,inputId)=>async e=>{e.preventDefault();if(!session){authModal();return;}const token=String($(inputId)?.value||'').trim();if(!token){notify('Enter the provider token first.','info');return;}const button=e.submitter;const previous=button?.textContent||'Connect';if(button){button.disabled=true;button.textContent='Connecting…';}try{await saveDeploymentTarget(integrationWorkspaceId(),provider,token);$(inputId).value='';notify(provider+' connected. The token was sent directly to the server for encrypted storage.','success');await refreshDeployments();}catch(error){notify(error.message||error,'error');}finally{if(button){button.disabled=false;button.textContent=previous;}}};
     $('#vercel-target-form')?.addEventListener('submit',saveTarget('vercel','#vercel-token'));
     $('#netlify-target-form')?.addEventListener('submit',saveTarget('netlify','#netlify-token'));
-    refreshGithub();
+    refreshGithub();refreshDeployments();
   }
   $('#execution-mode')?.addEventListener('change',e=>{settingsState.executionMode=e.target.value;persistSettings();});$('#toggle-autosave')?.addEventListener('click',()=>{settingsState.autoSave=!settingsState.autoSave;persistSettings();renderSettings(which)});$('#toggle-confirm')?.addEventListener('click',()=>{settingsState.confirmDelete=!settingsState.confirmDelete;persistSettings();renderSettings(which)});$('#language')?.addEventListener('change',e=>{settingsState.language=e.target.value;persistSettings()});$('#timezone')?.addEventListener('change',e=>{settingsState.timezone=e.target.value;persistSettings()});$('#default-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$('#ai-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$$('[data-agent]').forEach(button=>button.onclick=()=>{const id=button.dataset.agent;settingsState.agents[id]=!settingsState.agents[id];persistSettings();renderSettings('agents')});$$('[data-notification]').forEach(button=>button.onclick=()=>{const id=button.dataset.notification;settingsState.notifications[id]=!settingsState.notifications[id];persistSettings();renderSettings('notifications')});$('#security-signin')?.addEventListener('click',authModal);$('#security-signout')?.addEventListener('click',()=>signOut().then(()=>settingsPage('security')));$('#export-state')?.addEventListener('click',()=>downloadText('projectx-state.json',JSON.stringify(state,null,2),'application/json'));$('#clear-state')?.addEventListener('click',()=>{if(settingsState.confirmDelete&&!confirm('Clear local project cache? Cloud projects remain in your account.'))return;state={version:6,projects:[],active:null};persistLocal();home();});}
 function authScreen(initialMode='signin'){
