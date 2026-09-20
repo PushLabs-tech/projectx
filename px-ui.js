@@ -100,64 +100,91 @@ export function navForProject(project) {
 }
 
 export function publicMarkup() {
-  return `<div class="px-public-nav">
-    <a href="./" class="logo">ProjectX</a>
-    <div class="px-cta">
-      <a class="ghost" href="#px-examples">Examples</a>
-      <button class="ghost" id="public-workspace">Open workspace</button>
-      <button class="ghost" id="public-signin">Sign in</button>
-      <button class="primary" id="public-signup">Create account</button>
-    </div>
-  </div>
-  <section class="px-hero">
-    <div>
-      <div class="kicker">UNIVERSAL AI WORKSPACE</div>
-      <h1>Tell ProjectX what you want to accomplish.</h1>
-      <p class="lead">ProjectX understands the outcome, organizes the work, builds the artifact, and keeps a durable project brain so you can inspect, approve, test, and ship — without starting over every prompt.</p>
-      <div class="px-cta">
-        <button class="primary" id="public-start">Start a project</button>
-        <button class="ghost" id="public-examples">See examples</button>
+  return `<div class="px-site">
+    <header class="px-public-nav">
+      <a href="./" class="logo px-mark"><span class="px-mark-badge">X</span> ProjectX</a>
+      <nav class="px-cta">
+        <a class="ghost" href="#px-how">How it works</a>
+        <a class="ghost" href="#px-examples">Examples</a>
+        <button class="ghost" id="public-signin">Log in</button>
+        <button class="primary" id="public-signup">Sign up</button>
+      </nav>
+    </header>
+    <section class="px-hero">
+      <div>
+        <div class="kicker">PROJECTX</div>
+        <h1>An AI workspace that keeps the project, not just the chat.</h1>
+        <p class="lead">Describe an outcome. ProjectX builds a durable brain, files, preview, and tasks you can inspect — then you approve what lands.</p>
+        <div class="px-cta">
+          <button class="primary" id="public-signup-hero">Create a free account</button>
+          <button class="ghost" id="public-workspace">Open workspace</button>
+        </div>
+        <p class="sub">Email sign-in via Supabase. Google login is not connected. Isolated cloud VMs are not claimed.</p>
       </div>
+      <div class="px-product-shot" aria-hidden="true">
+        <div class="px-shot-col">Files<br><span class="sub">index.html</span><br><span class="sub">app.js</span><br><span class="sub">styles.css</span></div>
+        <div class="px-shot-col px-shot-main"><b>Preview</b><div class="sub">Sandboxed iframe</div><div class="px-shot-status">Agent · Working on homepage</div></div>
+        <div class="px-shot-col">Agent<br><span class="sub">Plan</span><br><span class="sub">Build</span><br><span class="sub">Awaiting approval</span></div>
+      </div>
+    </section>
+    <section class="px-how" id="px-how">
+      <div class="kicker">HOW IT WORKS</div>
+      <ol>
+        <li><b>Describe</b> the outcome in your own words.</li>
+        <li><b>Discover</b> one decision at a time (4 options + your own words).</li>
+        <li><b>Work</b> in files, preview, and tasks while the brain stays canonical.</li>
+        <li><b>Approve</b> before anything replaces the main project.</li>
+      </ol>
+    </section>
+    <div class="px-examples" id="px-examples">
+      <button data-example="Build a polished expense tracker web app."><b>Software</b><span class="sub">Expense tracker web app</span></button>
+      <button data-example="Build a mobile horror game with progression, enemies, and a shop."><b>Game</b><span class="sub">Mobile horror game</span></button>
+      <button data-example="Help me launch a sneaker cleaning business."><b>Business</b><span class="sub">Sneaker cleaning launch</span></button>
+      <button data-example="Create a research report comparing battery technologies for a solar prototype."><b>Research</b><span class="sub">Battery technology brief</span></button>
+      <button data-example="Create a pitch deck for a student startup."><b>Creative</b><span class="sub">Student startup pitch</span></button>
+      <button data-example="Research a market, design a landing page, build it, and prepare a pitch."><b>Hybrid</b><span class="sub">Market, page, and pitch</span></button>
     </div>
-    <div class="px-product-shot" aria-hidden="true">
-      <div class="px-shot-col">ProjectX<br><span class="sub">Overview</span><br><span class="sub">Assistant</span><br><span class="sub">Design</span><br><span class="sub">Files</span><br><span class="sub">Preview</span><br><span class="sub">Tasks</span><br><span class="sub">Brain</span></div>
-      <div class="px-shot-col px-shot-main"><b>Work surface</b><div class="sub">Live preview · canvas · files</div><div class="px-shot-status">Task · Homepage · Ready for review</div><div class="sub">Nothing lands on the main project until you approve it.</div></div>
-      <div class="px-shot-col">Assistant<br><span class="sub">Thinking</span><br><span class="sub">Working</span><br><span class="sub">Awaiting approval</span><br><span class="sub">Approve · Reject</span></div>
+    <section class="px-faq" id="px-faq">
+      <div class="kicker">FAQ</div>
+      <details open><summary>Is this Replit?</summary><p>No. ProjectX is a separate product. It is an AI workspace with a project brain, files, and a sandboxed preview. It does not copy Replit’s product, branding, or hosting.</p></details>
+      <details><summary>How do I log in?</summary><p>Use email and password on the Log in screen. Accounts are stored in your Supabase project. Social OAuth is not enabled.</p></details>
+      <details><summary>Do I need an AI key?</summary><p>You can browse the workspace without one. Discovery and Agent need a connected provider, a guest Gemini key in this browser, or a signed-in vault. One key is enough for testing.</p></details>
+      <details><summary>Does ProjectX run a cloud VM?</summary><p>No. Previews run in a sandboxed iframe in your browser. Export is available until a host is connected.</p></details>
+    </section>
+    <footer class="px-footer">
+      <a href="./privacy.html">Privacy</a>
+      <a href="./terms.html">Terms</a>
+      <a href="./billing.html">Plans</a>
+      <span>ProjectX · keep the context</span>
+    </footer>
+  </div>`;
+}
+
+export function authMarkup({mode}) {
+  const signup = mode === 'signup';
+  return `<div class="px-auth">
+    <a class="logo px-mark" id="auth-home" href="./"><span class="px-mark-badge">X</span> ProjectX</a>
+    <div class="px-auth-card">
+      <div class="kicker">${signup ? 'CREATE ACCOUNT' : 'LOG IN'}</div>
+      <h1>${signup ? 'Start your workspace' : 'Welcome back'}</h1>
+      <p class="sub">${signup ? 'Email and password. Projects sync to your Supabase account.' : 'Sign in to sync projects and the encrypted AI vault.'}</p>
+      <div class="px-cta" style="margin:14px 0">
+        <button class="ghost ${signup ? '' : 'active'}" id="auth-signin-mode" type="button">Log in</button>
+        <button class="ghost ${signup ? 'active' : ''}" id="auth-signup-mode" type="button">Sign up</button>
+      </div>
+      <label class="sub" for="auth-email">Email</label>
+      <input id="auth-email" class="input full" type="email" placeholder="you@email.com" autocomplete="username">
+      <label class="sub" for="auth-password" style="margin-top:10px;display:block">Password</label>
+      <input id="auth-password" class="input full" type="password" placeholder="At least 6 characters" style="margin-top:6px" autocomplete="${signup ? 'new-password' : 'current-password'}">
+      <div id="auth-status" class="sub" style="margin-top:10px"></div>
+      <button class="primary px-auth-submit" id="auth-submit" type="button">${signup ? 'Create account' : 'Log in'}</button>
+      <div class="px-auth-links">
+        <button class="ghost" id="auth-recover" type="button">Forgot password</button>
+        <button class="ghost" id="auth-guest" type="button">Continue as guest</button>
+      </div>
+      <p class="sub">Google and GitHub login are not connected. Payments can stay off while you test with one API key.</p>
     </div>
-  </section>
-  <section class="px-how">
-    <div class="kicker">HOW WORK MOVES</div>
-    <ol>
-      <li><b>Describe</b> the outcome in your own words.</li>
-      <li><b>Understand</b> it as a project brain — requirements, constraints, decisions.</li>
-      <li><b>Work</b> as visible tasks while you keep planning.</li>
-      <li><b>Review</b> files, designs, and tests before they become the main state.</li>
-    </ol>
-  </section>
-  <div class="px-examples" id="px-examples">
-    <button data-example="Build a polished expense tracker web app."><b>Software</b><span class="sub">Expense tracker web app</span></button>
-    <button data-example="Build a mobile horror game with progression, enemies, and a shop."><b>Game</b><span class="sub">Mobile horror game</span></button>
-    <button data-example="Help me launch a sneaker cleaning business."><b>Business</b><span class="sub">Sneaker cleaning launch</span></button>
-    <button data-example="Create a research report comparing battery technologies for a solar prototype."><b>Research</b><span class="sub">Battery technology brief</span></button>
-    <button data-example="Create a pitch deck for a student startup."><b>Creative</b><span class="sub">Student startup pitch</span></button>
-    <button data-example="Research a market, design a landing page, build it, and prepare a pitch."><b>Hybrid</b><span class="sub">Market, page, and pitch</span></button>
-  </div>
-  <section class="px-faq" id="px-faq">
-    <div class="kicker">FAQ</div>
-    <details open><summary>What happens after I describe an outcome?</summary><p>ProjectX opens discovery: one contextual decision at a time, four AI options plus “Describe in your own words.” A project brain is written only after valid discovery.</p></details>
-    <details><summary>Do I need an AI key?</summary><p>No, to open the workspace. Discovery and Agent work need a connected provider, a guest Gemini key in this browser, or a signed-in vault. Without AI you can still create a local draft project and inspect files.</p></details>
-    <details><summary>Does ProjectX run my app on a cloud VM?</summary><p>Browser-safe previews run in a sandboxed iframe. Isolated workers are not claimed. Export is available until a host is connected.</p></details>
-  </section>
-  <section class="px-how">
-    <div class="kicker">FREE STACK</div>
-    <p class="lead" style="max-width:62ch">ProjectX is built to run on GitHub Pages, Supabase, Edge Functions, and bring-your-own keys. Demo AI, when configured server-side, is rate-limited and never exposed in the browser.</p>
-  </section>
-  <footer class="px-footer">
-    <a href="./privacy.html">Privacy</a>
-    <a href="./terms.html">Terms</a>
-    <a href="./billing.html">Plans</a>
-    <span>Describe an outcome. ProjectX keeps the context.</span>
-  </footer>`;
+  </div>`;
 }
 
 export function chrome({esc, session, recents, active, body, project, nav, right, status, email, execNote}) {
@@ -183,14 +210,14 @@ export function chrome({esc, session, recents, active, body, project, nav, right
       <input class="input px-side-search" id="px-side-search" placeholder="Search" aria-label="Search project">
       <nav class="nav" id="px-tool-nav">${left}${extra}</nav>
       <div class="divider"></div>
-      <div class="label">Repls</div>
+      <div class="label">Projects</div>
       <div class="recent px-repl-list">${recent}</div>
       <div class="acct"><span class="px-avatar">${initial}</span><div><div>${email ? esc(String(email).split('@')[0]) : 'Guest'}</div><div class="sub">${session ? 'Cloud' : 'Local'} · ${esc(sync)}</div></div></div>
     </aside>
     <header class="px-topbar top">
       <button class="ghost px-nav-toggle" id="px-nav-toggle" aria-label="Open navigation">Menu</button>
       <strong class="px-top-title">${title}</strong>
-      ${project ? `<span class="px-pill">${esc(project.type || 'repl')}</span>` : ''}
+      ${project ? `<span class="px-pill">${esc(project.type || 'project')}</span>` : ''}
       <span class="px-dot ${session ? '' : 'warn'}" title="${esc(sync)}"></span>
       <span style="flex:1"></span>
       <button class="ghost" data-cmd="palette" title="Command palette">Search</button>
@@ -229,11 +256,11 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
     const files = Object.keys(p.files || {}).length;
     const updated = String(p.updatedAt || p.createdAt || '').slice(0, 10);
     return `<button class="px-repl-row" data-open="${esc(p.id)}"><span class="px-repl-icon">${esc((p.title || 'P').charAt(0).toUpperCase())}</span><span class="px-repl-meta"><b>${esc(p.title)}</b><span class="sub">${esc(p.type)} · ${files} files · ${esc(p.status || 'idle')}</span></span><span class="sub px-repl-when">${esc(updated)}</span></button>`;
-  }).join('') || '<div class="px-empty">No repls yet. Create one above.</div>';
+  }).join('') || '<div class="px-empty">No projects yet. Create one above.</div>';
   return `<div class="px-dash">
     <div class="px-dash-create">
       <div class="px-dash-create-head">
-        <b>Create a repl</b>
+        <b>Create a project</b>
         <span class="sub">${session ? 'AI connected' : guestReady ? 'Guest Gemini ready' : 'Connect AI in Settings to run Agent'}</span>
       </div>
       <div class="px-create-box">
@@ -243,7 +270,7 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
       <div class="px-template-row" id="home-templates">${TEMPLATES.map(t=>`<button type="button" class="chip" data-template="${t.id}">${esc(t.title)}</button>`).join('')}</div>
     </div>
     <div class="px-dash-list">
-      <div class="px-dash-list-head"><b>My repls</b><span class="sub">${projects.length}</span></div>
+      <div class="px-dash-list-head"><b>My projects</b><span class="sub">${projects.length}</span></div>
       <div id="home-projects">${rows}</div>
     </div>
   </div>`;

@@ -18,7 +18,7 @@ assert.match(ui, /id="px-project-switch"/);
 assert.match(ui, /id="px-bottom"/);
 assert.match(ui, /id="px-share"/);
 assert.match(ui, /class="px-dash"/);
-assert.match(ui, /Create a repl/);
+assert.match(ui, /Create a project/);
 assert.match(ui, /execNote/);
 assert.doesNotMatch(ui, /ExecutionProvider/);
 assert.match(runtime, /function applyChromeLayout\(/);
