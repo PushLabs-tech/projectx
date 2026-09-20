@@ -37,7 +37,7 @@ assert.match(ui, /id="px-bottom"/);
 assert.match(ui, /id="assistant-dock-form"/);
 assert.match(ui, /id="plan-dock-form"/);
 assert.match(ui, /id="start-input"/);
-assert.match(ui, /px-dash/);
+assert.match(ui, /px-home-stage|px-dash/);
 assert.doesNotMatch(ui, /ExecutionProvider/);
 assert.match(runtime, /applyChromeLayout/);
 assert.match(runtime, /px-ide/);
@@ -51,7 +51,8 @@ assert.match(runtime, /renderedOptions=\[\.\.\.options,'Describe in your own wor
 assert.match(ui, /export function authMarkup/);
 assert.match(ui, /id="auth-email"/);
 assert.match(ui, /id="auth-submit"/);
-assert.match(ui, /Create a project/);
+assert.match(ui, /what's next\?/);
+assert.match(ui, /What should we make\?/);
 assert.match(runtime, /function publicHome\(/);
 assert.match(runtime, /function workspaceHome\(/);
 assert.match(runtime, /function authScreen\(/);
