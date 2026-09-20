@@ -41,7 +41,7 @@ async function run() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-ProjectX-Worker-Token": Deno.env.get("PROJECTX_WORKER_TOKEN") || ""
+          "X-ProjectX-Worker-Token": workerToken
         },
         body: JSON.stringify({
           action: "runQueuedJob",
@@ -94,11 +94,11 @@ Deno.serve(async (req) => {
     // function without exposing a user session.
     const { data: secret, error: secretError } = await db.rpc("projectx_worker_token_get");
     if (secretError || !secret) throw new Error("Worker secret unavailable");
-    Deno.env.set("PROJECTX_WORKER_TOKEN", String(secret));
+    
 
     const body = await req.json().catch(() => ({}));
     const limit = Math.max(1, Math.min(10, Number(body?.limit || 10)));
-    const result = await run(limit);
+    const result = await run(limit, String(secret));
     return json({ ...result, requestedLimit: limit });
   } catch (error) {
     return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
