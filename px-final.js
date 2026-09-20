@@ -14,6 +14,7 @@ import {
   normalizeProjectType,
 } from './projectx-core.js';
 import appStylesheet from './px-app.css?url';
+import * as UI from './px-ui.js';
 
 const STORE = 'projectx_runtime_v7';
 const LOCAL_KEY = 'projectx_guest_gemini_key';
@@ -44,7 +45,13 @@ const DEFAULT_SETTINGS = {
   theme: 'light', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], orchestrator: MODELS[0] },
   agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true },
-  notifications: { build: true, test: true, deploy: true, credits: true, security: true }
+  notifications: { build: true, test: true, deploy: true, credits: true, security: true },
+  skills: []
+};
+const ExecutionProvider = {
+  kind: 'sequential-local',
+  isolatedWorkers: false,
+  note: 'No isolated cloud workers are connected. Independent tasks can be queued; execution is sequential through the Assistant.'
 };
 
 let state = read(STORE, { version: 7, projects: [], active: null });
@@ -52,6 +59,7 @@ if (!Array.isArray(state.projects)) state = { version: 7, projects: [], active: 
 else state.projects = state.projects.map(p => { try { return migrateProject(p); } catch { return p; } });
 state.version = 7;
 let settingsState = { ...DEFAULT_SETTINGS, ...read(LOCAL_SETTINGS, {}) };
+if (!Array.isArray(settingsState.skills)) settingsState.skills = [];
 settingsState.model = GEMINI_MODEL_MIGRATIONS.get(String(settingsState.model || '').trim().toLowerCase()) || settingsState.model;
 if (settingsState.agentModels && typeof settingsState.agentModels === 'object') {
   const migratedAgentModels = {};
@@ -327,17 +335,82 @@ function installOptionalAnalytics(){
 
 function installCss(){if($('#px-style'))return;const link=document.createElement('link');link.id='px-style';link.rel='stylesheet';link.href=appStylesheet;document.head.appendChild(link);}
 function ensureShell(){installCss();let root=$('#px-app');if(!root){root=document.createElement('div');root.id='px-app';document.body.appendChild(root);}return root;}
-function shell(body, active='home'){const root=ensureShell();const recents=state.projects.slice(0,6);root.innerHTML=`<aside class="side"><div class="logo">ProjectX</div><button class="new" data-nav="home">+ New project</button><nav class="nav"><button data-nav="home" class="${active==='home'?'active':''}">Home</button><button data-nav="projects" class="${active==='projects'?'active':''}">Projects</button><button data-nav="assistant" class="${active==='assistant'?'active':''}">Assistant</button><button data-nav="analytics" class="${active==='analytics'?'active':''}">Analytics</button><button data-nav="settings" class="${active==='settings'?'active':''}">Settings</button></nav><div class="divider"></div><div class="label">Recent</div><div class="recent">${recents.map(p=>`<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('')||'<div class="sub" style="padding:6px 10px">No projects yet</div>'}</div><div class="acct">${session?.user?.email?`Signed in as ${esc(session.user.email)}`:'Guest workspace'}<div class="sub" style="font-size:10px;margin-top:2px">${session?'Cloud sync enabled':'Local sync enabled'}</div></div></aside><main class="main"><div class="top"><button data-nav="home">Home</button>${session?'<button data-action="signout">Sign out</button>':'<button data-action="signin">Sign in</button>'}</div>${body}</main>`;root.onclick=async e=>{const nav=e.target.closest('[data-nav]')?.dataset.nav;if(nav)return navigate(nav);const open=e.target.closest('[data-open]')?.dataset.open;if(open)return openProject(open);const action=e.target.closest('[data-action]')?.dataset.action;if(action==='signin')return authModal();if(action==='signout'){await signOut();home();}};return root;}
-function workspaceHome(){shell(`<div class="wrap"><div class="center"><div class="kicker">PROJECT X</div><h1 class="hero-title">What do you want to accomplish?</h1><p class="sub" style="max-width:680px;margin:0 auto">Describe the outcome in plain language. ProjectX will clarify what is missing, shape the right workspace, and help you move from idea to something usable.</p><div class="chips" aria-label="How ProjectX works"><span class="chip" style="cursor:default">1 · Describe the outcome</span><span class="chip" style="cursor:default">2 · Refine the important details</span><span class="chip" style="cursor:default">3 · Build and verify</span></div><div class="composer"><textarea id="start-input" placeholder="Example: Build a landing page for my sneaker-cleaning business…"></textarea><div class="composer-foot"><span class="sub">${session?'Signed in · AI connection available':localGuestKey()?'Free Gemini key ready':'AI connection needed to begin'}</span><button class="send" id="start-send" aria-label="Start project">→</button></div></div><div class="sub" style="margin-top:12px">You do not need to know the project type or structure first. Start with the result you want.</div></div></div>`,'home');const input=$('#start-input');$('#start-send').onclick=()=>beginCreation(input.value);input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#start-send').click();}};}
+function bindChrome(root){
+  root.onclick=async e=>{
+    if(e.target.closest('#px-nav-toggle')) return $('#px-shell')?.classList.toggle('nav-open');
+    if(e.target.closest('[data-cmd="palette"]')) return openPalette();
+    if(e.target.closest('[data-cmd="add-tool"]')) return addProjectTool(activeProject());
+    const nav=e.target.closest('[data-nav]')?.dataset.nav;if(nav)return navigate(nav);
+    const open=e.target.closest('[data-open]')?.dataset.open;if(open)return openProject(open);
+    const action=e.target.closest('[data-action]')?.dataset.action;
+    if(action==='signin')return authModal('signin');
+    if(action==='signup')return authModal('signup');
+    if(action==='signout'){await signOut();home();}
+    const example=e.target.closest('[data-example]')?.dataset.example;
+    if(example){try{sessionStorage.setItem('projectx_pending_intent',example);}catch{} state.forceWorkspace=true;workspaceHome();const input=$('#start-input');if(input)input.value=example;}
+  };
+  bindSplit(root);
+}
+function bindSplit(root){
+  const split=$('#px-split-right',root);if(!split||split.dataset.bound)return;split.dataset.bound='1';
+  split.onpointerdown=e=>{
+    const startX=e.clientX,start=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--px-right'))||360;
+    const move=ev=>{const w=Math.min(520,Math.max(260,start-(ev.clientX-startX)));document.documentElement.style.setProperty('--px-right',w+'px');};
+    const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);};
+    window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
+  };
+}
+function addProjectTool(project){
+  if(!project)return;
+  const visible=new Set(UI.navForProject(project).map(n=>n[0]));
+  const pick=UI.PROJECT_NAV.find(([id])=>!visible.has(id));
+  if(!pick)return notify('All tools are already visible.','info');
+  project.uiHiddenTools=(project.uiHiddenTools||[]).filter(id=>id!==pick[0]);
+  project.uiToolOrder=[...UI.navForProject(project).map(n=>n[0]),pick[0]];
+  saveProject(project);renderProject(project);notify(pick[1]+' added to the project sidebar.','success');
+}
+function shell(body, active='home', opts={}){
+  const root=ensureShell();
+  root.classList.remove('px-public');
+  const recents=state.projects.slice(0,6);
+  const project=opts.project||null;
+  const right=opts.right;
+  root.innerHTML=UI.chrome({esc,session,recents,active,body,project,nav:opts.nav||active,right,status:opts.status,email:session?.user?.email});
+  bindChrome(root);
+  bindPalette();
+  bindDock(opts.project);
+  return root;
+}
+function bindDock(project){
+  if(!project)return;
+  const form=$('#assistant-dock-form');
+  if(form)form.onsubmit=async e=>{e.preventDefault();const text=$('#assistant-dock-input')?.value.trim();if(!text)return;$('#assistant-dock-input').value='';await sendProjectMessage(project,text);};
+  $$('[data-assist-action]').forEach(btn=>btn.onclick=()=>{
+    const a=btn.dataset.assistAction;
+    const input=$('#assistant-dock-input')||$('#project-input');
+    if(input){input.value=(input.value?input.value+' ':'')+a+': ';input.focus();}
+  });
+}
+function workspaceHome(){
+  shell(UI.launcherMarkup({esc,session,projects:state.projects,guestReady:Boolean(localGuestKey())}),'home');
+  const input=$('#start-input');
+  try{const pending=sessionStorage.getItem('projectx_pending_intent');if(pending&&input&&!input.value){input.value=pending;sessionStorage.removeItem('projectx_pending_intent');}}catch{}
+  $('#start-send').onclick=()=>beginCreation(input.value);
+  input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#start-send').click();}};
+}
 function publicHome(){
   const root=ensureShell();
-  root.innerHTML=`<div style="min-height:100vh;display:grid;place-items:center;background:#fff;color:#171a1f;padding:32px"><div style="width:min(760px,100%);text-align:center"><div style="font-size:22px;font-weight:800;letter-spacing:-.04em">ProjectX</div><h1 style="margin:32px 0 12px;font-size:clamp(40px,7vw,72px);line-height:1;letter-spacing:-.06em">Turn an idea into something real.</h1><p style="max-width:620px;margin:0 auto;color:#707987;font-size:15px;line-height:1.6">Describe what you want to accomplish, and ProjectX will help you understand it, plan it, build it, and move it forward.</p><div style="display:flex;justify-content:center;gap:9px;margin-top:24px;flex-wrap:wrap"><button class="primary" id="public-signin" style="height:42px;padding:0 17px">Sign in</button><button class="ghost" id="public-signup" style="height:42px;padding:0 17px">Create account</button></div></div></div>`;
-  $('#public-signin').onclick=()=>authModal();
+  root.classList.add('px-public');
+  root.innerHTML=UI.publicMarkup();
+  $('#public-signin').onclick=()=>authModal('signin');
   $('#public-signup').onclick=()=>authModal('signup');
+  $('#public-start').onclick=()=>{state.forceWorkspace=true;workspaceHome();};
+  $('#public-workspace').onclick=()=>{state.forceWorkspace=true;workspaceHome();};
+  $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
 }
 
 function home(){
-  if(session)return workspaceHome();
+  if(session||state.forceWorkspace||state.projects.length)return workspaceHome();
   publicHome();
 }
 async function beginCreation(text){
@@ -366,10 +439,7 @@ async function beginCreation(text){
   }
 }
 function renderInterview(history,meta){
-  shell(`<div class="interview poll-interview">
-    <div id="interview-poll" class="discovery-poll" aria-live="polite"></div>
-    <div id="interview-status" class="poll-status" aria-live="polite"></div>
-  </div>`,'home');
+  shell(UI.interviewMarkup(),'home');
   meta.initialIntent=String(history?.[0]?.text||'').trim();
 }function drawConversation(history,selector){const el=$(selector);if(!el)return;el.innerHTML=history.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');el.scrollTop=el.scrollHeight;}
 function mergeDiscoveryProject(previous={},next={}){
@@ -647,16 +717,33 @@ async function subscribeProjectRealtime(projectId){
 }
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{} await subscribeProjectRealtime(id);}}
 function renderProject(project){
-  const category=project.category||project.understanding?.category||project.type||'PROJECT';
-  const summary=String(project.understanding?.summary||project.intent||'').trim();
-  const tools=[['brain','Brain'],['architecture','Architecture'],['simulation','Outcome'],['explain','Why'],['improve','Make it Great'],['optimize','Optimize'],['transform','Transform'],['versions','Versions'],['resources','Resources'],['security','Security'],['delivery','Delivery']];
-  shell('<div class="project"><div class="kicker">PROJECT · '+esc(category)+'</div><h1 class="project-title">'+esc(project.title)+'</h1><div class="project-context"><span>'+esc(summary||'ProjectX is working from the current project brain.')+'</span></div><div class="project-tools">'+tools.map(t=>'<button class="tool-btn" data-project-tool="'+esc(t[0])+'">'+esc(t[1])+'</button>').join('')+'</div><div class="sections">'+project.sections.map(s=>'<button class="tab '+(project.selectedSection===s.id?'active':'')+'" data-section="'+esc(s.id)+'">'+esc(s.name)+'</button>').join('')+'</div><div id="project-body" class="body"></div></div>','projects');
+  project.uiNav=project.uiNav||'overview';
+  const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default;
+  const assistantDock=UI.assistantDock({esc,project,actions});
+  shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
   $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
-  $$('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>renderProjectTool(project,button.dataset.projectTool));
-  renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
+  $$('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiNav=button.dataset.projectTool;saveProject(project);renderProjectTool(project,button.dataset.projectTool);});
+  if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav){
+    renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
+  } else {
+    renderProjectTool(project,project.uiNav);
+  }
+  const dockLog=$('#assistant-dock-log');
+  if(dockLog&&Array.isArray(project.conversation)){
+    dockLog.innerHTML=project.conversation.slice(-MAX_HISTORY).map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');
+    dockLog.scrollTop=dockLog.scrollHeight;
+  }
 }
 async function renderProjectTool(project,tool){
-  const map={brain:renderBrain,architecture:renderArchitecture,simulation:renderSimulation,explain:renderExplain,improve:renderMakeGreat,optimize:renderOptimize,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery};
+  const body=$('#project-body');
+  if(!body&&tool!=='settings'){
+    project.uiNav=tool;
+    return renderProject(project);
+  }
+  const map={
+    brain:renderBrain,architecture:renderArchitecture,simulation:renderSimulation,explain:renderExplain,improve:renderMakeGreat,optimize:renderOptimize,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery,
+    overview:renderOverview,assistant:()=>renderProjectChat(project),build:()=>renderOutput(project),design:()=>renderCanvas(project),files:()=>renderFiles(project),preview:()=>renderOutput(project),tasks:()=>renderTasks(project),artifacts:()=>renderArtifacts(project),database:()=>renderDatabase(project),research:()=>{const section=project.sections.find(s=>s.kind==='research')||{id:'research',name:'Research',purpose:'Source-backed evidence',kind:'research'};return renderResearchSection(project,section);},tests:()=>renderTests(project),storage:()=>renderStorage(project),integrations:()=>renderIntegrations(project),deploy:()=>renderDeploy(project),settings:()=>settingsPage('general'),git:()=>renderVersions(project),secrets:()=>renderSecrets(project),seo:()=>renderSeo(project),terminal:()=>renderTerminal(project),collab:()=>renderCollab(project)
+  };
   return (map[tool]||renderBrain)(project);
 }
 function toolShell(kicker,title,description,body){
@@ -865,7 +952,73 @@ async function renderSection(project,section){
     case 'research': return renderResearchSection(project,section);
   }
 }
-const projectAgentSystem=`You are ProjectX's project agent. The canonical project specification is the source of truth. Return JSON only: {"intent":"answer|change|plan|build|test|research|publish","message":string,"changed":boolean,"specPatch":{},"plan":[{"title":string,"steps":string[],"status":"proposed|ready|blocked"}],"workspaceSections":[],"agents":[{"key":string,"name":string,"purpose":string,"tools":string[]}],"fileOperations":[{"op":"write|delete","path":"safe/relative/path","content":"complete file content"}],"researchQuery":string,"researchUrls":string[],"needsBuild":boolean}. For research, only return URLs explicitly supplied by the user; never invent sources. Never claim a file, artifact, build, test, research result, or deployment exists without returning the corresponding operation or verified result. For software/game changes prefer real file operations.`;
+const projectAgentSystem=`You are ProjectX's project agent. The canonical project specification is the source of truth. Return JSON only: {"intent":"answer|change|plan|build|test|research|publish","message":string,"changed":boolean,"specPatch":{},"plan":[{"title":string,"steps":string[],"status":"proposed|ready|blocked"}],"workspaceSections":[],"agents":[{"key":string,"name":"string","purpose":string,"tools":string[]}],"fileOperations":[{"op":"write|delete","path":"safe/relative/path","content":"complete file content"}],"researchQuery":string,"researchUrls":string[],"needsBuild":boolean}. For research, only return URLs explicitly supplied by the user; never invent sources. Never claim a file, artifact, build, test, research result, or deployment exists without returning the corresponding operation or verified result. For software/game changes prefer real file operations.`;
+function skillContext(){
+  const skills=(settingsState.skills||[]).filter(s=>s&&s.enabled&&s.name);
+  if(!skills.length)return '';
+  return ' Enabled skills: '+skills.map(s=>s.name).join(', ')+'.';
+}
+function refreshConversationViews(project){
+  const messages=Array.isArray(project.conversation)?project.conversation.slice(-MAX_HISTORY):[];
+  const html=messages.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');
+  const log=$('#project-log');if(log){log.innerHTML=html;log.scrollTop=log.scrollHeight;}
+  const dock=$('#assistant-dock-log');if(dock){dock.innerHTML=html;dock.scrollTop=dock.scrollHeight;}
+}
+async function sendProjectMessage(project,userText){
+  const text=String(userText||'').trim();
+  if(!text)return;
+  const messages=project.conversation.length?project.conversation.slice(-MAX_HISTORY):[{role:'assistant',text:'I have the canonical project state in context. What should we change or work on next?'}];
+  messages.push({role:'user',text});
+  project.conversation=messages.slice(-MAX_HISTORY);
+  refreshConversationViews(project);
+  const send=$('#project-send')||$('#assistant-dock-send');
+  if(send)send.disabled=true;
+  try{
+    const data=await aiJson('discuss',{project,history:messages,message:text,system:projectAgentSystem+skillContext()},5500);if(!data)throw new Error('The AI returned invalid project action data.');
+    const wantsMutation=Boolean(data.changed||(data.specPatch&&typeof data.specPatch==='object'&&Object.keys(data.specPatch).length)||(Array.isArray(data.plan)&&data.plan.length)||(Array.isArray(data.workspaceSections)&&data.workspaceSections.length)||(Array.isArray(data.fileOperations)&&data.fileOperations.length)||(Array.isArray(data.agents)&&data.agents.length));
+    const intent=String(data.intent||'answer').toLowerCase();
+    if(wantsMutation||['build','test','research','plan'].includes(intent)){
+      addTask(project,text.slice(0,80),{status:settingsState.executionMode==='Ask Me'&&wantsMutation?'awaiting approval':(wantsMutation?'active':'draft'),agent:intent==='research'?'researcher':intent==='test'?'tester':intent==='build'?'builder':'orchestrator',description:text,affectedFiles:(data.fileOperations||[]).map(x=>x.path).filter(Boolean)});
+    }
+    if(wantsMutation&&settingsState.executionMode==='Ask Me'){
+      project.pendingMutation={...data,message:String(data.message||'Review the proposed change.'),createdAt:now()};
+      messages.push({role:'assistant',text:'I prepared the requested change for approval. Nothing has been applied yet.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);renderProjectChat(project);return;
+    }
+    if(wantsMutation){
+      snapshot(project,'Before change');
+      const mutation=applyProjectMutation(project,{specPatch:data.specPatch||{},plan:Array.isArray(data.plan)?data.plan:undefined,workspaceSections:Array.isArray(data.workspaceSections)?data.workspaceSections:undefined,agents:Array.isArray(data.agents)?data.agents:undefined,fileOperations:Array.isArray(data.fileOperations)?data.fileOperations:[]});
+      if(!mutation.changed)throw new Error('The AI requested a mutation but nothing in the canonical project state changed.');
+      project.status=data.needsBuild?'needs-build':'changed';project.executionState={...(project.executionState||{}),lastAgent:'orchestrator'};
+      const tasks=ensureTasks(project);if(tasks[0]&&tasks[0].status==='active'){tasks[0].status='ready';tasks[0].updatedAt=now();applyProjectMutation(project,{executionStatePatch:{tasks}});}
+    }
+    if(data.changed&&!wantsMutation)throw new Error('The AI claimed a change without returning an executable mutation.');
+    messages.push({role:'assistant',text:String(data.message||'Done.')});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);await syncRemoteProject(project);
+    if(intent==='research'){
+      const query=String(data.researchQuery||'').trim(),urls=Array.isArray(data.researchUrls)?data.researchUrls.map(x=>String(x||'').trim()).filter(Boolean).slice(0,5):[];
+      if(!session){aiRequiredModal('Sign in to use source-backed research.');renderProject(project);return;}
+      if(!query||!urls.length){messages.push({role:'assistant',text:'Send the research question together with one or more source URLs I should analyze.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);refreshConversationViews(project);return;}
+      const result=await edge('research',{projectId:project.id,query,urls});
+      const mutation=applyProjectMutation(project,{researchPatch:{query,addSources:result.sources||urls.map(url=>({url})),addFindings:result.findings||[]}});
+      if(mutation.changed){project.executionState={...(project.executionState||{}),lastAgent:'researcher'};saveProject(project);await syncRemoteProject(project);}
+      messages.push({role:'assistant',text:String(result.summary||'Research added to the project evidence store.')});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);refreshConversationViews(project);renderProject(project);return;
+    }
+    if((intent==='build'||data.needsBuild)&&settingsState.executionMode!=='Ask Me'){
+      renderOutput(project);await buildArtifact(project);
+      if(settingsState.executionMode==='Autonomous'){
+        let results=await runTests(project);
+        for(let cycle=0;cycle<2&&!results.every(x=>x.pass);cycle++){const failures=results.filter(x=>!x.pass);await buildArtifact(project,failures);results=await runTests(project);}
+        const passed=results.every(x=>x.pass),status=passed?'verified':'needs-fix';project.tests={status:passed?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};project.status=status;saveProject(project);await syncRemoteProject(project);
+      }
+      return;
+    }
+    if((intent==='build'||data.needsBuild)&&settingsState.executionMode==='Ask Me'){messages.push({role:'assistant',text:'The build is ready to run. Open Output and start it when you are ready.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);refreshConversationViews(project);renderProject(project);return;}
+    if(intent==='test'){
+      renderTests(project);const results=await runTests(project),passed=results.every(x=>x.pass);project.tests={status:passed?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};project.status=passed?'verified':'needs-fix';saveProject(project);await syncRemoteProject(project);renderTests(project);return;
+    }
+    renderProject(project);
+  }catch(error){messages.push({role:'assistant',text:'I could not complete that request: '+error.message});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);refreshConversationViews(project);}
+  finally{if(send)send.disabled=false;}
+}
 function renderProjectChat(project,prefill=''){
   const body=$('#project-body'),messages=project.conversation.length?project.conversation.slice(-MAX_HISTORY):[{role:'assistant',text:'I have the canonical project state in context. What should we change or work on next?'}],pending=project.pendingMutation;
   body.innerHTML='<div class="box"><div class="sub">Project Chat controls the canonical project state. Ask Me pauses mutations for approval; other modes follow their configured automation level.</div><div id="project-log" class="conversation"></div>'+
@@ -890,48 +1043,8 @@ function renderProjectChat(project,prefill=''){
   const input=$('#project-input'),send=$('#project-send');input.value=prefill;
   $('#project-form').onsubmit=async e=>{
     e.preventDefault();const userText=input.value.trim();if(!userText||send.disabled)return;
-    send.disabled=true;messages.push({role:'user',text:userText});drawConversation(messages,'#project-log');input.value='';
-    try{
-      const data=await aiJson('discuss',{project,history:messages,message:userText,system:projectAgentSystem},5500);if(!data)throw new Error('The AI returned invalid project action data.');
-      const wantsMutation=Boolean(data.changed||(data.specPatch&&typeof data.specPatch==='object'&&Object.keys(data.specPatch).length)||(Array.isArray(data.plan)&&data.plan.length)||(Array.isArray(data.workspaceSections)&&data.workspaceSections.length)||(Array.isArray(data.fileOperations)&&data.fileOperations.length)||(Array.isArray(data.agents)&&data.agents.length));
-      if(wantsMutation&&settingsState.executionMode==='Ask Me'){
-        project.pendingMutation={...data,message:String(data.message||'Review the proposed change.'),createdAt:now()};
-        messages.push({role:'assistant',text:'I prepared the requested change for approval. Nothing has been applied yet.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);renderProjectChat(project);return;
-      }
-      if(wantsMutation){
-        snapshot(project,'Before change');
-        const mutation=applyProjectMutation(project,{specPatch:data.specPatch||{},plan:Array.isArray(data.plan)?data.plan:undefined,workspaceSections:Array.isArray(data.workspaceSections)?data.workspaceSections:undefined,agents:Array.isArray(data.agents)?data.agents:undefined,fileOperations:Array.isArray(data.fileOperations)?data.fileOperations:[]});
-        if(!mutation.changed)throw new Error('The AI requested a mutation but nothing in the canonical project state changed.');
-        project.status=data.needsBuild?'needs-build':'changed';project.executionState={...(project.executionState||{}),lastAgent:'orchestrator'};
-      }
-      if(data.changed&&!wantsMutation)throw new Error('The AI claimed a change without returning an executable mutation.');
-      messages.push({role:'assistant',text:String(data.message||'Done.')});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);await syncRemoteProject(project);
-      const intent=String(data.intent||'answer').toLowerCase();
-      if(intent==='research'){
-        const query=String(data.researchQuery||'').trim(),urls=Array.isArray(data.researchUrls)?data.researchUrls.map(x=>String(x||'').trim()).filter(Boolean).slice(0,5):[];
-        if(!session){aiRequiredModal('Sign in to use source-backed research.');renderProject(project);return;}
-        if(!query||!urls.length){messages.push({role:'assistant',text:'Send the research question together with one or more source URLs I should analyze.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);drawConversation(messages,'#project-log');return;}
-        const result=await edge('research',{projectId:project.id,query,urls});
-        const mutation=applyProjectMutation(project,{researchPatch:{query,addSources:result.sources||urls.map(url=>({url})),addFindings:result.findings||[]}});
-        if(mutation.changed){project.executionState={...(project.executionState||{}),lastAgent:'researcher'};saveProject(project);await syncRemoteProject(project);}
-        messages.push({role:'assistant',text:String(result.summary||'Research added to the project evidence store.')});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);drawConversation(messages,'#project-log');renderProject(project);return;
-      }
-      if((intent==='build'||data.needsBuild)&&settingsState.executionMode!=='Ask Me'){
-        renderOutput(project);await buildArtifact(project);
-        if(settingsState.executionMode==='Autonomous'){
-          let results=await runTests(project);
-          for(let cycle=0;cycle<2&&!results.every(x=>x.pass);cycle++){const failures=results.filter(x=>!x.pass);await buildArtifact(project,failures);results=await runTests(project);}
-          const passed=results.every(x=>x.pass),status=passed?'verified':'needs-fix';project.tests={status:passed?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};project.status=status;saveProject(project);await syncRemoteProject(project);
-        }
-        return;
-      }
-      if((intent==='build'||data.needsBuild)&&settingsState.executionMode==='Ask Me'){messages.push({role:'assistant',text:'The build is ready to run. Open Output and start it when you are ready.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);drawConversation(messages,'#project-log');renderProject(project);return;}
-      if(intent==='test'){
-        renderTests(project);const results=await runTests(project),passed=results.every(x=>x.pass);project.tests={status:passed?'passed':'failed',specVersion:project.specVersion,results,updatedAt:now()};project.status=passed?'verified':'needs-fix';saveProject(project);await syncRemoteProject(project);renderTests(project);return;
-      }
-      renderProject(project);
-    }catch(error){messages.push({role:'assistant',text:'I could not complete that request: '+error.message});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);drawConversation(messages,'#project-log');}
-    finally{send.disabled=false;}
+    input.value='';
+    await sendProjectMessage(project,userText);
   };
   input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('#project-form').requestSubmit();}};
 }
@@ -1088,10 +1201,19 @@ function mountArtifact(project){
 }
 function renderFiles(project){
   const paths=Object.keys(project.files||{}).sort(),first=paths[0]||null,body=$('#project-body');
-  body.innerHTML='<div class="box"><div class="files"><div class="file-list">'+(paths.map((path,i)=>'<button class="'+(i===0?'active':'')+'" data-file="'+esc(path)+'">'+esc(path)+'</button>').join('')||'<div class="sub">No generated files yet.</div>')+'</div><div style="padding-left:14px"><div class="row"><b id="file-name">'+esc(first||'No file selected')+'</b><div class="actions">'+(first?'<button class="ghost" id="preview-file">Preview changes</button><button class="ghost" id="save-file">Save</button><button class="download" id="download-file">Download</button>':'')+'</div></div><textarea id="file-code-editor" class="code-editor" spellcheck="false">'+esc(first?project.files[first]:'Build the project to create real files.')+'</textarea></div></div></div>';
+  body.innerHTML='<div class="box"><div class="files"><div class="file-list">'+(paths.map((path,i)=>'<button class="'+(i===0?'active':'')+'" data-file="'+esc(path)+'">'+esc(path)+'</button>').join('')||'<div class="sub">No generated files yet.</div>')+'<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div style="padding-left:14px"><div class="row"><b id="file-name">'+esc(first||'No file selected')+'</b><div class="actions">'+(first?'<button class="ghost" id="preview-file">Preview changes</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':'')+'</div></div><textarea id="file-code-editor" class="code-editor" spellcheck="false">'+esc(first?project.files[first]:'Build the project to create real files.')+'</textarea><div class="sub" id="file-dirty"></div></div></div></div>';
   let currentPath=first;
-  const selectFile=path=>{$$('[data-file]',body).forEach(x=>x.classList.toggle('active',x.dataset.file===path));currentPath=path;$('#file-name').textContent=path;$('#file-code-editor').value=project.files[path]||'';};
+  const markDirty=()=>{$('#file-dirty').textContent=(currentPath&&project.files[currentPath]!==$('#file-code-editor').value)?'Unsaved changes in '+currentPath:'';};
+  const selectFile=path=>{$$('[data-file]',body).forEach(x=>x.classList.toggle('active',x.dataset.file===path));currentPath=path;$('#file-name').textContent=path;$('#file-code-editor').value=project.files[path]||'';markDirty();};
   $('[data-file]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.file));
+  $('#file-code-editor')?.addEventListener('input',markDirty);
+  $('#new-file')?.addEventListener('click',()=>{
+    const raw=prompt('New file path');const path=sanitizePath(raw||'');
+    if(!path)return notify('That path is not allowed.','error');
+    snapshot(project,'Before new file');
+    applyProjectMutation(project,{fileOperations:[{op:'write',path,content:''}]});
+    saveProject(project);renderFiles(project);
+  });
   $('#preview-file')?.addEventListener('click',()=>{
     if(!currentPath||!Object.hasOwn(project.files,currentPath))return;
     const before=String(project.files[currentPath]||''),after=$('#file-code-editor').value;
@@ -1105,7 +1227,23 @@ function renderFiles(project){
     snapshot(project,'Before file edit');
     const mutation=applyProjectMutation(project,{fileOperations:[{op:'write',path:currentPath,content}]});
     if(!mutation.changed)return;
-    project.status='needs-build';saveProject(project);await syncRemoteProject(project);notify('File saved. Generated output is now stale until rebuilt and verified.','success');
+    project.status='needs-build';saveProject(project);await syncRemoteProject(project);notify('File saved. Generated output is now stale until rebuilt and verified.','success');markDirty();
+  });
+  $('#rename-file')?.addEventListener('click',async()=>{
+    if(!currentPath)return;
+    const next=sanitizePath(prompt('Rename to',currentPath)||'');
+    if(!next||next===currentPath)return;
+    snapshot(project,'Before rename');
+    const content=project.files[currentPath];
+    applyProjectMutation(project,{fileOperations:[{op:'write',path:next,content},{op:'delete',path:currentPath}]});
+    saveProject(project);await syncRemoteProject(project);renderFiles(project);
+  });
+  $('#delete-file')?.addEventListener('click',async()=>{
+    if(!currentPath)return;
+    if(settingsState.confirmDelete&&!confirm('Delete '+currentPath+'?'))return;
+    snapshot(project,'Before delete');
+    applyProjectMutation(project,{fileOperations:[{op:'delete',path:currentPath}]});
+    saveProject(project);await syncRemoteProject(project);renderFiles(project);
   });
   $('#download-file')?.addEventListener('click',()=>currentPath&&downloadText(currentPath,project.files[currentPath]));
 }
@@ -1193,7 +1331,11 @@ function projectsPage(){
   render();
 }
 
-function analyticsPage(){shell(`<div class="panel"><div class="kicker">PROJECT X</div><h1 class="hero-title" style="font-size:44px">Analytics</h1><div class="grid"><div class="box"><b>Projects</b><div class="sub">${state.projects.length}</div></div><div class="box"><b>AI</b><div class="sub">${session?'Secure account connected':localGuestKey()?'Local session key configured':'Not connected'}</div></div><div class="box"><b>Outputs</b><div class="sub">${state.projects.filter(p=>p.artifacts?.output).length}</div></div></div></div>`,'analytics');}
+function analyticsPage(){
+  const tasks=state.projects.reduce((n,p)=>n+(p.executionState?.tasks||[]).length,0);
+  const items=state.projects.flatMap(p=>(p.versions||[]).slice(-3).map(v=>({title:p.title,label:v.label,at:v.at})));
+  shell(`<div class="panel"><div class="kicker">ACTIVITY</div><h1 class="hero-title" style="font-size:36px">What happened</h1><p class="sub">Project-derived activity only — no invented metrics.</p><div class="grid"><div class="box"><b>Projects</b><div class="sub">${state.projects.length}</div></div><div class="box"><b>Tasks</b><div class="sub">${tasks}</div></div><div class="box"><b>Outputs</b><div class="sub">${state.projects.filter(p=>p.artifacts?.output).length}</div></div></div><div class="box" style="margin-top:12px">${items.length?items.slice().reverse().slice(0,20).map(x=>`<div class="item"><b>${esc(x.title)}</b><div class="sub">${esc(x.label||'Snapshot')} · ${esc(x.at||'')}</div></div>`).join(''):'<div class="placeholder">No snapshots yet.</div>'}</div></div>`,'analytics');
+}
 async function assistantPage(){shell(`<div class="panel"><div class="kicker">PROJECT X</div><h1 class="hero-title" style="font-size:44px">Assistant X</h1><div class="box"><div id="assistant-log" class="conversation"></div><form id="assistant-form" class="form"><textarea id="assistant-input" placeholder="Ask a general ProjectX question..."></textarea><button class="primary">Send</button></form></div></div>`,'assistant');const messages=[{role:'assistant',text:'What do you need help with?'}];drawConversation(messages,'#assistant-log');$('#assistant-form').onsubmit=async e=>{e.preventDefault();const text=$('#assistant-input').value.trim();if(!text)return;messages.push({role:'user',text});drawConversation(messages,'#assistant-log');$('#assistant-input').value='';try{messages.push({role:'assistant',text:await aiText({message:text,history:messages,project:activeProject()||{},system:'You are Assistant X for ProjectX. Be concise and practical. Never claim actions you did not perform.'})});}catch(error){messages.push({role:'assistant',text:`AI unavailable: ${error.message}`});}drawConversation(messages,'#assistant-log');};}
 const SETTINGS=[['general','General'],['ai','AI'],['agents','Agents'],['integrations','Integrations'],['defaults','Project Defaults'],['appearance','Appearance'],['notifications','Notifications'],['security','Security & Privacy'],['git','Git & Deployment'],['storage','Storage'],['billing','Billing & Usage'],['advanced','Advanced']];
 function settingsPage(which='general'){shell(`<div class="panel"><div class="kicker">PROJECT X</div><h1 class="hero-title" style="font-size:44px">Settings</h1><div class="settings"><nav class="settings-nav">${SETTINGS.map(([id,name])=>`<button class="${id===which?'active':''}" data-setting="${id}">${name}</button>`).join('')}</nav><div id="settings-body"></div></div></div>`,'settings');$$('[data-setting]').forEach(button=>button.onclick=()=>settingsPage(button.dataset.setting));renderSettings(which);}
@@ -1202,13 +1344,19 @@ else if(which==='ai')return renderAiSettings(body);
 else if(which==='agents')return renderAgentSettings(body);
 else if(which==='integrations')body.innerHTML=`<h2>Integrations</h2><div class="box"><div class="row"><div><b>Supabase</b><div class="sub">${ensureSupabase()?'Configured':'Not configured'}</div></div><span class="status ${ensureSupabase()?'ok':'warn'}">${ensureSupabase()?'READY':'PLACEHOLDER'}</span></div><div class="row"><div><b>GitHub</b><div class="sub">Repository automation requires OAuth integration.</div></div><span class="status warn">PLACEHOLDER</span></div></div>`;
 else if(which==='defaults')body.innerHTML=`<h2>Project Defaults</h2><div class="box"><div class="row"><b>Default model</b><select class="select" id="default-model">${MODELS.map(m=>`<option ${p.model===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="row"><b>Response style</b><select class="select" id="response-style"><option ${p.responseStyle==='concise'?'selected':''}>concise</option><option ${p.responseStyle==='balanced'?'selected':''}>balanced</option><option ${p.responseStyle==='detailed'?'selected':''}>detailed</option></select></div></div>`;
-else if(which==='appearance')body.innerHTML=`<h2>Appearance</h2><div class="box"><div class="row"><b>Theme</b><span class="sub">Light workspace is currently implemented.</span></div><div class="placeholder">Dark/system styling remains a placeholder and is not falsely marked active.</div></div>`;
+else if(which==='appearance')body.innerHTML=`<h2>Appearance</h2><div class="box"><div class="row"><b>Theme</b><span class="sub">Workspace uses the ProjectX dark technical theme. The public homepage is light.</span></div></div>`;
 else if(which==='notifications')body.innerHTML=`<h2>Notifications</h2><div class="box">${Object.entries(p.notifications).map(([id,on])=>`<div class="row"><b>${esc(id)}</b><button class="ghost" data-notification="${id}">${on?'On':'Off'}</button></div>`).join('')}</div>`;
 else if(which==='security')body.innerHTML=`<h2>Security & Privacy</h2><div class="box"><div class="row"><div><b>AI credential storage</b><div class="sub">${session?'Server-side encrypted vault':'Local browser session'}</div></div><span class="status ${session?'ok':'warn'}">${session?'SECURE':'LOCAL'}</span></div><div class="row"><div><b>Account</b><div class="sub">${session?esc(session.user?.email||'Signed in'):'Not signed in'}</div></div>${session?'<button class="ghost" id="security-signout">Sign out</button>':'<button class="ghost" id="security-signin">Sign in</button>'}</div><div class="placeholder">Client-side guest mode never syncs credentials to ProjectX. Sign in to use the encrypted server-side vault.</div></div><div class="box" style="margin-top:10px"><div class="row"><div><b>Security events</b><div class="sub">Recent security events recorded for this account.</div></div><button class="ghost" id="load-security-events">${session?'Load':'Sign in'}</button></div><div id="security-events" class="sub" style="margin-top:10px">No events loaded.</div></div>`;
 else if(which==='git')body.innerHTML=`<h2>Git & Deployment</h2><div class="box"><div class="placeholder">GitHub OAuth, repository automation, branch creation, and deployment are placeholders until their real account-level integrations are configured.</div></div>`;
 else if(which==='storage')body.innerHTML=`<h2>Storage</h2><div class="box"><div class="row"><b>Projects</b><span class="sub">${state.projects.length}</span></div><div class="row"><b>Generated files</b><span class="sub">${state.projects.reduce((count,project)=>count+Object.keys(project.files||{}).length,0)}</span></div></div>`;
 else if(which==='billing')body.innerHTML=`<h2>Billing & Usage</h2><div class="box"><div class="row"><div><b>Plan & checkout</b><div class="sub">Manage Pro and Max subscriptions from the billing page. Checkout becomes active when Razorpay merchant settings are configured.</div></div><button class="ghost" id="open-billing">Open billing</button></div><div class="grid" style="margin-top:10px"><div class="box"><b>30-day requests</b><div id="usage-total" class="hero-title" style="font-size:28px;margin:6px 0">—</div></div><div class="box"><b>30-day units</b><div id="usage-units" class="hero-title" style="font-size:28px;margin:6px 0">—</div></div><div class="box"><b>Top actions</b><div id="usage-actions" class="sub" style="margin-top:7px">Loading…</div></div></div><div class="box" style="margin-top:10px"><b>Recent AI usage</b><div id="usage-recent" style="margin-top:8px">Loading…</div></div></div>`;
-else body.innerHTML=`<h2>Advanced</h2><div class="box"><button class="ghost" id="export-state">Export local state</button><button class="ghost" id="clear-state" style="margin-left:7px">Clear local cache</button><div class="placeholder" style="margin-top:12px">Experimental options are intentionally inactive until implemented.</div></div>`;bindSettings(which);}
+else body.innerHTML=`<h2>Advanced</h2><div class="box"><button class="ghost" id="export-state">Export local state</button><button class="ghost" id="clear-state" style="margin-left:7px">Clear local cache</button></div><div class="box" style="margin-top:10px"><b>Skills</b><p class="sub">Only enabled skill names are added to Assistant context.</p><form id="skill-form" class="form"><input id="skill-name" class="input full" placeholder="Skill name"><button class="primary">Add</button></form><div id="skill-list"></div></div>`;bindSettings(which);
+  if(which==='advanced'){
+    const draw=()=>{$('#skill-list').innerHTML=(settingsState.skills||[]).map((s,i)=>`<div class="row"><b>${esc(s.name)}</b><button class="ghost" data-skill="${i}">${s.enabled?'Enabled':'Disabled'}</button></div>`).join('')||'<div class="placeholder">No skills yet.</div>';$$('[data-skill]').forEach(b=>b.onclick=()=>{settingsState.skills[Number(b.dataset.skill)].enabled=!settingsState.skills[Number(b.dataset.skill)].enabled;persistSettings();draw();});};
+    draw();
+    $('#skill-form')?.addEventListener('submit',e=>{e.preventDefault();const name=$('#skill-name').value.trim();if(!name)return;settingsState.skills=[...(settingsState.skills||[]),{name,description:'',instructions:'',enabled:true,version:1}];persistSettings();$('#skill-name').value='';draw();});
+  }
+}
 async function renderAgentSettings(body){
   const roles={interviewer:'Discovery and ambiguity reduction.',planner:'Plans from the project brain.',builder:'Creates real files and outputs.',tester:'Validates current artifacts.',researcher:'Structures source-backed evidence.',orchestrator:'Coordinates project actions and execution.'};
   body.innerHTML=`<h2>Agents</h2><p class="sub">Choose specialist models and enable or disable roles. Connected-account model preferences apply to the matching ProjectX specialist.</p><div class="box" id="agent-settings"><div class="sub">Loading available models…</div></div>`;
@@ -1304,11 +1452,162 @@ function bindSettings(which){
   });
   if(which==='billing'&&session)loadUsagePanel();$('#open-billing')?.addEventListener('click',()=>{location.href='./billing.html';});
   $('#execution-mode')?.addEventListener('change',e=>{settingsState.executionMode=e.target.value;persistSettings();});$('#toggle-autosave')?.addEventListener('click',()=>{settingsState.autoSave=!settingsState.autoSave;persistSettings();renderSettings(which)});$('#toggle-confirm')?.addEventListener('click',()=>{settingsState.confirmDelete=!settingsState.confirmDelete;persistSettings();renderSettings(which)});$('#language')?.addEventListener('change',e=>{settingsState.language=e.target.value;persistSettings()});$('#timezone')?.addEventListener('change',e=>{settingsState.timezone=e.target.value;persistSettings()});$('#default-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$('#ai-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$$('[data-agent]').forEach(button=>button.onclick=()=>{const id=button.dataset.agent;settingsState.agents[id]=!settingsState.agents[id];persistSettings();renderSettings('agents')});$$('[data-notification]').forEach(button=>button.onclick=()=>{const id=button.dataset.notification;settingsState.notifications[id]=!settingsState.notifications[id];persistSettings();renderSettings('notifications')});$('#security-signin')?.addEventListener('click',authModal);$('#security-signout')?.addEventListener('click',()=>signOut().then(()=>settingsPage('security')));$('#export-state')?.addEventListener('click',()=>downloadText('projectx-state.json',JSON.stringify(state,null,2),'application/json'));$('#clear-state')?.addEventListener('click',()=>{if(settingsState.confirmDelete&&!confirm('Clear local project cache? Cloud projects remain in your account.'))return;state={version:6,projects:[],active:null};persistLocal();home();});}
-function authModal(){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">PROJECT X ACCOUNT</div><h2>Use secure project storage</h2><p class="sub">Sign in to sync projects and store AI credentials in the encrypted server-side vault.</p><div style="display:flex;gap:7px;margin:12px 0"><button class="ghost" id="auth-signin-mode">Sign in</button><button class="ghost" id="auth-signup-mode">Create account</button></div><input id="auth-email" class="input full" type="email" placeholder="Email"><input id="auth-password" class="input full" type="password" placeholder="Password" style="margin-top:7px"><div id="auth-status" class="sub" style="margin-top:8px"></div><div class="actions"><button class="ghost" id="auth-cancel">Cancel</button><button class="primary" id="auth-submit">Continue</button></div></div>`;document.body.appendChild(modal);currentModal=modal;let mode='signin';const setMode=m=>{mode=m;$('#auth-signin-mode').classList.toggle('active',m==='signin');$('#auth-signup-mode').classList.toggle('active',m==='signup');};$('#auth-signin-mode').onclick=()=>setMode('signin');$('#auth-signup-mode').onclick=()=>setMode('signup');$('#auth-cancel').onclick=closeModal;$('#auth-submit').onclick=async()=>{const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<6){$('#auth-status').textContent='Enter an email and a password with at least 6 characters.';return;}const button=$('#auth-submit');button.disabled=true;try{await authAction(mode,email,password);closeModal();await syncRemoteProjects();settingsPage('ai');notify('Secure account connected.','success');}catch(error){$('#auth-status').textContent=error.message;}finally{button.disabled=false;}};}
+function authModal(initialMode='signin'){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">PROJECT X ACCOUNT</div><h2>Use secure project storage</h2><p class="sub">Sign in to sync projects and store AI credentials in the encrypted server-side vault.</p><div style="display:flex;gap:7px;margin:12px 0"><button class="ghost" id="auth-signin-mode">Sign in</button><button class="ghost" id="auth-signup-mode">Create account</button></div><input id="auth-email" class="input full" type="email" placeholder="Email" autocomplete="username"><input id="auth-password" class="input full" type="password" placeholder="Password" style="margin-top:7px" autocomplete="current-password"><div id="auth-status" class="sub" style="margin-top:8px"></div><div class="actions"><button class="ghost" id="auth-recover">Recover</button><button class="ghost" id="auth-cancel">Cancel</button><button class="primary" id="auth-submit">Continue</button></div></div>`;document.body.appendChild(modal);currentModal=modal;let mode=initialMode==='signup'?'signup':'signin';const setMode=m=>{mode=m;$('#auth-signin-mode').classList.toggle('active',m==='signin');$('#auth-signup-mode').classList.toggle('active',m==='signup');$('#auth-submit').textContent=m==='signup'?'Create account':'Sign in';};setMode(mode);$('#auth-signin-mode').onclick=()=>setMode('signin');$('#auth-signup-mode').onclick=()=>setMode('signup');$('#auth-cancel').onclick=closeModal;$('#auth-recover').onclick=async()=>{const email=$('#auth-email').value.trim();if(!email){$('#auth-status').textContent='Enter your email to send a recovery link.';return;}try{const client=ensureSupabase();if(!client)throw new Error('Auth is not configured.');const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.href.split('#')[0]});if(error)throw error;$('#auth-status').textContent='If that account exists, a recovery email was sent.';}catch(error){$('#auth-status').textContent=error.message;}};$('#auth-submit').onclick=async()=>{const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<6){$('#auth-status').textContent='Enter an email and a password with at least 6 characters.';return;}const button=$('#auth-submit');button.disabled=true;try{await authAction(mode,email,password);closeModal();await syncRemoteProjects();home();notify('Secure account connected.','success');}catch(error){$('#auth-status').textContent=error.message;}finally{button.disabled=false;}};}
 function closeModal(){currentModal?.remove();currentModal=null;}
 function aiRequiredModal(message){closeModal();const modal=document.createElement('div');modal.className='modal-bg';modal.innerHTML=`<div class="modal"><div class="kicker">AI CONNECTION REQUIRED</div><h2>Connect your AI</h2><p class="sub">${esc(message)}</p><p class="sub" style="margin-top:10px"><a href="${GEMINI_KEY_URL}" target="_blank" rel="noopener noreferrer">Create a free-tier Gemini API key</a> in Google AI Studio, then paste it into Settings → AI.</p><div class="actions"><button class="ghost" id="ai-close">Cancel</button><button class="primary" id="ai-settings">Open Settings</button></div></div>`;document.body.appendChild(modal);currentModal=modal;$('#ai-close').onclick=closeModal;$('#ai-settings').onclick=()=>{closeModal();settingsPage('ai');};}
-function navigate(route){if(route==='home')home();else if(route==='projects')projectsPage();else if(route==='analytics')analyticsPage();else if(route==='assistant')assistantPage();else if(route==='settings')settingsPage('general');}
+function ensureTasks(project){
+  project.executionState=project.executionState||{};
+  if(!Array.isArray(project.executionState.tasks)){
+    const runs=Array.isArray(project.executionState.runs)?project.executionState.runs:[];
+    project.executionState.tasks=runs.map(r=>({id:r.id,title:r.task||r.agent||'Task',description:r.task||'',status:r.status==='in_progress'?'active':(r.status||'draft'),agent:r.agent,createdAt:r.startedAt,updatedAt:r.startedAt,affectedFiles:[],logs:[],result:null,approval:null}));
+  }
+  return project.executionState.tasks;
+}
+function addTask(project,title,opts={}){
+  const tasks=ensureTasks(project);
+  const task={id:crypto.randomUUID?.()||('task-'+Date.now()),title:String(title||'Untitled task').slice(0,160),description:String(opts.description||'').slice(0,2000),status:opts.status||'draft',priority:opts.priority||'normal',agent:opts.agent||'orchestrator',dependencies:opts.dependencies||[],progress:0,createdAt:now(),updatedAt:now(),affectedFiles:opts.affectedFiles||[],affectedArtifacts:[],logs:[],result:null,verification:null,approval:null,error:null};
+  tasks.unshift(task);
+  applyProjectMutation(project,{executionStatePatch:{tasks,status:'in_progress',lastAgent:task.agent}});
+  saveProject(project);syncRemoteProject(project);
+  return task;
+}
+function renderOverview(project){
+  const root=$('#project-body');if(!root)return;
+  const tasks=ensureTasks(project);
+  const files=Object.keys(project.files||{});
+  root.innerHTML=`<div class="grid"><div class="box"><b>Brain</b><div class="sub">${esc(project.understanding?.summary||project.intent||'No summary yet.')}</div></div><div class="box"><b>Tasks</b><div class="sub">${tasks.length} recorded</div></div><div class="box"><b>Files</b><div class="sub">${files.length} in workspace</div></div></div><div class="box" style="margin-top:12px"><b>Next</b><div class="sub">Open Assistant to change the project, Design to iterate visually, or Tasks to inspect work.</div><div class="actions"><button class="primary" data-project-tool="assistant">Open Assistant</button><button class="ghost" data-project-tool="tasks">Task board</button></div></div>`;
+  $$('[data-project-tool]',root).forEach(b=>b.onclick=()=>renderProjectTool(project,b.dataset.projectTool));
+}
+function renderTasks(project){
+  const root=$('#project-body');if(!root)return;
+  const tasks=ensureTasks(project);
+  toolShell('TASKS','Work board',ExecutionProvider.note,'<form id="task-form" class="form"><input id="task-title" class="input full" placeholder="New task, e.g. Authentication"><button class="primary">Add task</button></form>'+UI.taskBoard(tasks,esc)+'<div id="task-detail"></div>');
+  $('#task-form').onsubmit=e=>{e.preventDefault();const title=$('#task-title').value.trim();if(!title)return;addTask(project,title,{status:'draft'});renderTasks(project);};
+  const drawDetail=t=>{
+    $('#task-detail').innerHTML=`<div class="box px-task-detail" style="margin-top:12px"><b>${esc(t.title)}</b><div class="sub">${esc(t.status)} · ${esc(t.agent||'orchestrator')} · ${esc(t.updatedAt||'')}</div><p class="sub">${esc(t.description||'No description.')}</p><div class="sub">Files: ${esc((t.affectedFiles||[]).join(', ')||'None')}</div><div class="placeholder">${ExecutionProvider.isolatedWorkers?'Worker attached.':'Queued work runs sequentially through Assistant. This task does not start a remote shell.'}</div><div class="actions"><button class="ghost" data-task-status="active">Start</button><button class="ghost" data-task-status="ready">Mark ready</button><button class="primary" data-task-status="done">Approve / done</button><button class="ghost" data-task-status="cancelled">Cancel</button></div></div>`;
+    $$('[data-task-status]').forEach(b=>b.onclick=()=>{t.status=b.dataset.taskStatus;t.updatedAt=now();if(t.status==='done'&&project.pendingMutation)return renderProjectChat(project);applyProjectMutation(project,{executionStatePatch:{tasks}});saveProject(project);renderTasks(project);});
+  };
+  $$('[data-task]').forEach(el=>el.onclick=()=>{const t=tasks.find(x=>x.id===el.dataset.task);if(t)drawDetail(t);});
+}
+function renderCanvas(project){
+  const root=$('#project-body');if(!root)return;
+  project.design=project.design||{x:0,y:0,z:1,frames:[],history:[]};
+  const files=project.files||{};
+  const html=assemblePreviewHtml(files);
+  root.innerHTML=`<div class="box"><div class="kicker">DESIGN CANVAS</div><p class="sub">Pan and zoom. Live frames are the sandboxed artifact. Mock frames are exploratory until you apply them to project files.</p><div class="actions"><button class="ghost" id="canvas-mock">Add mock</button><button class="ghost" id="canvas-variant">Variants A–D</button><button class="ghost" id="canvas-undo">Undo</button><button class="primary" id="canvas-apply">Apply selected</button></div></div><div class="px-canvas" id="px-canvas"><div class="px-canvas-inner" id="px-canvas-inner"></div></div>`;
+  const canvas=$('#px-canvas'),inner=$('#px-canvas-inner');
+  const pushHistory=()=>{project.design.history=(project.design.history||[]).concat([JSON.stringify(project.design.frames)]).slice(-20);};
+  const drawFrames=()=>{
+    inner.querySelectorAll('.px-frame').forEach(n=>{if(n.dataset.frame!=='live')n.remove();});
+    (project.design.frames||[]).forEach(f=>{
+      const el=document.createElement('div');
+      el.className='px-frame'+(project.design.selected===f.id?' selected':'');
+      el.dataset.frame=f.id;
+      el.style.cssText=`left:${f.left}px;top:${f.top}px;width:${f.width}px;height:${f.height}px`;
+      el.innerHTML=`<div class="px-frame-label">${esc(f.label)}</div><div class="body" style="padding:12px;color:#111">${esc(f.body||'Mock')}</div><div class="px-frame-resize" data-resize="${esc(f.id)}"></div>`;
+      inner.appendChild(el);
+    });
+  };
+  const live=document.createElement('div');
+  live.className='px-frame selected';
+  live.dataset.frame='live';
+  live.style.cssText='left:40px;top:40px;width:720px;height:480px';
+  live.innerHTML='<div class="px-frame-label">Live artifact</div>';
+  const frame=document.createElement('iframe');
+  frame.setAttribute('sandbox','allow-scripts');
+  frame.title='Canvas preview';
+  frame.srcdoc=html;
+  live.appendChild(frame);
+  inner.appendChild(live);
+  drawFrames();
+  let x=project.design.x||0,y=project.design.y||0,z=project.design.z||1,drag=null,resize=null;
+  const apply=()=>{inner.style.transform=`translate(${x}px,${y}px) scale(${z})`;project.design.x=x;project.design.y=y;project.design.z=z;};
+  apply();
+  canvas.onwheel=e=>{e.preventDefault();z=Math.min(2.2,Math.max(.35,z+(e.deltaY<0?.08:-.08)));apply();};
+  canvas.onpointerdown=e=>{
+    const rz=e.target.closest('[data-resize]');
+    if(rz){const f=project.design.frames.find(x=>x.id===rz.dataset.resize);resize={f,sx:e.clientX,sy:e.clientY,w:f.width,h:f.height};canvas.setPointerCapture(e.pointerId);return;}
+    const fr=e.target.closest('.px-frame');
+    if(fr){project.design.selected=fr.dataset.frame;$$('.px-frame').forEach(n=>n.classList.toggle('selected',n===fr));return;}
+    drag={sx:e.clientX-x,sy:e.clientY-y};canvas.setPointerCapture(e.pointerId);
+  };
+  canvas.onpointermove=e=>{
+    if(resize?.f){resize.f.width=Math.max(180,resize.w+(e.clientX-resize.sx)/z);resize.f.height=Math.max(120,resize.h+(e.clientY-resize.sy)/z);drawFrames();live.remove();inner.prepend(live);return;}
+    if(!drag)return;x=e.clientX-drag.sx;y=e.clientY-drag.sy;apply();
+  };
+  canvas.onpointerup=()=>{drag=null;resize=null;saveProject(project);};
+  $('#canvas-mock').onclick=()=>{pushHistory();project.design.frames.push({id:'mock-'+Date.now(),label:'Mock',body:String(project.understanding?.summary||project.intent||'Exploratory mock'),left:80+(project.design.frames.length*24),top:540,width:320,height:200});drawFrames();saveProject(project);};
+  $('#canvas-variant').onclick=()=>{pushHistory();['A','B','C','D'].forEach((letter,i)=>project.design.frames.push({id:'var-'+letter+Date.now(),label:'Variant '+letter,body:'Direction '+letter+' for '+String(project.title||'project'),left:800,top:40+i*220,width:280,height:200}));drawFrames();saveProject(project);notify('Four variant frames added. Apply writes the selected direction into design files.','info');};
+  $('#canvas-undo').onclick=()=>{const last=(project.design.history||[]).pop();if(!last)return;project.design.frames=JSON.parse(last);drawFrames();saveProject(project);};
+  $('#canvas-apply').onclick=()=>{
+    const id=project.design.selected;
+    if(!id||id==='live')return notify('Live frame is already the production artifact. Rebuild from Output to change files.','info');
+    const f=(project.design.frames||[]).find(x=>x.id===id);if(!f)return notify('Select a mock or variant frame first.','info');
+    snapshot(project,'Before applying canvas direction');
+    applyProjectMutation(project,{fileOperations:[{op:'write',path:'design/selected.md',content:'# '+f.label+'\n\n'+String(f.body||'')+'\n'}]});
+    project.artifacts={...(project.artifacts||{}),design:{kind:'mockup',specVersion:project.specVersion,summary:f.label,stale:false,updatedAt:now()}};
+    saveProject(project);syncRemoteProject(project);notify(f.label+' applied as design/selected.md.','success');
+  };
+}
+function renderArtifacts(project){
+  const list=Object.entries(project.artifacts||{});
+  toolShell('ARTIFACTS','Project artifacts','One project can hold several related deliverables that share the brain.','<div class="actions"><button class="primary" id="new-artifact">New artifact note</button></div>'+(list.length?list.map(([k,v])=>`<div class="item"><b>${esc(k)}</b><p>${esc(v?.kind||'artifact')} · spec v${esc(v?.specVersion)} · ${v?.stale?'stale':'current'}</p></div>`).join(''):'<div class="px-empty">No artifacts yet. Build from Output to create the first.</div>'));
+  $('#new-artifact')?.addEventListener('click',()=>{project.artifacts={...(project.artifacts||{}),['note-'+Date.now()]:{kind:'note',specVersion:project.specVersion,summary:'Workspace note',stale:false,updatedAt:now()}};saveProject(project);renderArtifacts(project);});
+}
+function renderDatabase(){
+  toolShell('DATABASE','Project data','Uses your Supabase project when connected. No rows are invented.','<div class="placeholder">Schema explorer is available when this account has authorized table access. Connect Supabase in Settings → Integrations. Destructive queries require confirmation.</div><div class="sub" style="margin-top:10px">Current session: '+(ensureSupabase()?'client configured':'not configured')+'</div>');
+}
+function renderStorage(){
+  toolShell('STORAGE','Assets','Supabase Storage buckets are account-level. Upload is enabled only with an authenticated session and configured bucket.','<div class="placeholder">'+(session?'No storage bucket is linked to this project yet.':'Sign in to manage stored assets.')+'</div>');
+}
+function renderIntegrations(){
+  toolShell('INTEGRATIONS','Connectors','Only mark a connector connected after a real OAuth or credential handshake.','<div class="box"><div class="row"><b>GitHub</b><span class="status warn">Not connected</span></div><div class="row"><b>Supabase</b><span class="status '+(ensureSupabase()?'ok':'warn')+'">'+(ensureSupabase()?'Client ready':'Not configured')+'</span></div><div class="row"><b>Stripe</b><span class="status warn">Not connected</span></div></div>');
+}
+function renderSecrets(project){
+  const names=Array.isArray(project.executionState?.secretNames)?project.executionState.secretNames:[];
+  toolShell('SECRETS','Environment names','Secret values are never shown in the browser. Names are recorded on the project; values belong in the encrypted account vault.','<form id="secret-form" class="form"><input id="secret-name" class="input full" placeholder="NAME, e.g. STRIPE_KEY"><button class="primary">Add name</button></form>'+(names.map(n=>`<div class="row"><b>${esc(n)}</b><span class="sub">•••• stored server-side if a vault entry exists</span></div>`).join('')||'<div class="placeholder">No secret names recorded.</div>'));
+  $('#secret-form')?.addEventListener('submit',e=>{e.preventDefault();const name=String($('#secret-name').value||'').trim().replace(/[^A-Z0-9_]/gi,'').slice(0,48);if(!name)return;const next=[...new Set([...names,name])];applyProjectMutation(project,{executionStatePatch:{secretNames:next}});saveProject(project);renderSecrets(project);});
+}
+function renderSeo(project){
+  const html=String(project.files?.['index.html']||'');
+  const title=(html.match(/<title>([^<]*)<\/title>/i)||[])[1];
+  const desc=(html.match(/name=["']description["'][^>]*content=["']([^"']*)/i)||html.match(/content=["']([^"']*)["'][^>]*name=["']description["']/i)||[])[1];
+  toolShell('SEO','Document metadata','Reads the current artifact only. Search rankings are not invented.','<div class="box"><div class="row"><b>Title</b><span class="sub">'+(title?esc(title):'Not found in index.html')+'</span></div><div class="row"><b>Description</b><span class="sub">'+(desc?esc(desc):'Not found')+'</span></div><div class="row"><b>Canonical HTML</b><span class="sub">'+(html?'Present':'No index.html')+'</span></div></div>');
+}
+function renderTerminal(){
+  toolShell('OUTPUT','Execution provider',ExecutionProvider.note,'<div class="placeholder">Remote terminal is unavailable. '+esc(ExecutionProvider.kind)+' — ProjectX will not pretend a shell command succeeded.</div>');
+}
+function renderCollab(){
+  toolShell('MEMBERS','Collaboration','Presence uses Supabase Realtime when signed in. Additional members appear only after they exist on the project.','<div class="box"><div class="row"><b>'+(session?.user?.email||'Guest')+'</b><span class="sub">Owner</span></div></div>'+(session?'<div class="sub" style="margin-top:8px">Realtime channel is attached while this project is open.</div>':'<div class="placeholder">Sign in to sync collaboration events.</div>'));
+}
+function renderDeploy(project){
+  toolShell('DEPLOY','Publish','ProjectX does not invent a production URL. Configure a real host to go live.','<div class="grid"><div class="box"><b>Status</b><div class="sub">Not deployed</div></div><div class="box"><b>Environment</b><div class="sub">Development (local/cloud project files)</div></div><div class="box"><b>Domain</b><div class="sub">Add a domain after a host is connected.</div></div></div><div class="actions"><button class="ghost" id="export-deploy">Export artifact</button></div>');
+  $('#export-deploy')?.addEventListener('click',()=>renderDelivery(project));
+}
+function openPalette(){
+  const pal=$('#px-palette');if(!pal)return;pal.hidden=false;$('#px-palette-input').value='';drawPalette('');$('#px-palette-input').focus();
+}
+function drawPalette(q){
+  const list=$('#px-palette-list');if(!list)return;
+  const query=String(q||'').toLowerCase();
+  const cmds=UI.COMMANDS.filter(c=>c[1].toLowerCase().includes(query));
+  const projects=state.projects.filter(p=>p.title.toLowerCase().includes(query)).slice(0,8);
+  list.innerHTML=cmds.map(c=>`<button data-cmd-go="${esc(c[2])}">${esc(c[1])}</button>`).join('')+projects.map(p=>`<button data-open="${esc(p.id)}">Open ${esc(p.title)}</button>`).join('');
+  $$('[data-cmd-go]',list).forEach(b=>b.onclick=()=>{closePalette();const id=b.dataset.cmdGo;const p=activeProject();if(p&&UI.PROJECT_NAV.some(n=>n[0]===id)){p.uiNav=id;saveProject(p);return renderProjectTool(p,id);}navigate(id);});
+}
+function closePalette(){$('#px-palette')&&($('#px-palette').hidden=true);}
+function bindPalette(){
+  const input=$('#px-palette-input');if(!input||input.dataset.bound)return;input.dataset.bound='1';
+  input.oninput=()=>drawPalette(input.value);
+  input.onkeydown=e=>{if(e.key==='Escape')closePalette();if(e.key==='Enter'){$('#px-palette-list button')?.click();}};
+}
+
+function navigate(route){if(route==='home')home();else if(route==='projects')projectsPage();else if(route==='analytics')analyticsPage();else if(route==='assistant'){const p=activeProject();if(p){p.uiNav='assistant';return renderProjectTool(p,'assistant');}assistantPage();}else if(route==='settings')settingsPage('general');else if(UI.PROJECT_NAV.some(n=>n[0]===route)){const p=activeProject();if(p){p.uiNav=route;saveProject(p);return renderProjectTool(p,route);}projectsPage();}}
 window.addEventListener('beforeunload',()=>runtimeTestCleanup?.());
-async function boot(){installCss();installOptionalAnalytics();await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();const wantsSignin=location.hash==='#signin'||new URLSearchParams(location.search).get('auth')==='signin';if(wantsSignin){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>authModal(),0);}}
+window.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}
+  if(e.key==='Escape')closePalette();
+});
+async function boot(){installCss();installOptionalAnalytics();await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();const wantsSignin=location.hash==='#signin'||new URLSearchParams(location.search).get('auth')==='signin';if(wantsSignin){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>authModal('signin'),0);}const wantsSignup=location.hash==='#signup'||new URLSearchParams(location.search).get('auth')==='signup';if(wantsSignup){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>authModal('signup'),0);}}
 window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot};
 boot();

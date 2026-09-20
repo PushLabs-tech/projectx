@@ -3,8 +3,10 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
+const ui = fs.readFileSync(new URL('../px-ui.js', import.meta.url), 'utf8');
 const edge = fs.readFileSync(new URL('../supabase/functions/ai/index.ts', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const surface = runtime + ui;
 
 const domIds = [
   'px-app',
@@ -16,7 +18,7 @@ const domIds = [
 ];
 
 for (const id of domIds) {
-  assert.match(runtime, new RegExp(`id="${id}"|id='${id}'|#${id}`), `runtime must reference #${id}`);
+  assert.match(surface, new RegExp(`id="${id}"|id='${id}'|#${id}`), `runtime must reference #${id}`);
 }
 
 assert.match(runtime, /function ensureShell\(\)/);
@@ -24,10 +26,10 @@ assert.match(runtime, /function installCss\(\)/);
 assert.match(runtime, /root\.id='px-app'|id="px-app"/);
 assert.match(runtime, /link\.id='px-style'|style\.id='px-style'|id=['"]px-style['"]/);
 
-assert.match(runtime, /id="interview-poll"/);
-assert.match(runtime, /id="interview-status"/);
-assert.match(runtime, /id="project-body"/);
-assert.match(runtime, /id="project-frame"/);
+assert.match(surface, /id="interview-poll"/);
+assert.match(surface, /id="interview-status"/);
+assert.match(surface, /id="project-body"/);
+assert.match(surface, /id="project-frame"/);
 
 assert.match(runtime, /function validDiscoveryPollLocal/);
 assert.match(runtime, /Describe in your own words/);
@@ -36,7 +38,8 @@ assert.match(runtime, /renderedOptions=\[\.\.\.options,'Describe in your own wor
 
 assert.match(runtime, /function publicHome\(/);
 assert.match(runtime, /function workspaceHome\(/);
-assert.match(runtime, /if\(session\)return workspaceHome\(\)/);
+assert.match(runtime, /if\(session\|\|state\.forceWorkspace\|\|state\.projects\.length\)return workspaceHome\(\)/);
+assert.match(runtime, /authModal\('signup'\)/);
 
 assert.match(runtime, /window\.ProjectX=\{/);
 assert.match(runtime, /state:\(\)=>state/);
