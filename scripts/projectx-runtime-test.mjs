@@ -17,8 +17,9 @@ assert.doesNotMatch(index, /dashboard-clean\.js|projectx-adaptive\.js|projectx-o
 assert.match(ui, /id="px-project-switch"/);
 assert.match(ui, /id="px-bottom"/);
 assert.match(ui, /id="px-share"/);
-assert.match(ui, /class="px-home-stage"/);
-assert.match(ui, /what's next\?/);
+assert.match(ui, /class="panel"/);
+assert.match(ui, /Continue the work/);
+assert.match(ui, /Tell ProjectX what you want to accomplish/);
 assert.match(ui, /execNote/);
 assert.doesNotMatch(ui, /ExecutionProvider/);
 assert.match(runtime, /function applyChromeLayout\(/);

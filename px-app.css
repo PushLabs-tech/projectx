@@ -59,8 +59,11 @@ html, body {
   }
 }
 
-#px-app.px-public { background: var(--px-bg); color: var(--px-text); overflow: auto; }
-#px-app.px-public .ghost { border: 0; background: transparent; color: var(--px-text); }
+#px-app.px-public { background: var(--px-public-bg); color: var(--px-public-ink); overflow: auto; }
+#px-app.px-public .primary, #px-app.px-public .new { background: var(--px-public-ink); color: #f4f1ea; }
+#px-app.px-public .ghost { border: 1px solid #d8d3c8; background: #fff; color: var(--px-public-ink); }
+#px-app.px-public .kicker { color: var(--px-public-muted); }
+#px-app.px-public .sub { color: var(--px-public-muted); }
 .px-dash-shell { grid-template-columns: var(--px-left) minmax(0,1fr); grid-template-rows: minmax(0,1fr); }
 .px-dash-shell .px-topbar, .px-dash-shell .px-statusbar, .px-dash-shell .px-bottom { display: none; }
 .px-dash-shell .px-left { grid-row: 1; background: #f4f1eb; overflow: hidden; }

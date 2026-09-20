@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
-    "build": "vite build",
+    "build": "vite build && cp -f config.js dist/config.js",
     "check": "node --check px-final.js && node --check projectx-core.js && node --check px-ui.js && node scripts/projectx-dom-contract-test.mjs && node scripts/projectx-runtime-test.mjs && node scripts/projectx-forensic-regression.mjs && node scripts/backend-contract-test.mjs",
     "security:scan": "node scripts/security-scan.mjs",
     "test": "npm run check && npm run security:scan",

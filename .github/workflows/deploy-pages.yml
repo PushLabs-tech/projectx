@@ -35,6 +35,8 @@ jobs:
         run: npm test
       - name: Build production bundle
         run: npm run build
+      - name: Verify Pages config
+        run: test -f dist/config.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

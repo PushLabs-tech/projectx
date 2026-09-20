@@ -37,7 +37,8 @@ assert.match(ui, /id="px-bottom"/);
 assert.match(ui, /id="assistant-dock-form"/);
 assert.match(ui, /id="plan-dock-form"/);
 assert.match(ui, /id="start-input"/);
-assert.match(ui, /px-home-stage|px-dash/);
+assert.match(ui, /px-hero|px-product-shot/);
+assert.match(ui, /Continue the work/);
 assert.doesNotMatch(ui, /ExecutionProvider/);
 assert.match(runtime, /applyChromeLayout/);
 assert.match(runtime, /px-ide/);
@@ -51,12 +52,12 @@ assert.match(runtime, /renderedOptions=\[\.\.\.options,'Describe in your own wor
 assert.match(ui, /export function authMarkup/);
 assert.match(ui, /id="auth-email"/);
 assert.match(ui, /id="auth-submit"/);
-assert.match(ui, /what's next\?/);
-assert.match(ui, /What should we make\?/);
+assert.match(ui, /Tell ProjectX what you want to accomplish/);
+assert.match(ui, /UNIVERSAL AI WORKSPACE/);
 assert.match(runtime, /function publicHome\(/);
 assert.match(runtime, /function workspaceHome\(/);
 assert.match(runtime, /function authScreen\(/);
-assert.match(runtime, /if\(session\|\|route==='workspace'\|\|state\.forceWorkspace\)return workspaceHome\(\)/);
+assert.match(runtime, /state\.forceWorkspace\|\|state\.projects\.length\)return workspaceHome\(\)/);
 assert.match(runtime, /authScreen\('signup'\)/);
 
 assert.match(runtime, /window\.ProjectX=\{/);

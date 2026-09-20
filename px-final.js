@@ -528,8 +528,7 @@ function bindStartComposer(){
   });
 }
 function workspaceHome(){
-  const name=String(session?.user?.email||'').split('@')[0]||'there';
-  shell(UI.launcherMarkup({esc,session,projects:state.projects,guestReady:Boolean(localGuestKey()),name}),'home');
+  shell(UI.launcherMarkup({esc,session,projects:state.projects,guestReady:Boolean(localGuestKey())}),'home');
   bindStartComposer();
 }
 function publicHome(){
@@ -537,19 +536,20 @@ function publicHome(){
   root.classList.add('px-public');
   root.classList.remove('px-auth-page');
   root.innerHTML=UI.publicMarkup();
-  const goLogin=()=>{history.replaceState(null,'',location.pathname+'#login');authScreen('signin');};
-  const goSignup=()=>{history.replaceState(null,'',location.pathname+'#signup');authScreen('signup');};
-  $('#public-signin').onclick=goLogin;
-  $('#public-signin-alt')?.addEventListener('click',goLogin);
-  $('#public-signup')?.addEventListener('click',goSignup);
-  const menu=$('#public-menu');
-  const panel=$('#public-menu-panel');
-  menu?.addEventListener('click',()=>{
-    if(!panel)return;
-    if(panel.hasAttribute('hidden')){panel.removeAttribute('hidden');menu.setAttribute('aria-expanded','true');}
-    else{panel.setAttribute('hidden','');menu.setAttribute('aria-expanded','false');}
+  const openWorkspace=()=>{state.forceWorkspace=true;history.replaceState(null,'',location.pathname+'#workspace');workspaceHome();};
+  $('#public-signin').onclick=()=>authScreen('signin');
+  $('#public-signup').onclick=()=>authScreen('signup');
+  $('#public-start').onclick=openWorkspace;
+  $('#public-workspace').onclick=openWorkspace;
+  $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
+  $$('[data-example]').forEach(btn=>btn.onclick=()=>{
+    try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example||'');}catch{}
+    state.forceWorkspace=true;
+    history.replaceState(null,'',location.pathname+'#workspace');
+    workspaceHome();
+    const input=$('#start-input');
+    if(input)input.value=btn.dataset.example||'';
   });
-  bindStartComposer();
 }
 function routeFromLocation(){
   const hash=String(location.hash||'').replace(/^#/,'').split('?')[0];
@@ -564,7 +564,7 @@ function home(){
   if(session&&(route==='login'||route==='signup'))return workspaceHome();
   if(route==='login')return authScreen('signin');
   if(route==='signup')return authScreen('signup');
-  if(session||route==='workspace'||state.forceWorkspace)return workspaceHome();
+  if(session||route==='workspace'||state.forceWorkspace||state.projects.length)return workspaceHome();
   publicHome();
 }
 async function beginCreation(text){
