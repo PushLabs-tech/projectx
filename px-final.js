@@ -177,13 +177,24 @@ async function integrationEdge(functionName, action, payload = {}) {
   return data;
 }
 
-async function startGitHubConnection(workspaceId) {
-  const result = await integrationEdge('github', 'startOAuth', { workspaceId });
+function integrationWorkspaceId() {
+  try {
+    const fromUrl = new URLSearchParams(location.search).get('workspace');
+    if (fromUrl) { localStorage.setItem('projectx_workspace_id', fromUrl); return fromUrl; }
+    return localStorage.getItem('projectx_workspace_id') || '';
+  } catch { return ''; }
+}
+function integrationProjectId() {
+  const p = activeProject();
+  return p?.sync?.remoteId || p?.id || '';
+}
+async function startGitHubConnection(workspaceId, projectId = integrationProjectId()) {
+  const result = await integrationEdge('github', 'startOAuth', { workspaceId: workspaceId || '', projectId });
   if (!result.url) throw new Error('GitHub OAuth URL missing');
   window.location.assign(result.url);
 }
-
-async function githubListRepositories(workspaceId) { return integrationEdge('github', 'listRepos', { workspaceId }); }
+async function githubStatus(workspaceId) { return integrationEdge('github', 'status', { workspaceId: workspaceId || '' }); }
+async function githubListRepositories(workspaceId) { return integrationEdge('github', 'listRepos', { workspaceId: workspaceId || integrationWorkspaceId() }); }
 async function githubCreateRepository(workspaceId, name, options = {}) { return integrationEdge('github', 'createRepo', { workspaceId, name, ...options }); }
 async function githubPushFiles(workspaceId, fullName, files, options = {}) { return integrationEdge('github', 'pushFiles', { workspaceId, fullName, files, ...options }); }
 async function deployProject(projectId, provider = 'vercel', label = 'default') { return integrationEdge('deploy', 'deploy', { projectId, provider, label }); }
@@ -1673,7 +1684,8 @@ function settingsPage(which='general'){shell(`<div class="panel"><div class="kic
 async function renderSettings(which){const body=$('#settings-body');if(!body)return;const p=settingsState;if(which==='general')body.innerHTML=`<h2>General</h2><p class="sub">Core ProjectX preferences.</p><div class="box"><div class="row"><div><b>Working mode</b><div class="sub">Choose how much automation ProjectX should use. Provider details stay hidden from normal project work.</div></div><select class="select" id="execution-mode">${['Fast','Balanced','Powerful','Ask Me','Mostly Automatic','Autonomous'].map(m=>'<option '+(p.executionMode===m?'selected':'')+'>'+m+'</option>').join('')}</select></div><div class="row"><div><b>Auto-save</b><div class="sub">Save successful project changes automatically.</div></div><button class="ghost" id="toggle-autosave">${p.autoSave?'On':'Off'}</button></div><div class="row"><div><b>Confirm destructive actions</b></div><button class="ghost" id="toggle-confirm">${p.confirmDelete?'On':'Off'}</button></div><div class="row"><b>Language</b><select class="select" id="language"><option>English</option></select></div><div class="row"><b>Timezone</b><input class="input" id="timezone" value="${esc(p.timezone)}"></div></div>`;
 else if(which==='ai')return renderAiSettings(body);
 else if(which==='agents')return renderAgentSettings(body);
-else if(which==='integrations')body.innerHTML=`<h2>Integrations</h2><div class="box"><div class="row"><div><b>Supabase</b><div class="sub">${ensureSupabase()?'Configured':'Not configured'}</div></div><span class="status ${ensureSupabase()?'ok':'warn'}">${ensureSupabase()?'READY':'PLACEHOLDER'}</span></div><div class="row"><div><b>GitHub</b><div class="sub">Repository automation requires OAuth integration.</div></div><span class="status warn">PLACEHOLDER</span></div></div>`;
+else if(which==='integrations')body.innerHTML=`<h2>Integrations</h2><p class="sub">Connect the services ProjectX uses to sync code, publish projects, and collaborate. Credentials stay server-side; this page only shows connection state.</p><div class="box"><div class="row"><div><b>Supabase</b><div class="sub">${ensureSupabase()?'Project client configured':'Client not configured'}</div></div><span class="status ${ensureSupabase()?'ok':'warn'}">${ensureSupabase()?'READY':'SETUP NEEDED'}</span></div></div><div class="box" style="margin-top:10px"><div class="row"><div><b>GitHub</b><div class="sub" id="github-connection-copy">Checking connection…</div></div><span class="status warn" id="github-connection-status">CHECKING</span></div><div class="actions" style="margin-top:10px"><button class="primary" id="github-connect">${session?'Connect GitHub':'Sign in to connect GitHub'}</button><button class="ghost" id="github-refresh" ${session?'':'disabled'}>Refresh</button><button class="ghost" id="github-disconnect" style="display:none">Disconnect</button></div><div id="github-repositories" style="margin-top:12px"></div></div><div class="grid" style="margin-top:10px"><div class="box"><div class="row"><div><b>Vercel</b><div class="sub">Store a deployment token securely for this workspace.</div></div><span class="status warn">NOT CONNECTED</span></div><form id="vercel-target-form" class="form" style="margin-top:10px"><input id="vercel-token" class="input full" type="password" autocomplete="off" placeholder="Vercel token"><button class="ghost">Connect Vercel</button></form></div><div class="box"><div class="row"><div><b>Netlify</b><div class="sub">Store a deployment token securely for this workspace.</div></div><span class="status warn">NOT CONNECTED</span></div><form id="netlify-target-form" class="form" style="margin-top:10px"><input id="netlify-token" class="input full" type="password" autocomplete="off" placeholder="Netlify token"><button class="ghost">Connect Netlify</button></form></div></div><div class="box" style="margin-top:10px"><div class="row"><div><b>Resources</b><div class="sub">Upload PDF, DOCX, XLSX, Markdown, text, JSON, and code files from a project workspace.</div></div><span class="status ok">READY</span></div><div class="row" style="margin-top:8px"><div><b>Collaboration</b><div class="sub">Workspace invitations and member access are available after sign-in.</div></div><span class="status ${session?'ok':'warn'}">${session?'READY':'SIGN IN'}</span></div></div>`;
+else if(which==='defaults')
 else if(which==='defaults')body.innerHTML=`<h2>Project Defaults</h2><div class="box"><div class="row"><b>Default model</b><select class="select" id="default-model">${MODELS.map(m=>`<option ${p.model===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="row"><b>Response style</b><select class="select" id="response-style"><option ${p.responseStyle==='concise'?'selected':''}>concise</option><option ${p.responseStyle==='balanced'?'selected':''}>balanced</option><option ${p.responseStyle==='detailed'?'selected':''}>detailed</option></select></div></div>`;
 else if(which==='appearance')body.innerHTML=`<h2>Appearance</h2><div class="box"><div class="row"><b>Theme</b><span class="sub">Workspace uses the ProjectX dark technical theme. The public homepage is light.</span></div></div>`;
 else if(which==='notifications')body.innerHTML=`<h2>Notifications</h2><div class="box">${Object.entries(p.notifications).map(([id,on])=>`<div class="row"><b>${esc(id)}</b><button class="ghost" data-notification="${id}">${on?'On':'Off'}</button></div>`).join('')}</div>`;
@@ -1782,6 +1794,35 @@ function bindSettings(which){
     try{const result=await edge('securityEvents');const events=Array.isArray(result.events)?result.events:[];node.innerHTML=events.length?events.map(e=>'<div class="brain-row"><b>'+esc(e.severity||'info')+' · '+esc(e.event_type||'event')+'</b><div class="sub">'+esc(e.created_at||'')+'</div></div>').join(''):'No security events recorded.';}catch(error){node.textContent=error.message;}
   });
   if(which==='billing'&&session)loadUsagePanel();$('#open-billing')?.addEventListener('click',()=>{location.href='./billing.html';});
+  if(which==='integrations'){
+    const workspaceId=integrationWorkspaceId();
+    const statusNode=$('#github-connection-status'),copyNode=$('#github-connection-copy'),repoNode=$('#github-repositories');
+    const showRepos=async()=>{
+      if(!session){repoNode.innerHTML='<div class="placeholder">Sign in to access GitHub repositories.</div>';return;}
+      const ws=integrationWorkspaceId();
+      if(!ws){repoNode.innerHTML='<div class="placeholder">Open or sync a cloud project first so ProjectX can associate GitHub with its workspace.</div>';return;}
+      repoNode.innerHTML='<div class="sub">Loading repositories…</div>';
+      try{
+        const result=await githubListRepositories(ws),repos=Array.isArray(result.repositories)?result.repositories:[];
+        repoNode.innerHTML=repos.length?'<div class="sub" style="margin-bottom:6px">'+repos.length+' repositories available</div>'+repos.slice(0,20).map(r=>'<div class="row"><div><b>'+esc(r.full_name)+'</b><div class="sub">'+(r.private?'Private':'Public')+' · '+esc(r.default_branch||'main')+'</div></div><a class="ghost" href="'+esc(r.html_url||'#')+'" target="_blank" rel="noreferrer">Open</a></div>').join(''):'<div class="placeholder">No repositories returned. Create one after connecting GitHub.</div>';
+      }catch(error){repoNode.innerHTML='<div class="placeholder">Repository access failed: '+esc(error.message||error)+'</div>';}
+    };
+    const refreshGithub=async()=>{
+      if(!session){statusNode.textContent='SIGN IN';statusNode.className='status warn';copyNode.textContent='Sign in before connecting GitHub.';return;}
+      try{
+        const result=await githubStatus(workspaceId);
+        if(result.connected){statusNode.textContent='CONNECTED';statusNode.className='status ok';copyNode.textContent='Connected as '+(result.githubLogin||'GitHub user')+'.';$('#github-connect').textContent='Reconnect GitHub';$('#github-disconnect').style.display='inline-flex';await showRepos();}
+        else{statusNode.textContent='NOT CONNECTED';statusNode.className='status warn';copyNode.textContent='Connect GitHub to sync repositories and push generated files.';$('#github-connect').textContent='Connect GitHub';$('#github-disconnect').style.display='none';repoNode.innerHTML='<div class="placeholder">No GitHub repository connection yet.</div>';}
+      }catch(error){statusNode.textContent='SETUP NEEDED';statusNode.className='status warn';copyNode.textContent=error.message||'GitHub connection unavailable.';repoNode.innerHTML='';}
+    };
+    $('#github-connect')?.addEventListener('click',()=>{if(!session){authModal();return;}startGitHubConnection(integrationWorkspaceId(),integrationProjectId()).catch(error=>notify(error.message||error,'error'));});
+    $('#github-refresh')?.addEventListener('click',refreshGithub);
+    $('#github-disconnect')?.addEventListener('click',async()=>{try{await integrationEdge('github','disconnect',{workspaceId:integrationWorkspaceId()});notify('GitHub disconnected.','success');await refreshGithub();}catch(error){notify(error.message||error,'error');}});
+    const saveTarget=(provider,inputId)=>async e=>{e.preventDefault();if(!session){authModal();return;}const token=String($(inputId)?.value||'').trim();if(!token){notify('Enter the provider token first.','info');return;}try{await saveDeploymentTarget(integrationWorkspaceId(),provider,token);$(inputId).value='';notify(provider+' connected. The token was sent directly to the server for encrypted storage.','success');}catch(error){notify(error.message||error,'error');}};
+    $('#vercel-target-form')?.addEventListener('submit',saveTarget('vercel','#vercel-token'));
+    $('#netlify-target-form')?.addEventListener('submit',saveTarget('netlify','#netlify-token'));
+    refreshGithub();
+  }
   $('#execution-mode')?.addEventListener('change',e=>{settingsState.executionMode=e.target.value;persistSettings();});$('#toggle-autosave')?.addEventListener('click',()=>{settingsState.autoSave=!settingsState.autoSave;persistSettings();renderSettings(which)});$('#toggle-confirm')?.addEventListener('click',()=>{settingsState.confirmDelete=!settingsState.confirmDelete;persistSettings();renderSettings(which)});$('#language')?.addEventListener('change',e=>{settingsState.language=e.target.value;persistSettings()});$('#timezone')?.addEventListener('change',e=>{settingsState.timezone=e.target.value;persistSettings()});$('#default-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$('#ai-model')?.addEventListener('change',e=>{settingsState.model=e.target.value;persistSettings()});$$('[data-agent]').forEach(button=>button.onclick=()=>{const id=button.dataset.agent;settingsState.agents[id]=!settingsState.agents[id];persistSettings();renderSettings('agents')});$$('[data-notification]').forEach(button=>button.onclick=()=>{const id=button.dataset.notification;settingsState.notifications[id]=!settingsState.notifications[id];persistSettings();renderSettings('notifications')});$('#security-signin')?.addEventListener('click',authModal);$('#security-signout')?.addEventListener('click',()=>signOut().then(()=>settingsPage('security')));$('#export-state')?.addEventListener('click',()=>downloadText('projectx-state.json',JSON.stringify(state,null,2),'application/json'));$('#clear-state')?.addEventListener('click',()=>{if(settingsState.confirmDelete&&!confirm('Clear local project cache? Cloud projects remain in your account.'))return;state={version:6,projects:[],active:null};persistLocal();home();});}
 function authScreen(initialMode='signin'){
   closeModal();
