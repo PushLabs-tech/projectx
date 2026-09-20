@@ -25,6 +25,7 @@ const GEMINI_KEY_URL = 'https://aistudio.google.com/app/apikey';
 const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 const MAX_HISTORY = 80;
 const LOCAL_AI_BUDGET = 'projectx_ai_budget_v1';
+const LOCAL_SYNC_OUTBOX = 'projectx_sync_outbox_v1';
 const GEMINI_MODEL_MIGRATIONS = new Map([
   ['gemini-2.0-flash', 'gemini-3.8-flash'],
   ['gemini-2.0-flash-lite', 'gemini-3.5-flash-lite'],
@@ -89,6 +90,24 @@ let projectRealtimeChannel = null;
 
 function persistLocal() { write(STORE, state); }
 function persistSettings() { write(LOCAL_SETTINGS, settingsState); }
+function syncOutbox() { const value=read(LOCAL_SYNC_OUTBOX, {}); return value && typeof value==='object' && !Array.isArray(value) ? value : {}; }
+function queueSync(project) { if(!project?.id) return; const outbox=syncOutbox(); outbox[project.id]={project:serializeForPersistence(project),queuedAt:now()}; write(LOCAL_SYNC_OUTBOX,outbox); }
+function removeQueuedSync(projectId) { const outbox=syncOutbox(); if(outbox[projectId]){delete outbox[projectId];write(LOCAL_SYNC_OUTBOX,outbox);} }
+async function flushSyncOutbox() {
+  if(!session || !settingsState.autoSave) return;
+  const outbox=syncOutbox();
+  for(const [projectId,entry] of Object.entries(outbox).slice(0,5)){
+    try{
+      const result=await edge('persistProject',{project:entry.project});
+      const project=state.projects.find(p=>p.id===projectId);
+      if(project){project.sync={remoteId:result.projectId||project.id,mode:'cloud',lastSyncedAt:now(),baseUpdatedAt:result.updatedAt||now()};persistLocal();}
+      removeQueuedSync(projectId);
+    }catch(e){
+      const message=String(e?.message||e);
+      if(/changed on the server|newer on the server|reload before saving/i.test(message)) break;
+    }
+  }
+}
 function activeProject() { return state.projects.find(p => p.id === state.active) || null; }
 function localGuestKey() { try { return sessionStorage.getItem(LOCAL_KEY) || ''; } catch { return ''; } }
 function setGuestKey(value) { try { if (value) sessionStorage.setItem(LOCAL_KEY, value); else sessionStorage.removeItem(LOCAL_KEY); } catch {} }
@@ -855,8 +874,8 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
 
 function saveProject(project,initial=false){if(initial)snapshot(project,'Initial project');const i=state.projects.findIndex(p=>p.id===project.id);if(i>=0)state.projects[i]=project;else state.projects.unshift(project);state.active=project.id;persistLocal();}
 function snapshot(project,label){project.versions=Array.isArray(project.versions)?project.versions:[];project.versions.push({version:project.specVersion,label,at:now(),title:project.title,type:project.type,understanding:JSON.parse(JSON.stringify(project.understanding||{})),sections:JSON.parse(JSON.stringify(project.sections||[])),spec:JSON.parse(JSON.stringify(project.spec)),files:JSON.parse(JSON.stringify(project.files||{})),artifacts:JSON.parse(JSON.stringify(project.artifacts||{})),research:JSON.parse(JSON.stringify(project.research||{}))});if(project.versions.length>20)project.versions.splice(0,project.versions.length-20);}
-async function syncRemoteProjects(){await refreshSession();if(!session)return;try{const result=await edge('listProjects');for(const remoteRaw of result.projects||[]){const remote=migrateProject(remoteRaw);const local=state.projects.find(p=>p.id===remote.id);if(!local||new Date(remote.updatedAt)>new Date(local.updatedAt||0)){const i=state.projects.findIndex(p=>p.id===remote.id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);}}persistLocal();}catch(e){notify(`Cloud sync unavailable: ${e.message}`,'error');}}
-async function syncRemoteProject(project){if(!session||!settingsState.autoSave)return;try{const result=await edge('persistProject',{project:serializeForPersistence(project)});project.sync={remoteId:result.projectId||project.id,mode:'cloud',lastSyncedAt:now(),baseUpdatedAt:result.updatedAt||now()};persistLocal();}catch(e){project.sync={remoteId:project.sync?.remoteId||project.id,mode:'local',lastSyncedAt:project.sync?.lastSyncedAt||null,baseUpdatedAt:project.sync?.baseUpdatedAt||null,error:e.message};persistLocal();}}
+async function syncRemoteProjects(){await refreshSession();if(!session)return;try{const result=await edge('listProjects');for(const remoteRaw of result.projects||[]){const remote=migrateProject(remoteRaw);const local=state.projects.find(p=>p.id===remote.id);if(!local||new Date(remote.updatedAt)>new Date(local.updatedAt||0)){const i=state.projects.findIndex(p=>p.id===remote.id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);}}persistLocal();await flushSyncOutbox();}catch(e){notify(`Cloud sync unavailable: ${e.message}`,'error');}}
+async function syncRemoteProject(project){if(!session||!settingsState.autoSave)return;try{const result=await edge('persistProject',{project:serializeForPersistence(project)});removeQueuedSync(project.id);project.sync={remoteId:result.projectId||project.id,mode:'cloud',lastSyncedAt:now(),baseUpdatedAt:result.updatedAt||now(),error:null};persistLocal();}catch(e){queueSync(project);project.sync={remoteId:project.sync?.remoteId||project.id,mode:'pending',lastSyncedAt:project.sync?.lastSyncedAt||null,baseUpdatedAt:project.sync?.baseUpdatedAt||null,error:e.message};persistLocal();}}
 async function subscribeProjectRealtime(projectId){
   if(!session||!ensureSupabase()||!projectId)return;
   try{if(projectRealtimeChannel)await supa.removeChannel(projectRealtimeChannel);}catch{}
