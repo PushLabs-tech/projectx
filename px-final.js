@@ -1194,29 +1194,29 @@ function renderImpact(project){
   const edges=Array.isArray(impact.edges)?impact.edges:[];
   const pill=(label,value)=>'<div class="box"><div class="kicker">'+esc(label)+'</div><div style="font-size:24px;font-weight:700;margin-top:4px">'+esc(value)+'</div></div>';
   const list=(items,empty)=>items.length?items.map(x=>'<div class="item"><b>'+esc(x)+'</b></div>').join(''):'<div class="sub">'+esc(empty)+'</div>';
-  const changedIds=new Set(changed.map(x=>'input:'+String(x).toLowerCase().replace(/\\s+/g,'_')));
-  const graphNodes=nodes.filter(n=>n.kind!=='input'||changedIds.has(n.id)).slice(0,80);
+  const graphNodes=nodes.slice(0,80);
   const nodeMap=new Map(graphNodes.map(n=>[n.id,n]));
   const graphEdges=edges.filter(e=>nodeMap.has(e.from)&&nodeMap.has(e.to)).slice(0,140);
-  const graph=graphNodes.length?'<div class="px-impact-graph">'+graphNodes.map(n=>'<div class="px-impact-node '+esc(n.status)+'"><span class="px-impact-kind">'+esc(n.kind)+'</span><b>'+esc(n.label)+'</b></div>').join('')+'</div>':'<div class="sub">Make a project change to build the dependency graph.</div>';
-  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces changes through the current project state and shows the work connected to that change.','
-    <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">
-      '+pill('Inputs changed',changed.length)+pill('Nodes affected',graphNodes.length)+pill('Dependency edges',graphEdges.length)+'
-    </div>
-    <div class="sub" style="margin-bottom:14px">'+esc(impact.summary||'No downstream impact detected.')+'</div>
-    <div class="box"><div class="kicker">DEPENDENCY MAP</div><h3 style="margin:4px 0 10px">What this change touches</h3>'+graph+'</div>
-    <div class="grid" style="margin-top:14px">
-      <div class="box"><h3 style="margin-top:0">Changed</h3>'+list(changed,'No changed inputs.')+'</div>
-      <div class="box"><h3 style="margin-top:0">Affected</h3>'+list(affected,'No downstream areas.')+'</div>
-      <div class="box"><h3 style="margin-top:0">Needs review</h3>'+list(invalidated,'Nothing currently invalidated.')+'</div>
-    </div>
-    '+(sections.length?'<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Affected workspace sections</h3>'+list(sections,'None')+'</div>':'')+'
-    <div class="box" style="margin-top:14px"><h3 style="margin-top:0">Suggested next actions</h3>'+list(actions,'No follow-up action required.')+'</div>
-    <div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="primary" id="impact-apply">Open affected work</button></div>
-    <div id="impact-status" class="sub" style="margin-top:10px"></div>
-  ');
+  const graph=graphNodes.length?'<div class="px-impact-graph">'+graphNodes.map(n=>'<div class="px-impact-node '+esc(n.status||'active')+'"><span class="px-impact-kind">'+esc(n.kind)+'</span><b>'+esc(n.label)+'</b></div>').join('')+'</div>':'<div class="sub">Make a project change to build the dependency graph.</div>';
+  const body=[
+    '<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">',
+    pill('Inputs changed',changed.length),pill('Nodes affected',graphNodes.length),pill('Dependency edges',graphEdges.length),
+    '</div>',
+    '<div class="sub" style="margin-bottom:14px">'+esc(impact.summary||'No downstream impact detected.')+'</div>',
+    '<div class="box"><div class="kicker">DEPENDENCY MAP</div><h3 style="margin:4px 0 10px">What this change touches</h3>'+graph+'</div>',
+    '<div class="grid" style="margin-top:14px">',
+    '<div class="box"><h3 style="margin-top:0">Changed</h3>'+list(changed,'No changed inputs.')+'</div>',
+    '<div class="box"><h3 style="margin-top:0">Affected</h3>'+list(affected,'No downstream areas.')+'</div>',
+    '<div class="box"><h3 style="margin-top:0">Needs review</h3>'+list(invalidated,'Nothing currently invalidated.')+'</div>',
+    '</div>',
+    sections.length?'<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Affected workspace sections</h3>'+list(sections,'None')+'</div>':'',
+    '<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Suggested next actions</h3>'+list(actions,'No follow-up action required.')+'</div>',
+    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="primary" id="impact-apply">Open affected work</button></div>',
+    '<div id="impact-status" class="sub" style="margin-top:10px"></div>'
+  ].join('');
+  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces changes through the current project state and shows the work connected to that change.',body);
   $('#impact-refresh').onclick=()=>{project.impact=buildImpactGraph(project,project.spec||{},project.spec||{},{});saveProject(project);renderImpact(project);};
-  $('#impact-apply').onclick=()=>{const target=sections.length?project.sections.find(s=>sections.includes(s.name)):project.sections.find(s=>s.kind==='planning');if(target){project.selectedSection=target.id;project.uiNav='overview';saveProject(project);renderProject(project);}else{$('#impact-status').textContent='No affected workspace section is available yet.';}};
+  $('#impact-apply').onclick=()=>{const target=sections.length?project.sections.find(s=>sections.includes(s.name)):project.sections.find(s=>s.kind==='planning');if(target){project.selectedSection=target.id;project.uiNav='overview';saveProject(project);}else{$('#impact-status').textContent='No affected workspace section is available yet.';}};
 }
 
 function renderProjectSecurity(project){
