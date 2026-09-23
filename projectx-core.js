@@ -206,93 +206,54 @@ export function invalidateArtifacts(project) {
 }
 
 export function buildImpactGraph(project = {}, beforeSpec = {}, afterSpec = {}, mutation = {}) {
+  const labels = { goal:'Goal', users:'Users', requirements:'Requirements', constraints:'Constraints', features:'Features', decisions:'Decisions', dependencies:'Dependencies', resources:'Resources', assets:'Assets', deliverables:'Deliverables', acceptanceCriteria:'Acceptance criteria', successCriteria:'Success criteria', openQuestions:'Open questions', platform:'Platform', technology:'Technology', visualDirection:'Visual direction', currentState:'Current state', assumptions:'Assumptions', risks:'Risks', uncertainties:'Uncertainties', projectType:'Project type', projectTitle:'Project title', plan:'Plan', research:'Research', files:'Files' };
+  const same = (x,y) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
   const changed = [];
-  const fields = ['goal','users','requirements','constraints','features','decisions','dependencies','resources','assets','deliverables','acceptanceCriteria','successCriteria','openQuestions','platform','technology','visualDirection','currentState'];
-  const same = (a,b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const fields = Object.keys(labels).filter(x => !['projectType','projectTitle','plan','research','files'].includes(x));
   for (const field of fields) if (!same(beforeSpec?.[field], afterSpec?.[field])) changed.push(field);
   if (mutation.projectType && String(mutation.projectType) !== String(project.type || '')) changed.push('projectType');
   if (mutation.projectTitle && String(mutation.projectTitle) !== String(project.title || '')) changed.push('projectTitle');
-  if (mutation.plan) changed.push('plan');
-  if (mutation.researchPatch) changed.push('research');
-  const fileChanged = Array.isArray(mutation.fileOperations) && mutation.fileOperations.length > 0;
-  if (fileChanged) changed.push('files');
+  if (mutation.plan && !same(mutation.beforePlan, mutation.afterPlan)) changed.push('plan');
+  if (mutation.researchPatch && !same(mutation.beforeResearch, mutation.afterResearch)) changed.push('research');
+  if (mutation.fileOperations?.length && mutation.filesActuallyChanged !== false) changed.push('files');
   const unique = [...new Set(changed)];
-
   const downstream = {
-    goal:['requirements','constraints','decisions','deliverables','plan','files','tests'],
-    users:['requirements','features','decisions','deliverables','plan','files'],
-    requirements:['plan','files','tests'],
-    constraints:['decisions','plan','deliverables','files','tests'],
-    features:['plan','files','tests'],
-    decisions:['plan','deliverables','files','tests'],
-    dependencies:['plan','files','tests'],
-    resources:['research','plan','files'],
-    assets:['files','preview','tests'],
-    deliverables:['files','preview','tests','deployment'],
-    acceptanceCriteria:['tests','verification'],
-    successCriteria:['tests','verification'],
-    openQuestions:['discovery','decisions','plan'],
-    platform:['files','tests','deployment'],
-    technology:['files','tests','deployment'],
-    visualDirection:['design','files','preview'],
-    currentState:['plan','research','verification'],
-    projectType:['architecture','files','tests','deployment'],
-    projectTitle:['metadata'],
-    plan:['tasks','execution'],
-    research:['decisions','plan'],
-    files:['preview','tests','deployment']
+    goal:['requirements','constraints','decisions','deliverables','plan','files','tests'], users:['requirements','features','decisions','deliverables','plan','files'],
+    requirements:['decisions','plan','files','tasks','tests'], constraints:['decisions','plan','deliverables','files','tasks','tests'], features:['plan','files','tasks','tests'],
+    decisions:['requirements','plan','deliverables','files','tasks','experiments','tests'], dependencies:['plan','files','tasks','tests'], resources:['research','decisions','plan','files'],
+    assets:['files','preview','tests'], deliverables:['files','preview','tasks','tests','deployment'], acceptanceCriteria:['tests','verification'], successCriteria:['tests','verification'],
+    openQuestions:['discovery','decisions','plan'], assumptions:['decisions','plan','verification'], risks:['decisions','plan','tasks','verification'], uncertainties:['decisions','plan','verification'],
+    platform:['files','tests','deployment'], technology:['files','tests','deployment'], visualDirection:['design','files','preview'], currentState:['plan','research','verification'],
+    projectType:['architecture','files','tests','deployment'], projectTitle:['metadata'], plan:['tasks','execution'], research:['evidence','decisions','plan'], files:['artifacts','preview','tests','deployment']
   };
-  const affected = new Set();
-  for (const field of unique) (downstream[field] || []).forEach(x => affected.add(x));
-
-  const sections = Array.isArray(project.sections) ? project.sections : [];
-  const sectionNames = [];
-  for (const section of sections) {
-    const kind = String(section?.kind || 'workspace');
-    const name = String(section?.name || '').trim();
-    if (!name || section.id === 'chat') continue;
-    if (affected.has(kind) || affected.has(name.toLowerCase()) || (affected.has('files') && /code|workspace|output/i.test(kind))) sectionNames.push(name);
-  }
-
-  const invalidated = [];
-  if (affected.has('files') || affected.has('preview') || affected.has('deployment')) invalidated.push('Current build/output');
-  if (affected.has('tests') || affected.has('verification')) invalidated.push('Verification results');
-  if (affected.has('plan') || affected.has('tasks') || affected.has('execution')) invalidated.push('Execution plan');
-  if (affected.has('decisions')) invalidated.push('Dependent decisions');
-  if (affected.has('research')) invalidated.push('Research context');
-
-  const suggestedActions = [];
-  if (affected.has('decisions')) suggestedActions.push('Review decisions affected by this change');
-  if (affected.has('plan') || affected.has('tasks')) suggestedActions.push('Regenerate affected plan/tasks');
-  if (affected.has('files') || affected.has('preview')) suggestedActions.push('Rebuild affected artifacts');
-  if (affected.has('tests') || affected.has('verification')) suggestedActions.push('Rerun verification');
-  if (affected.has('deployment')) suggestedActions.push('Review deployment before publishing');
-
-  const labels = {
-    goal:'Goal', users:'Users', requirements:'Requirements', constraints:'Constraints', features:'Features',
-    decisions:'Decisions', dependencies:'Dependencies', resources:'Resources', assets:'Assets',
-    deliverables:'Deliverables', acceptanceCriteria:'Acceptance criteria', successCriteria:'Success criteria',
-    openQuestions:'Open questions', platform:'Platform', technology:'Technology', visualDirection:'Visual direction',
-    currentState:'Current state', projectType:'Project type', projectTitle:'Project title', plan:'Plan',
-    research:'Research', files:'Files'
-  };
-  const changedLabels = unique.map(x => labels[x] || x);
-  const score = Math.min(100, unique.length * 12 + affected.size * 5 + (invalidated.length * 8));
-  return {
-    version:Number(project.specVersion || 1),
-    changed:changedLabels,
-    affected:[...affected],
-    affectedSections:[...new Set(sectionNames)].slice(0,20),
-    invalidated:[...new Set(invalidated)],
-    suggestedActions:[...new Set(suggestedActions)],
-    impactScore:score,
-    summary: unique.length
-      ? `${changedLabels.length} project inputs changed; ${affected.size} downstream areas may need review.`
-      : 'No downstream impact detected.',
-    generatedAt:new Date().toISOString()
-  };
+  const affected = new Set(); unique.forEach(k => (downstream[k] || []).forEach(v => affected.add(v)));
+  const nodes=[]; const edges=[];
+  const addNode=(id,kind,label,status='active')=>{if(id&&!nodes.some(n=>n.id===id))nodes.push({id,kind,label,status});};
+  const addEdge=(from,to,kind)=>{if(from&&to&&!edges.some(e=>e.from===from&&e.to===to&&e.kind===kind))edges.push({from,to,kind});};
+  unique.forEach(k=>addNode('input:'+k,'input',labels[k],'changed'));
+  const inputs=['requirements','constraints','features','decisions','deliverables','technology','visualDirection','files'];
+  const source=unique.find(k=>inputs.includes(k));
+  Object.entries(project.artifacts||{}).slice(0,50).forEach(([key,v])=>{const id='artifact:'+key;addNode(id,'artifact',String(v?.summary||key),v?.stale?'stale':'active');if(source)addEdge('input:'+source,id,'affects');});
+  Object.keys(project.files||{}).slice(0,80).forEach(path=>{const id='file:'+path;addNode(id,'file',path,'active');if(source)addEdge('input:'+source,id,'implements');});
+  (Array.isArray(project.plan)?project.plan:[]).slice(0,50).forEach((task,i)=>{const id='task:'+String(task?.id||i);addNode(id,'task',String(task?.title||id),String(task?.status||'proposed'));if(source)addEdge('input:'+source,id,'affects');});
+  (Array.isArray(project.tests?.results)?project.tests.results:[]).slice(0,50).forEach((t,i)=>{const id='test:'+i;addNode(id,'test',String(t?.name||'Verification '+(i+1)),String(t?.status||'not_checked'));if(source)addEdge('input:'+source,id,'verifies');});
+  const sections=Array.isArray(project.sections)?project.sections:[]; const sectionNames=[];
+  for(const section of sections){const kind=String(section?.kind||'workspace'),name=String(section?.name||'').trim();if(!name||section.id==='chat')continue;if(affected.has(kind)||affected.has(name.toLowerCase())||(affected.has('files')&&/code|workspace|output/i.test(kind)))sectionNames.push(name);}
+  const invalidated=[];
+  if(affected.has('files')||affected.has('preview')||affected.has('deployment')||affected.has('artifacts'))invalidated.push('Current build/output');
+  if(affected.has('tests')||affected.has('verification'))invalidated.push('Verification results');
+  if(affected.has('plan')||affected.has('tasks')||affected.has('execution'))invalidated.push('Execution plan');
+  if(affected.has('decisions'))invalidated.push('Dependent decisions');
+  if(affected.has('research')||affected.has('evidence'))invalidated.push('Research context');
+  const suggestedActions=[];
+  if(affected.has('decisions'))suggestedActions.push('Review decisions affected by this change');
+  if(affected.has('plan')||affected.has('tasks'))suggestedActions.push('Regenerate affected plan/tasks');
+  if(affected.has('files')||affected.has('preview')||affected.has('artifacts'))suggestedActions.push('Rebuild affected artifacts');
+  if(affected.has('tests')||affected.has('verification'))suggestedActions.push('Rerun verification');
+  if(affected.has('deployment'))suggestedActions.push('Review deployment before publishing');
+  const changedLabels=unique.map(x=>labels[x]||x);
+  return {version:Number(project.specVersion||1),changed:changedLabels,affected:[...affected],affectedSections:[...new Set(sectionNames)].slice(0,20),invalidated:[...new Set(invalidated)],suggestedActions:[...new Set(suggestedActions)],nodes:nodes.slice(0,180),edges:edges.slice(0,360),impactScore:Math.min(100,unique.length*12+affected.size*5+invalidated.length*8),summary:unique.length?changedLabels.length+' project inputs changed; '+affected.size+' downstream areas may need review.':'No downstream impact detected.',generatedAt:new Date().toISOString()};
 }
-
 export function applyProjectMutation(project, mutation = {}) {
   project.files = project.files || {};
   project.agents = normalizeAgents(project.agents || [], project.type);
