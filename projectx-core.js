@@ -335,6 +335,13 @@ export function restoreProjectSnapshot(project, snapshot = {}) {
   if (Array.isArray(snapshot.sections) && snapshot.sections.length) project.sections = buildDependencyMap(normalizeSections(snapshot.sections, nextType));
   if (snapshot.understanding && typeof snapshot.understanding === 'object') project.understanding = JSON.parse(JSON.stringify(snapshot.understanding));
   if (snapshot.research && typeof snapshot.research === 'object') project.research = JSON.parse(JSON.stringify(snapshot.research));
+  if (Array.isArray(snapshot.plan)) project.plan = JSON.parse(JSON.stringify(snapshot.plan));
+  if (snapshot.agents && typeof snapshot.agents === 'object') project.agents = JSON.parse(JSON.stringify(snapshot.agents));
+  if (snapshot.artifacts && typeof snapshot.artifacts === 'object') project.artifacts = JSON.parse(JSON.stringify(snapshot.artifacts));
+  if (snapshot.outputs && typeof snapshot.outputs === 'object') project.outputs = JSON.parse(JSON.stringify(snapshot.outputs));
+  if (snapshot.tests && typeof snapshot.tests === 'object') project.tests = JSON.parse(JSON.stringify(snapshot.tests));
+  if (snapshot.executionState && typeof snapshot.executionState === 'object') project.executionState = JSON.parse(JSON.stringify(snapshot.executionState));
+  if (snapshot.sectionContent && typeof snapshot.sectionContent === 'object') project.sectionContent = JSON.parse(JSON.stringify(snapshot.sectionContent));
   project.specVersion = Number(project.specVersion || 1) + 1;
   project.updatedAt = new Date().toISOString();
   invalidateArtifacts(project);
