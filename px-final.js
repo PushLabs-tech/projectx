@@ -19,7 +19,7 @@ import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
 
 const STORE = 'projectx_runtime_v7';
-const LOCAL_KEY = 'projectx_guest_gemini_key';
+const LOCAL_KEY = 'projectx_guest_gemini_key'; // legacy key name retained only for migration; AI requests no longer use browser-held keys
 const LOCAL_STATUS = 'projectx_guest_gemini_status';
 const LOCAL_SETTINGS = 'projectx_settings_v6';
 const GEMINI_KEY_URL = 'https://aistudio.google.com/app/apikey';
@@ -46,7 +46,7 @@ const now = () => new Date().toISOString();
 
 const DEFAULT_SETTINGS = {
   model: MODELS[0], responseStyle: 'balanced', executionMode: 'Mostly Automatic', autoSave: true, confirmDelete: true,
-  theme: 'dark', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  theme: 'light', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], orchestrator: MODELS[0] },
   agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true },
   notifications: { build: true, test: true, deploy: true, credits: true, security: true },
@@ -292,39 +292,19 @@ async function commitDiscoveryBrain(meta,project,data,answers,workspace){
 }
 
 async function directGemini(messages, system, jsonMode = false, maxOutputTokens = 3000) {
-  const key = localGuestKey();
-  if (!key) throw Object.assign(new Error('Connect an AI provider in Settings before continuing.'), { code: 'NO_KEY' });
-  const models = [...new Set([settingsState.model || MODELS[0], ...MODELS])];
-  let last = new Error('AI unavailable');
-  for (const model of models) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        if (attempt) await sleep(1200);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 20000);
-        const isGemini38 = /^gemini-3\\.8-flash$/i.test(String(model).trim());
-        const generationConfig = { maxOutputTokens };
-        // Gemini 3.8 uses thinking-level controls instead of legacy sampling params.
-        if (!isGemini38) generationConfig.temperature = settingsState.responseStyle === 'concise' ? 0.15 : 0.25;
-        if (jsonMode) generationConfig.responseMimeType = 'application/json';
-        const body = { systemInstruction: { parts: [{ text: system }] }, contents: messages.slice(-MAX_HISTORY).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.text ?? '').slice(0, 12000) }] })), generationConfig };
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: controller.signal });
-        clearTimeout(timer);
-        if (res.ok) {
-          const d = await res.json();
-          const text = d?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
-          if (text) return { text, model };
-          last = new Error('Empty AI response.');
-          break;
-        }
-        last = new Error((await res.text().catch(() => '')) || `Gemini ${res.status}`);
-        if (res.status === 429 || res.status >= 500) continue;
-        if (res.status === 401 || res.status === 403) break;
-        break;
-      } catch (e) { last = e?.name === 'AbortError' ? new Error('AI request timed out.') : e; }
-    }
-  }
-  throw last;
+  if (!session?.access_token) throw Object.assign(new Error('Sign in and connect an AI provider in Settings before using AI.'), { code: 'NO_SESSION' });
+  const result = await edge('chat', {
+    mode: 'discuss',
+    project: serializeForPersistence(activeProject() || {}),
+    message: messages?.length ? String(messages[messages.length - 1]?.text || '') : '',
+    history: Array.isArray(messages) ? messages : [],
+    system: String(system || ''),
+    model: settingsState.model,
+    jsonMode: Boolean(jsonMode),
+    maxTokens: effectiveMaxTokens(maxOutputTokens)
+  });
+  if (!result?.text) throw new Error('Empty AI response.');
+  return { text: result.text, model: result.model || settingsState.model };
 }
 
 const parseJson = text => {
