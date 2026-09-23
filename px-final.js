@@ -11,6 +11,7 @@ import {
   assemblePreviewHtml,
   serializeForPersistence,
   buildDependencyMap,
+  buildImpactGraph,
   projectArtifactKind,
   normalizeProjectType,
 } from './projectx-core.js';
@@ -1011,7 +1012,7 @@ async function renderProjectTool(project,tool){
     return renderProject(project);
   }
   const map={
-    brain:renderBrain,architecture:renderArchitecture,simulation:renderSimulation,explain:renderExplain,improve:renderMakeGreat,optimize:renderOptimize,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery,
+    brain:renderBrain,impact:renderImpact,architecture:renderArchitecture,simulation:renderSimulation,explain:renderExplain,improve:renderMakeGreat,optimize:renderOptimize,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery,
     overview:renderOverview,assistant:()=>renderProjectChat(project),build:()=>renderOutput(project),design:()=>renderCanvas(project),files:()=>renderFiles(project),preview:()=>renderOutput(project),tasks:()=>renderTasks(project),artifacts:()=>renderArtifacts(project),database:()=>renderDatabase(project),research:()=>{const section=project.sections.find(s=>s.kind==='research')||{id:'research',name:'Research',purpose:'Source-backed evidence',kind:'research'};return renderResearchSection(project,section);},tests:()=>renderTests(project),storage:()=>renderStorage(project),integrations:()=>renderIntegrations(project),deploy:()=>renderDeploy(project),settings:()=>settingsPage('general'),git:()=>renderVersions(project),secrets:()=>renderSecrets(project),seo:()=>renderSeo(project),terminal:()=>renderTerminal(project),collab:()=>renderCollab(project)
   };
   return (map[tool]||renderBrain)(project);
@@ -1202,6 +1203,35 @@ function projectSecurityChecks(project){
     {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.',blockBuild:true}
   ];
 }
+function renderImpact(project){
+  const impact=project.impact||buildImpactGraph(project,project.spec||{},project.spec||{},{});
+  const changed=Array.isArray(impact.changed)?impact.changed:[];
+  const affected=Array.isArray(impact.affected)?impact.affected:[];
+  const invalidated=Array.isArray(impact.invalidated)?impact.invalidated:[];
+  const actions=Array.isArray(impact.suggestedActions)?impact.suggestedActions:[];
+  const sections=Array.isArray(impact.affectedSections)?impact.affectedSections:[];
+  const pill=(label,value)=>`<div class="box"><div class="kicker">${esc(label)}</div><div style="font-size:24px;font-weight:700;margin-top:4px">${esc(value)}</div></div>`;
+  const list=(items,empty)=>items.length?items.map(x=>`<div class="item"><b>${esc(x)}</b></div>`).join(''):`<div class="sub">${esc(empty)}</div>`;
+  const score=Math.max(0,Math.min(100,Number(impact.impactScore||0)));
+  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces changes through the current project state and identifies work that may need review, regeneration, or verification.',`
+    <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">
+      ${pill('Impact score',score+'/100')}${pill('Inputs changed',changed.length)}${pill('Areas affected',affected.length)}
+    </div>
+    <div class="sub" style="margin-bottom:14px">${esc(impact.summary||'No downstream impact detected.')}</div>
+    <div class="grid">
+      <div class="box"><h3 style="margin-top:0">Changed</h3>${list(changed,'No changed inputs.')}</div>
+      <div class="box"><h3 style="margin-top:0">Affected</h3>${list(affected,'No downstream areas.')}</div>
+      <div class="box"><h3 style="margin-top:0">Needs review</h3>${list(invalidated,'Nothing currently invalidated.')}</div>
+    </div>
+    ${sections.length?`<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Affected workspace sections</h3>${list(sections,'None')}</div>`:''}
+    <div class="box" style="margin-top:14px"><h3 style="margin-top:0">Suggested next actions</h3>${list(actions,'No follow-up action required.')}</div>
+    <div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="primary" id="impact-apply">Open affected work</button></div>
+    <div id="impact-status" class="sub" style="margin-top:10px"></div>
+  `);
+  $('#impact-refresh').onclick=()=>{project.impact=buildImpactGraph(project,project.spec||{},project.spec||{},{});saveProject(project);renderImpact(project);};
+  $('#impact-apply').onclick=()=>{const target=sections.length?project.sections.find(s=>sections.includes(s.name)):project.sections.find(s=>s.kind==='planning');if(target){project.selectedSection=target.id;project.uiNav='overview';saveProject(project);renderProject(project);}else{$('#impact-status').textContent='No affected workspace section is available yet.';}};
+}
+
 function renderProjectSecurity(project){
   const checks=projectSecurityChecks(project);
   toolShell('SECURITY','Project security checks','Fast local checks on generated files. Credential-like findings are advisory; critical execution and transport checks block a verified build. This does not replace a full security review.','<div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'PASS':'FAIL')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div>');
