@@ -18,6 +18,7 @@ export const PROJECT_NAV = [
   ['database', 'Database'],
   ['research', 'Research'],
   ['brain', 'Brain'],
+  ['impact', 'Impact'],
   ['tests', 'Tests'],
   ['security', 'Security'],
   ['storage', 'Storage'],
@@ -31,7 +32,7 @@ export const PROJECT_NAV = [
   ['settings', 'Settings']
 ];
 
-export const CORE_NAV = ['overview', 'assistant', 'build', 'design', 'files', 'preview', 'tasks', 'artifacts', 'brain', 'settings'];
+export const CORE_NAV = ['overview', 'assistant', 'build', 'design', 'files', 'preview', 'tasks', 'artifacts', 'brain', 'impact', 'settings'];
 
 export const TEMPLATES = [
   {id:'website',title:'Website',intent:'Build a polished landing page for a local service business.',type:'Website',deliverables:['Working website']},
@@ -51,6 +52,7 @@ export const COMMANDS = [
   ['palette-files', 'Open files', 'files'],
   ['palette-preview', 'Open preview', 'preview'],
   ['palette-brain', 'Open Brain', 'brain'],
+  ['palette-impact', 'Open Impact Engine', 'impact'],
   ['palette-tasks', 'Open tasks', 'tasks'],
   ['palette-design', 'Open design canvas', 'design'],
   ['palette-deploy', 'Open deploy', 'deploy'],
