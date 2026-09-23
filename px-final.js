@@ -112,7 +112,7 @@ async function flushSyncOutbox() {
 function activeProject() { return state.projects.find(p => p.id === state.active) || null; }
 function localGuestKey() { try { return sessionStorage.getItem(LOCAL_KEY) || ''; } catch { return ''; } }
 function setGuestKey(value) { try { if (value) sessionStorage.setItem(LOCAL_KEY, value); else sessionStorage.removeItem(LOCAL_KEY); } catch {} }
-function guestStatus() { return read(LOCAL_STATUS, null); }
+function guestStatus() { return session?.access_token ? read(LOCAL_STATUS, null) : null; }
 function setGuestStatus(value) { write(LOCAL_STATUS, value ? { connected: true, hint: `••••${value.slice(-4)}`, at: now() } : { connected: false }); }
 
 function ensureSupabase() {
@@ -298,7 +298,7 @@ async function directGemini(messages, system, jsonMode = false, maxOutputTokens 
     project: serializeForPersistence(activeProject() || {}),
     message: messages?.length ? String(messages[messages.length - 1]?.text || '') : '',
     history: Array.isArray(messages) ? messages : [],
-    system: String(system || ''),
+    systemOverride: String(system || ''),
     model: settingsState.model,
     jsonMode: Boolean(jsonMode),
     maxTokens: effectiveMaxTokens(maxOutputTokens)
@@ -1398,7 +1398,7 @@ async function renderOutput(project){
   }else $('#output-area').innerHTML='<div class="placeholder">ProjectX will generate the deliverable from the current canonical specification.</div>';
 }
 async function buildArtifact(project,repairResults=[]){
-  if(!session&&!localGuestKey())return aiRequiredModal('Connect Gemini before ProjectX can build the real artifact.');
+  if(!session)return aiRequiredModal('Sign in and connect an AI provider before ProjectX can build the real artifact.');
   const button=$('#build-output'),area=$('#output-area'),software=projectArtifactKind(project.type)==='software';
   if(!button||!area)return;
   button.disabled=true;
