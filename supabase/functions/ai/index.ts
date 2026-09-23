@@ -792,8 +792,9 @@ async function chat(user: any, body: any) {
   if (!all.length) throw new Error("No compatible AI models are reachable");
   const candidates = deterministicCandidates(all, mode === "understand" || mode === "artifact" ? "build" : mode, String(body.model || "auto"));
   if (!candidates.length) throw new Error("No compatible model is available for this task");
+  const systemPrompt = String(body.systemOverride || "").trim().slice(0, 12000) || systemFor(mode, project);
   const messages = [
-    { role: "system", content: systemFor(mode, project) },
+    { role: "system", content: systemPrompt },
     ...historyMessages(body.history),
     { role: "user", content: limitText(body.message || JSON.stringify(body.payload || {}), 16000) }
   ];
@@ -803,7 +804,7 @@ async function chat(user: any, body: any) {
     if ((RATE.get(k) || 0) > Date.now()) continue;
     attempted.push(m.id);
     try {
-      const result = await providerChat(m.credential, m.id, messages, { providerKey: m.credential.providerKey, maxTokens: mode === "artifact" ? 10000 : mode === "understand" ? 3600 : 5000 });
+      const result = await providerChat(m.credential, m.id, messages, { providerKey: m.credential.providerKey, maxTokens: Number(body.maxTokens) > 0 ? Math.min(Number(body.maxTokens), 10000) : (mode === "artifact" ? 10000 : mode === "understand" ? 3600 : 5000) });
       await admin.from("ai_usage").insert({ user_id: user.id, project_id: project?.id || null, action: mode, provider: m.provider, model: m.id, units: 1 });
       if (["understand", "artifact", "plan"].includes(mode)) {
         let parsed = mode === "understand" ? parseDiscoveryJson(result.text) : (() => { try { return JSON.parse(result.text); } catch { return null; } })();
@@ -814,7 +815,7 @@ async function chat(user: any, body: any) {
           }
           try {
             const repairMessages = [
-              { role: "system", content: systemFor("understand", project) },
+              { role: "system", content: systemPrompt || systemFor("understand", project) },
               { role: "user", content: `Repair or reconstruct the discovery result into JSON only. Preserve all useful project information already inferred. The poll is mandatory. Its decision is a short contextual label, never a question. Generate exactly four concise, concrete options that are genuine candidate values for the most important missing project detail in the actual project context. Do not use generic fallback phrases, canned choices, unrelated options, or question-form options. Do not include the fifth fixed choice Describe in your own words; the runtime adds it.\nLATEST USER INPUT:\n${limitText(body.message || "", 12000)}\nCURRENT RESULT:\n${limitText(JSON.stringify(parsed), 30000)}` }
             ];
             const repaired = await providerChat(m.credential, m.id, repairMessages, { providerKey: m.credential.providerKey, maxTokens: 2600 });

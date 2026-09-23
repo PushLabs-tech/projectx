@@ -19,7 +19,7 @@ import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
 
 const STORE = 'projectx_runtime_v7';
-const LOCAL_KEY = 'projectx_guest_gemini_key';
+const LOCAL_KEY = 'projectx_guest_gemini_key'; // legacy key name retained only for migration; AI requests no longer use browser-held keys
 const LOCAL_STATUS = 'projectx_guest_gemini_status';
 const LOCAL_SETTINGS = 'projectx_settings_v6';
 const GEMINI_KEY_URL = 'https://aistudio.google.com/app/apikey';
@@ -46,7 +46,7 @@ const now = () => new Date().toISOString();
 
 const DEFAULT_SETTINGS = {
   model: MODELS[0], responseStyle: 'balanced', executionMode: 'Mostly Automatic', autoSave: true, confirmDelete: true,
-  theme: 'dark', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  theme: 'light', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], orchestrator: MODELS[0] },
   agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true },
   notifications: { build: true, test: true, deploy: true, credits: true, security: true },
@@ -112,7 +112,7 @@ async function flushSyncOutbox() {
 function activeProject() { return state.projects.find(p => p.id === state.active) || null; }
 function localGuestKey() { try { return sessionStorage.getItem(LOCAL_KEY) || ''; } catch { return ''; } }
 function setGuestKey(value) { try { if (value) sessionStorage.setItem(LOCAL_KEY, value); else sessionStorage.removeItem(LOCAL_KEY); } catch {} }
-function guestStatus() { return read(LOCAL_STATUS, null); }
+function guestStatus() { return session?.access_token ? read(LOCAL_STATUS, null) : null; }
 function setGuestStatus(value) { write(LOCAL_STATUS, value ? { connected: true, hint: `••••${value.slice(-4)}`, at: now() } : { connected: false }); }
 
 function ensureSupabase() {
@@ -292,39 +292,19 @@ async function commitDiscoveryBrain(meta,project,data,answers,workspace){
 }
 
 async function directGemini(messages, system, jsonMode = false, maxOutputTokens = 3000) {
-  const key = localGuestKey();
-  if (!key) throw Object.assign(new Error('Connect an AI provider in Settings before continuing.'), { code: 'NO_KEY' });
-  const models = [...new Set([settingsState.model || MODELS[0], ...MODELS])];
-  let last = new Error('AI unavailable');
-  for (const model of models) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        if (attempt) await sleep(1200);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 20000);
-        const isGemini38 = /^gemini-3\\.8-flash$/i.test(String(model).trim());
-        const generationConfig = { maxOutputTokens };
-        // Gemini 3.8 uses thinking-level controls instead of legacy sampling params.
-        if (!isGemini38) generationConfig.temperature = settingsState.responseStyle === 'concise' ? 0.15 : 0.25;
-        if (jsonMode) generationConfig.responseMimeType = 'application/json';
-        const body = { systemInstruction: { parts: [{ text: system }] }, contents: messages.slice(-MAX_HISTORY).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.text ?? '').slice(0, 12000) }] })), generationConfig };
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: controller.signal });
-        clearTimeout(timer);
-        if (res.ok) {
-          const d = await res.json();
-          const text = d?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
-          if (text) return { text, model };
-          last = new Error('Empty AI response.');
-          break;
-        }
-        last = new Error((await res.text().catch(() => '')) || `Gemini ${res.status}`);
-        if (res.status === 429 || res.status >= 500) continue;
-        if (res.status === 401 || res.status === 403) break;
-        break;
-      } catch (e) { last = e?.name === 'AbortError' ? new Error('AI request timed out.') : e; }
-    }
-  }
-  throw last;
+  if (!session?.access_token) throw Object.assign(new Error('Sign in and connect an AI provider in Settings before using AI.'), { code: 'NO_SESSION' });
+  const result = await edge('chat', {
+    mode: 'discuss',
+    project: serializeForPersistence(activeProject() || {}),
+    message: messages?.length ? String(messages[messages.length - 1]?.text || '') : '',
+    history: Array.isArray(messages) ? messages : [],
+    systemOverride: String(system || ''),
+    model: settingsState.model,
+    jsonMode: Boolean(jsonMode),
+    maxTokens: effectiveMaxTokens(maxOutputTokens)
+  });
+  if (!result?.text) throw new Error('Empty AI response.');
+  return { text: result.text, model: result.model || settingsState.model };
 }
 
 const parseJson = text => {
@@ -1210,26 +1190,33 @@ function renderImpact(project){
   const invalidated=Array.isArray(impact.invalidated)?impact.invalidated:[];
   const actions=Array.isArray(impact.suggestedActions)?impact.suggestedActions:[];
   const sections=Array.isArray(impact.affectedSections)?impact.affectedSections:[];
-  const pill=(label,value)=>`<div class="box"><div class="kicker">${esc(label)}</div><div style="font-size:24px;font-weight:700;margin-top:4px">${esc(value)}</div></div>`;
-  const list=(items,empty)=>items.length?items.map(x=>`<div class="item"><b>${esc(x)}</b></div>`).join(''):`<div class="sub">${esc(empty)}</div>`;
-  const score=Math.max(0,Math.min(100,Number(impact.impactScore||0)));
-  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces changes through the current project state and identifies work that may need review, regeneration, or verification.',`
-    <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">
-      ${pill('Impact score',score+'/100')}${pill('Inputs changed',changed.length)}${pill('Areas affected',affected.length)}
-    </div>
-    <div class="sub" style="margin-bottom:14px">${esc(impact.summary||'No downstream impact detected.')}</div>
-    <div class="grid">
-      <div class="box"><h3 style="margin-top:0">Changed</h3>${list(changed,'No changed inputs.')}</div>
-      <div class="box"><h3 style="margin-top:0">Affected</h3>${list(affected,'No downstream areas.')}</div>
-      <div class="box"><h3 style="margin-top:0">Needs review</h3>${list(invalidated,'Nothing currently invalidated.')}</div>
-    </div>
-    ${sections.length?`<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Affected workspace sections</h3>${list(sections,'None')}</div>`:''}
-    <div class="box" style="margin-top:14px"><h3 style="margin-top:0">Suggested next actions</h3>${list(actions,'No follow-up action required.')}</div>
-    <div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="primary" id="impact-apply">Open affected work</button></div>
-    <div id="impact-status" class="sub" style="margin-top:10px"></div>
-  `);
+  const nodes=Array.isArray(impact.nodes)?impact.nodes:[];
+  const edges=Array.isArray(impact.edges)?impact.edges:[];
+  const pill=(label,value)=>'<div class="box"><div class="kicker">'+esc(label)+'</div><div style="font-size:24px;font-weight:700;margin-top:4px">'+esc(value)+'</div></div>';
+  const list=(items,empty)=>items.length?items.map(x=>'<div class="item"><b>'+esc(x)+'</b></div>').join(''):'<div class="sub">'+esc(empty)+'</div>';
+  const graphNodes=nodes.slice(0,80);
+  const nodeMap=new Map(graphNodes.map(n=>[n.id,n]));
+  const graphEdges=edges.filter(e=>nodeMap.has(e.from)&&nodeMap.has(e.to)).slice(0,140);
+  const graph=graphNodes.length?'<div class="px-impact-graph">'+graphNodes.map(n=>'<div class="px-impact-node '+esc(n.status||'active')+'"><span class="px-impact-kind">'+esc(n.kind)+'</span><b>'+esc(n.label)+'</b></div>').join('')+'</div>':'<div class="sub">Make a project change to build the dependency graph.</div>';
+  const body=[
+    '<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">',
+    pill('Inputs changed',changed.length),pill('Nodes affected',graphNodes.length),pill('Dependency edges',graphEdges.length),
+    '</div>',
+    '<div class="sub" style="margin-bottom:14px">'+esc(impact.summary||'No downstream impact detected.')+'</div>',
+    '<div class="box"><div class="kicker">DEPENDENCY MAP</div><h3 style="margin:4px 0 10px">What this change touches</h3>'+graph+'</div>',
+    '<div class="grid" style="margin-top:14px">',
+    '<div class="box"><h3 style="margin-top:0">Changed</h3>'+list(changed,'No changed inputs.')+'</div>',
+    '<div class="box"><h3 style="margin-top:0">Affected</h3>'+list(affected,'No downstream areas.')+'</div>',
+    '<div class="box"><h3 style="margin-top:0">Needs review</h3>'+list(invalidated,'Nothing currently invalidated.')+'</div>',
+    '</div>',
+    sections.length?'<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Affected workspace sections</h3>'+list(sections,'None')+'</div>':'',
+    '<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Suggested next actions</h3>'+list(actions,'No follow-up action required.')+'</div>',
+    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="primary" id="impact-apply">Open affected work</button></div>',
+    '<div id="impact-status" class="sub" style="margin-top:10px"></div>'
+  ].join('');
+  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces changes through the current project state and shows the work connected to that change.',body);
   $('#impact-refresh').onclick=()=>{project.impact=buildImpactGraph(project,project.spec||{},project.spec||{},{});saveProject(project);renderImpact(project);};
-  $('#impact-apply').onclick=()=>{const target=sections.length?project.sections.find(s=>sections.includes(s.name)):project.sections.find(s=>s.kind==='planning');if(target){project.selectedSection=target.id;project.uiNav='overview';saveProject(project);renderProject(project);}else{$('#impact-status').textContent='No affected workspace section is available yet.';}};
+  $('#impact-apply').onclick=()=>{const target=sections.length?project.sections.find(s=>sections.includes(s.name)):project.sections.find(s=>s.kind==='planning');if(target){project.selectedSection=target.id;project.uiNav='overview';saveProject(project);}else{$('#impact-status').textContent='No affected workspace section is available yet.';}};
 }
 
 function renderProjectSecurity(project){
@@ -1418,7 +1405,7 @@ async function renderOutput(project){
   }else $('#output-area').innerHTML='<div class="placeholder">ProjectX will generate the deliverable from the current canonical specification.</div>';
 }
 async function buildArtifact(project,repairResults=[]){
-  if(!session&&!localGuestKey())return aiRequiredModal('Connect Gemini before ProjectX can build the real artifact.');
+  if(!session)return aiRequiredModal('Sign in and connect an AI provider before ProjectX can build the real artifact.');
   const button=$('#build-output'),area=$('#output-area'),software=projectArtifactKind(project.type)==='software';
   if(!button||!area)return;
   button.disabled=true;
