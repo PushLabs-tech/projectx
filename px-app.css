@@ -421,3 +421,11 @@ html, body {
   #px-app.px-public .px-public-nav .ghost:not(.primary) { padding: 7px 8px; font-size: 11px; }
   .px-cta .primary, .px-cta .ghost { flex: 1 1 auto; }
 }
+
+/* Impact Engine dependency map */
+.px-impact-graph{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:stretch;padding:4px 0}
+.px-impact-node{min-height:64px;border:1px solid var(--px-line);border-radius:10px;background:var(--px-bg-raised);padding:10px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.px-impact-node.changed{border-color:var(--px-accent);background:#eef1ff}
+.px-impact-node.stale{border-color:var(--px-warn);background:#fff8e8}
+.px-impact-kind{font:10px/1 var(--px-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--px-soft)}
+@media(max-width:760px){.px-impact-graph{grid-template-columns:repeat(2,minmax(0,1fr))}}
