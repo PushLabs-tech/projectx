@@ -1,5 +1,6 @@
 import { reconcileChange, markReconciliationState, inputNodeIds, createReconciliationQueue, getReconciliationQueue, getReadyReconciliationActions, updateReconciliationAction, recordReconciliationResult, resetFailedReconciliation } from './projectx-reconciliation.js';
 import { getExecutionPolicy, getExecutorDefinition, selectExecutor, createActionContract, createExecutionPlan, appendExecutionJournal, canExecuteAction, shouldRepairAfterFailure, prepareReconciliationRepair, diagnoseFailures, createRepairActionContract, scheduleRepairCycle } from './projectx-execution.js';
+export { sanitizeTransactionPath, validateTransactionOperations, createExecutionTransaction, applyTransaction, rollbackTransaction, transactionDigest } from './projectx-transaction.js';
 
 export const CORE_VERSION = 4;
 
