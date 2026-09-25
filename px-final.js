@@ -77,7 +77,7 @@ const DEFAULT_SETTINGS = {
 const ExecutionProvider = {
   kind: 'orchestrated-remote',
   isolatedWorkers: true,
-  note: 'Signed-in rebuild, update, and repair actions execute through the ProjectX remote worker; browser verification remains the final local truth gate.'
+  note: 'Signed-in rebuild, update, and repair actions execute through the ProjectX remote worker; browser verification remains the local truth gate, and connected GitHub repositories can run exact snapshots in an ephemeral isolated build runner.'
 };
 const DeploymentProvider = {
   kind: 'github-pages-export',
@@ -253,6 +253,144 @@ async function githubStatus(workspaceId) { return integrationEdge('github', 'sta
 async function githubListRepositories(workspaceId) { return integrationEdge('github', 'listRepos', { workspaceId: workspaceId || integrationWorkspaceId() }); }
 async function githubCreateRepository(workspaceId, name, options = {}) { return integrationEdge('github', 'createRepo', { workspaceId, name, ...options }); }
 async function githubPushFiles(workspaceId, fullName, files, options = {}) { return integrationEdge('github', 'pushFiles', { workspaceId, fullName, files, ...options }); }
+async function startIsolatedBuild(project, fullName, branch = 'main', commitSha = '', clientRequestId = '') {
+  return integrationEdge('github', 'startBuild', {
+    workspaceId: integrationWorkspaceId(),
+    projectId: project?.sync?.remoteId || project?.id || '',
+    fullName, branch, commitSha, clientRequestId
+  });
+}
+async function isolatedBuildStatus(buildRunId) {
+  return integrationEdge('github', 'buildStatus', { buildRunId });
+}
+async function isolatedBuildRuns(projectId = integrationProjectId()) {
+  return integrationEdge('github', 'buildRuns', { projectId });
+}
+async function cancelIsolatedBuild(buildRunId) {
+  return integrationEdge('github', 'cancelBuild', { buildRunId });
+}
+function isolatedBuildRecord(project, patch = {}) {
+  const executionState = project.executionState && typeof project.executionState === 'object' ? project.executionState : {};
+  project.executionState = {
+    ...executionState,
+    isolatedBuild: { ...(executionState.isolatedBuild || {}), ...patch }
+  };
+  saveProject(project);
+  return project.executionState.isolatedBuild;
+}
+function isolatedBuildPanelHtml(project) {
+  const build = project.executionState?.isolatedBuild;
+  if (!build) return '<div id="isolated-build-status" class="sub">No external build run yet.</div>';
+  const terminal = ['success','failure','cancelled','timed_out','skipped'].includes(String(build.status || ''));
+  const label = String(build.status || 'queued').toUpperCase();
+  const detail = build.commitSha ? esc(String(build.commitSha).slice(0,12)) : 'snapshot pending';
+  const repo = build.repositoryFullName ? esc(build.repositoryFullName) : 'No repository selected';
+  const runLink = build.htmlUrl ? '<a class="ghost" href="'+esc(build.htmlUrl)+'" target="_blank" rel="noreferrer">Open run</a>' : '';
+  const artifactCount = Array.isArray(build.artifactSummary) ? build.artifactSummary.length : 0;
+  return '<div id="isolated-build-status" class="row" style="margin-top:10px"><div><b>External verification · '+label+'</b><div class="sub">'+repo+' · '+detail+(artifactCount ? ' · '+artifactCount+' artifact'+(artifactCount===1?'':'s') : '')+'</div></div><div class="actions">'+runLink+'</div></div>';
+}
+async function resolveIsolatedBuildTarget(project) {
+  const workspaceId = integrationWorkspaceId();
+  if (!workspaceId) throw new Error('Sync this project to a cloud workspace before using the isolated build runner.');
+  const storedRepo = String(project.sync?.githubRepo || '').trim();
+  const storedBranch = String(project.sync?.githubBranch || '').trim();
+  if (storedRepo) return { fullName: storedRepo, branch: storedBranch || 'main' };
+  const result = await githubListRepositories(workspaceId);
+  const repos = Array.isArray(result?.repositories) ? result.repositories : [];
+  if (!repos.length) throw new Error('No GitHub repositories are available. Connect GitHub and create or select a repository first.');
+  let selected = repos.length === 1 ? repos[0] : null;
+  if (!selected) {
+    const menu = repos.slice(0,30).map((item, i) => (i + 1) + '. ' + item.full_name + ' [' + (item.default_branch || 'main') + ']').join('\n');
+    const raw = prompt('Choose the GitHub repository for isolated builds.\n\n' + menu + '\n\nEnter its number or owner/repository:');
+    const value = String(raw || '').trim();
+    if (!value) throw new Error('Repository selection cancelled.');
+    const index = Number(value);
+    selected = Number.isInteger(index) && index >= 1 && index <= repos.length ? repos[index - 1] : repos.find(item => String(item.full_name).toLowerCase() === value.toLowerCase());
+  }
+  if (!selected?.full_name) throw new Error('That GitHub repository could not be resolved.');
+  project.sync = { ...(project.sync || {}), githubRepo: selected.full_name, githubBranch: selected.default_branch || storedBranch || 'main' };
+  saveProject(project);
+  return { fullName: selected.full_name, branch: selected.default_branch || storedBranch || 'main' };
+}
+async function updateIsolatedBuildPanel(project) {
+  const node = $('#isolated-build-status');
+  if (node) node.outerHTML = isolatedBuildPanelHtml(project);
+}
+async function pollIsolatedBuild(project, buildRunId) {
+  if (!buildRunId) return null;
+  const started = Date.now();
+  while (Date.now() - started < 10 * 60 * 1000) {
+    try {
+      const result = await isolatedBuildStatus(buildRunId);
+      const run = result?.buildRun;
+      if (run) {
+        isolatedBuildRecord(project, {
+          id: run.id, status: run.status, conclusion: run.conclusion,
+          repositoryFullName: run.repositoryFullName, branch: run.branch, commitSha: run.commitSha,
+          workflowRunId: run.workflowRunId, runAttempt: run.runAttempt, htmlUrl: run.htmlUrl,
+          evidence: run.evidence, artifactSummary: run.artifactSummary,
+          requestedAt: run.requestedAt, updatedAt: run.updatedAt,
+          polling: !['success','failure','cancelled','timed_out','skipped'].includes(String(run.status || ''))
+        });
+        await updateIsolatedBuildPanel(project);
+        const status = String(run.status || '');
+        if (['success','failure','cancelled','timed_out','skipped'].includes(status)) {
+          notify(status === 'success' ? 'Isolated build passed.' : 'Isolated build finished with '+status+'. Review the run evidence.', status === 'success' ? 'success' : 'error');
+          return run;
+        }
+      }
+    } catch (error) {
+      isolatedBuildRecord(project, { polling: false, error: String(error?.message || error) });
+      await updateIsolatedBuildPanel(project);
+      notify('Could not refresh isolated build status: '+String(error?.message || error),'error');
+      return null;
+    }
+    await sleep(4000);
+  }
+  isolatedBuildRecord(project, { polling: false, status: 'timed_out', error: 'ProjectX stopped waiting for the external runner after 10 minutes.' });
+  await updateIsolatedBuildPanel(project);
+  notify('ProjectX stopped waiting for the isolated build runner. The GitHub run may still be active.','error');
+  return null;
+}
+async function requestIsolatedBuild(project) {
+  if (!session) { authModal(); return; }
+  if (projectArtifactKind(project.type) !== 'software' || !Object.keys(project.files || {}).length) {
+    notify('Build the current software artifact before starting isolated verification.','info');
+    return;
+  }
+  if (project.executionState?.isolatedBuild?.polling) {
+    notify('An isolated build is already running.','info');
+    return;
+  }
+  const button = $('#run-isolated-build');
+  if (button) { button.disabled = true; button.textContent = 'Preparing…'; }
+  try {
+    const target = await resolveIsolatedBuildTarget(project);
+    const files = Object.entries(project.files || {}).map(([path, content]) => ({ path, content: String(content ?? '') })).slice(0, 500);
+    const pushed = await githubPushFiles(integrationWorkspaceId(), target.fullName, files, { branch: target.branch, message: 'chore: ProjectX isolated verification snapshot' });
+    const commitSha = String(pushed?.commitSha || '').trim();
+    if (!commitSha) throw new Error('GitHub did not return the verification snapshot commit SHA.');
+    const clientRequestId = 'px-build-'+project.id+'-'+commitSha;
+    const started = await startIsolatedBuild(project, target.fullName, target.branch, commitSha, clientRequestId);
+    const run = started?.buildRun;
+    if (!run?.id) throw new Error('GitHub build runner did not return a durable run id.');
+    isolatedBuildRecord(project, {
+      id: run.id, status: run.status || 'queued', repositoryFullName: target.fullName,
+      branch: target.branch, commitSha, requestedAt: run.requestedAt || now(), polling: true, error: null
+    });
+    await updateIsolatedBuildPanel(project);
+    notify('Snapshot pushed. Isolated build started.','success');
+    await pollIsolatedBuild(project, run.id);
+    renderOutput(project);
+  } catch (error) {
+    isolatedBuildRecord(project, { polling: false, status: 'failure', error: String(error?.message || error) });
+    await updateIsolatedBuildPanel(project);
+    notify(String(error?.message || error),'error');
+  } finally {
+    const current = $('#run-isolated-build');
+    if (current) { current.disabled = false; current.textContent = 'Run isolated build'; }
+  }
+}
 async function deployProject(projectId, provider = 'vercel', label = 'default') { return integrationEdge('deploy', 'deploy', { projectId, provider, label }); }
 async function deploymentStatus(projectId) { return integrationEdge('deploy', 'status', { projectId }); }
 async function saveDeploymentTarget(workspaceId, provider, token, options = {}) { return integrationEdge('deploy', 'saveTarget', { workspaceId, provider, token, projectId: integrationProjectId(), ...options }); }
