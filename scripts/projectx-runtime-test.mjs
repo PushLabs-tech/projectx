@@ -18,7 +18,7 @@ assert.doesNotMatch(index, /dashboard-clean\.js|projectx-adaptive\.js|projectx-o
 assert.match(ui, /id="px-project-switch"/);
 assert.match(ui, /id="px-bottom"/);
 assert.match(ui, /replit-shell/);
-assert.match(ui, /class="px-launcher"/);
+assert.match(ui, /px-home-builder/);
 assert.match(ui, /What are you building\?/);
 assert.match(ui, /Tell ProjectX what you want to accomplish/);
 assert.match(ui, /execNote/);
@@ -184,7 +184,7 @@ assert.match(runtime, /renderMakeGreat/);
 assert.match(runtime, /renderOptimize/);
 assert.match(runtime, /renderTransform/);
 assert.match(runtime, /restoreProjectSnapshot/);
-assert.match(runtime, /Visual edit/);
+assert.match(runtime, /Edit with Agent/);
 assert.match(shellSource, /preview-mobile/);
 assert.match(runtime, /preview-file/);
 assert.match(runtime, /resource-file/);

@@ -2043,10 +2043,21 @@ async function renderOutput(project){
   const output=project.artifacts?.output;
   const current=output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
   const title=software?(project.type==='Game'?'Playtest':project.type==='Presentation'?'Presentation':'Output'):'Deliverable';
-  const description=current?'Current output generated from the project brain.':software?'No current artifact exists yet.':'No document deliverable exists yet.';
+  const description=current?'Current verified artifact.':software?'Start by asking Agent to build your artifact.':'Generate a deliverable from the project brain.';
   const isolated=project.executionState?.isolatedBuild;
-  const runLabel=isolated?.polling?'Build running…':'Run isolated build';
-  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><div class="actions"><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button>${software?'<button id="visual-edit" class="ghost">Visual edit</button>':''}${software&&current?'<button id="run-isolated-build" class="ghost" '+(isolated?.polling?'disabled':'')+'>'+runLabel+'</button>':''}</div></div><div id="output-area" style="margin-top:14px"></div>${software&&current?isolatedBuildPanelHtml(project):''}</div>`;
+  const runLabel=isolated?.polling?'Building…':'Run isolated build';
+  body.innerHTML=`<div class="px-output-workspace">
+    <div class="px-output-header">
+      <div><div class="px-output-eyebrow">${software?'APP WORKSPACE':'DELIVERABLE'}</div><h2>${title}</h2><div class="sub">${esc(description)}</div></div>
+      <div class="px-output-actions">
+        <button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button>
+        ${software?'<button id="visual-edit" class="ghost">Edit with Agent</button>':''}
+        ${software&&current?'<button id="run-isolated-build" class="ghost" '+(isolated?.polling?'disabled':'')+'>'+runLabel+'</button>':''}
+      </div>
+    </div>
+    <div id="output-area" class="px-output-stage"></div>
+    ${software&&current?'<div class="px-output-build-status">'+isolatedBuildPanelHtml(project)+'</div>':''}
+  </div>`;
   $('#build-output').onclick=()=>buildArtifact(project);
   $('#run-isolated-build')?.addEventListener('click',()=>requestIsolatedBuild(project));
   $('#visual-edit')?.addEventListener('click',()=>renderProjectChat(project,'Make a visual change: '));
@@ -2056,8 +2067,17 @@ async function renderOutput(project){
       const docPath=Object.keys(project.files||{}).find(p=>/\.(md|txt|csv|json)$/i.test(p))||Object.keys(project.files||{})[0];
       $('#output-area').innerHTML=`<div class="document-output"><pre class="document-text">${esc(docPath?project.files[docPath]:'No document content.')}</pre></div>`;
     }
-  }else $('#output-area').innerHTML='<div class="placeholder">ProjectX will generate the deliverable from the current canonical specification.</div>';
+  }else{
+    $('#output-area').innerHTML=`<div class="px-empty-stage">
+      <div class="px-empty-stage-icon">✦</div>
+      <strong>Your workspace is ready</strong>
+      <span>Ask Agent to build the first version. Your preview will appear here.</span>
+      <button class="primary" id="empty-build">Build with AI</button>
+    </div>`;
+    $('#empty-build').onclick=()=>buildArtifact(project);
+  }
 }
+
 async function buildArtifact(project,repairResults=[]){
   if(!session){aiRequiredModal('Sign in and connect an AI provider before ProjectX can build the real artifact.');return {ok:false,error:'Sign in and connect an AI provider before ProjectX can build the real artifact.'};}
   const button=$('#build-output'),area=$('#output-area'),software=projectArtifactKind(project.type)==='software';
@@ -2146,7 +2166,7 @@ async function buildArtifact(project,repairResults=[]){
 }
 function mountArtifact(project){
   const area=$('#output-area');if(!area)return;
-  area.innerHTML='<div class="preview-toolbar"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Project output"></iframe></div>';
+  area.innerHTML='<div class="px-preview-toolbar"><div class="px-preview-modes"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="px-preview-state"><span class="px-live-dot"></span> Live preview</div></div><div class="px-artifact-stage"><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Project output"></iframe></div></div>';
   const frame=$('#project-frame');frame.srcdoc=assemblePreviewHtml(project.files||{});runtimeTestCleanup?.();
   const onMessage=e=>{
     if(e.source!==frame.contentWindow)return;
@@ -2154,16 +2174,21 @@ function mountArtifact(project){
       const event=e.data?.event||{};
       if(event.kind==='runtime_error'||event.kind==='unhandled_rejection'){
         const msg=String(event.message||'Runtime error');
-        notify('Preview failed to run. '+msg+'. Open Assistant to diagnose.','error');
+        notify('Preview failed to run. '+msg+'. Open Agent to diagnose.','error');
         setAgentStatus('Failed');
         const dock=$('#assistant-dock-input');if(dock)dock.value='Fix preview runtime error: '+msg;
       }else if(event.kind==='resource_error'){
-        notify('Preview reported a resource error. Open Assistant to diagnose.','error');
+        notify('Preview reported a resource error. Open Agent to diagnose.','error');
       }
     }
   };
   window.addEventListener('message',onMessage);runtimeTestCleanup=()=>window.removeEventListener('message',onMessage);
-  $('[data-viewport]').forEach(btn=>btn.onclick=()=>{const value=btn.dataset.viewport;$('[data-viewport]').forEach(x=>x.classList.toggle('active',x===btn));const artifact=$('.artifact');artifact.className='artifact preview-'+value;});
+  $$('[data-viewport]').forEach(btn=>btn.onclick=()=>{
+    const value=btn.dataset.viewport;
+    $$('[data-viewport]').forEach(x=>x.classList.toggle('active',x===btn));
+    const artifact=$('.artifact');
+    if(artifact)artifact.className='artifact preview-'+value;
+  });
 }
 function fileTreeNodes(paths){
   const root={};
