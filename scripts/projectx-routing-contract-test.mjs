@@ -25,7 +25,7 @@ for(const source of [router,bundledRouter]){
 }
 
 assert.match(ai,/routedCandidates\(all, agent/);
-assert.match(ai,/modelFeedbackForUser(user\.id, task)/);
+assert.match(ai,/modelFeedbackForUser\(user\.id, task\)/);
 assert.match(ai,/record_ai_model_feedback/);
 assert.match(ai,/async function recordModelFeedback/);
 assert.match(ai,/action === "recordModelFeedback"/);
