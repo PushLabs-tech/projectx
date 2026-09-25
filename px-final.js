@@ -1013,17 +1013,11 @@ async function submitDiscoveryChoice(value,history,meta){
 function renderInterviewUnderstanding(data){
   const root=$('#interview-understanding');
   if(!root)return;
-  const category=String(data?.category||'').trim();
   const summary=String(data?.summary||'').trim();
-  const missing=Array.isArray(data?.missing)?data.missing.slice(0,4):[];
   const project=data?.project||{};
-  const known=[
-    project.goal&&`Goal: ${project.goal}`,
-    Array.isArray(project.users)&&project.users.length&&`Users: ${project.users.slice(0,3).join(', ')}`,
-    Array.isArray(project.requirements)&&project.requirements.length&&`Requirements: ${project.requirements.slice(0,2).join('; ')}`,
-    Array.isArray(project.deliverables)&&project.deliverables.length&&`Deliverable: ${project.deliverables.slice(0,2).join('; ')}`
-  ].filter(Boolean).slice(0,4);
-  root.innerHTML=`<div class="understanding-main"><div class="understanding-copy"><div class="understanding-eyebrow">PROJECT BRIEF</div><div class="understanding-title">What ProjectX understands</div><div class="sub understanding-summary">${esc(summary||'Building the project brief from your request.')}</div>${category?`<div class="understanding-category">Focus · ${esc(category)}</div>`:''}${known.length?`<div class="understanding-known">${known.map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}${missing.length?`<div class="understanding-meta"><span>Project brief is still being refined</span></div>`:''}</div></div>`;
+  const goal=String(project.goal||'').trim();
+  const text=summary||goal;
+  root.innerHTML=text?`<div class="px-creation-understanding"><span class="px-creation-check">✓</span><span>Got it — ${esc(text.slice(0,220))}</span></div>`:'';
 }
 const interviewSystem = "You are ProjectX's discovery architect. Treat the user's original request as the source of truth. Classify multidimensionally with work_shape (build, investigate, create, plan, operate, decide, learn, solve), domains (software, research, business, creative, planning, real_world, education, game, engineering, personal), outputs (app, website, code, report, presentation, document, plan, checklist, campaign, dataset, prototype, physical_steps), execution_mode (digital, physical, mixed), and risk_level (low, consequential, regulated_or_high_impact). Multiple domains are allowed. Never force a single category or a REAL_WORLD/NON_REAL_WORLD binary. Ask only when an answer materially changes workflow, deliverable, scope, risk, tools, acceptance criteria, or next action. Generate exactly one contextual poll at a time with exactly four concrete candidate values; the runtime adds the fifth fixed choice 'Describe in your own words'. Never use generic filler, duplicates, unrelated options, or question-form options. Return JSON only with classification, category, domainPack, project, workspace, agents, confidence, missing, ambiguities, summary, and poll. Project should contain title,type,goal,users,requirements,constraints,features,decisions,dependencies,assets,deliverables,acceptanceCriteria,successCriteria,openQuestions,platform,technology,visualDirection,game,plan. Workspace sections must be genuinely relevant to the actual request. Never invent facts.";async function continueInterview(history, answers, meta={}){
   $('#interview-status')&&($('#interview-status').textContent='Thinking…');
