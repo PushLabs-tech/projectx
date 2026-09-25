@@ -2134,7 +2134,7 @@ async function buildArtifact(project,repairResults=[]){
     notify('Deliverable generated and validated from the current canonical project spec.','success');
     return {ok:true,version:project.specVersion,evidence:[...(project.tests?.results||[])].map(x=>({name:x.name,detail:x.detail||'',pass:x.pass!==false}))};
   }catch(error){
-    area.innerHTML=`<div class="placeholder">Generation failed: ${esc(error.message)}. Your previous deliverable was kept.</div>`;
+    area.innerHTML=`<div class="placeholder">I could not build this version yet: ${esc(error.message)}. Your previous work is safe.</div>`;
     return {ok:false,error:String(error?.message||error),evidence:project.tests?.results||[],version:project.specVersion};
   }finally{button.disabled=false;}
 }
@@ -2644,7 +2644,33 @@ function renderOverview(project){
   const root=$('#project-body');if(!root)return;
   const tasks=ensureTasks(project);
   const files=Object.keys(project.files||{});
-  root.innerHTML=`<div class="grid"><div class="box"><b>Brain</b><div class="sub">${esc(project.understanding?.summary||project.intent||'No summary yet.')}</div></div><div class="box"><b>Tasks</b><div class="sub">${tasks.length} recorded</div></div><div class="box"><b>Files</b><div class="sub">${files.length} in workspace</div></div></div><div class="box" style="margin-top:12px"><b>Next</b><div class="sub">Open Assistant to change the project, Design to iterate visually, or Tasks to inspect work.</div><div class="actions"><button class="primary" data-project-tool="assistant">Open Assistant</button><button class="ghost" data-project-tool="tasks">Task board</button></div></div>`;
+  const hasArtifact=Boolean(project.artifacts?.output?.specVersion===project.specVersion&&files.length);
+  const status=String(project.status||'ready').replace(/[-_]/g,' ');
+  const summary=String(project.understanding?.summary||project.intent||'').trim();
+  const next=hasArtifact
+    ? {title:'Your latest version is ready',detail:'Preview it, ask for changes, or keep building.',primary:'Open preview',tool:'preview'}
+    : {title:'Ready to build',detail:'ProjectX has your brief. Start the first real version and we’ll handle the technical work.',primary:'Build with AI',tool:'build'};
+  root.innerHTML=`
+    <div class="px-home">
+      <div class="px-home-hero">
+        <div class="kicker">YOUR PROJECT</div>
+        <h2>${esc(next.title)}</h2>
+        <p class="sub">${esc(summary||next.detail)}</p>
+        <div class="actions">
+          <button class="primary px-main-action" data-project-tool="${next.tool}">${next.primary}</button>
+          <button class="ghost" data-project-tool="assistant">Make a change</button>
+        </div>
+      </div>
+      <div class="px-home-stats">
+        <div><b>${files.length}</b><span>files</span></div>
+        <div><b>${tasks.length}</b><span>tasks</span></div>
+        <div><b>${esc(status)}</b><span>status</span></div>
+      </div>
+      <div class="px-home-next">
+        <div><b>What you can do next</b><div class="sub">${esc(next.detail)}</div></div>
+        <div class="actions"><button class="ghost" data-project-tool="preview">Preview</button><button class="ghost" data-project-tool="files">Files</button><button class="ghost" data-project-tool="tasks">Tasks</button></div>
+      </div>
+    </div>`;
   $$('[data-project-tool]',root).forEach(b=>b.onclick=()=>renderProjectTool(project,b.dataset.projectTool));
 }
 function renderTasks(project){
