@@ -140,6 +140,7 @@ async function executeExecutionJob(token:string,job:any) {
   }
 }
 async function proxyQueuedJob(token:string,job:any) {
+  const stopHeartbeat=await startLeaseHeartbeat(job);
   const controller=new AbortController();
   const seconds=Math.max(10,Math.min(MAX_TIMEOUT_SECONDS,Number(job.timeout_seconds || DEFAULT_TIMEOUT_SECONDS)));
   const timer=setTimeout(()=>controller.abort("queued_job_timeout"),seconds*1000);
@@ -149,7 +150,7 @@ async function proxyQueuedJob(token:string,job:any) {
     if(!response.ok || payload?.ok===false)throw new Error(String(payload?.error || "Queued job failed"));
     const {error}=await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:payload?.result ?? payload,p_error:null,p_retry_seconds:60,p_lease_token:job.lease_token}); if(error)throw error;
     return {id:job.id,status:"succeeded"};
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); stopHeartbeat(); }
 }
 async function run(limit:number,token:string) {
   const {data:jobs,error}=await db.rpc("claim_project_job",{p_worker:"supabase-remote",p_limit:Math.max(1,Math.min(MAX_BATCH,Number(limit||MAX_BATCH)))});
