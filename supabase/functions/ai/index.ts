@@ -10,7 +10,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUB
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
-const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary", "enqueueJob", "getJob", "cancelJob"]);
+const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "getUsageSummary", "enqueueJob", "getJob", "cancelJob"]);
 const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
@@ -872,6 +872,24 @@ async function runVerification(user:any, body:any) {
   return {ok:true,status:verificationStatus,results};
 }
 
+async function rollbackExecutionTransaction(user:any, body:any) {
+  const projectId=String(body?.projectId||"").trim();
+  const transactionId=String(body?.transactionId||"").trim();
+  if(!projectId) throw new Error("Project ID is required.");
+  if(!transactionId) throw new Error("Execution transaction ID is required.");
+  await authorizeProject(user,projectId,true);
+  const {data,error}=await admin.rpc("rollback_project_execution",{
+    p_project_id:projectId,
+    p_user_id:user.id,
+    p_transaction_id:transactionId,
+    p_reason:String(body?.reason||"User requested rollback").slice(0,500)
+  });
+  if(error) throw error;
+  const result=data&&typeof data==="object"?data:{};
+  if(result.ok===false) return {ok:false,...result,project:await getProject(user,projectId)};
+  return {ok:true,...result,project:await getProject(user,projectId)};
+}
+
 async function getUsageSummary(user:any, body:any) {
   const u=await usage(user);
   const since=new Date(Date.now()-30*24*60*60*1000).toISOString();
@@ -1017,6 +1035,7 @@ Deno.serve(async req => {
     if (action === "createPlan") return json(await createPlan(user, body));
     if (action === "createArtifactVersion") return json(await createArtifactVersion(user, body));
     if (action === "runVerification") return json(await runVerification(user, body));
+    if (action === "rollbackExecutionTransaction") return json(await rollbackExecutionTransaction(user, body));
     if (action === "getUsageSummary") return json(await getUsageSummary(user, body));
     if (action === "enqueueJob") return json(await enqueueJob(user, body));
     if (action === "getJob") return json(await getJob(user, body));
