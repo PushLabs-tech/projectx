@@ -13,7 +13,7 @@ for(const source of [router,bundledRouter]){
   assert.match(source,/interviewer:\s*'understand'/);
   assert.match(source,/planner:\s*'plan'/);
   assert.match(source,/builder:\s*'build'/);
-  assert.match(source,/tester:\s*'build'/);
+  assert.match(source,/tester:\s*'build'/);\n  assert.match(source,/repairer:\s*'repair'/);
   assert.match(source,/researcher:\s*'research'/);
   assert.match(source,/orchestrator:\s*'discuss'/);
   assert.match(source,/export function routingTask/);
