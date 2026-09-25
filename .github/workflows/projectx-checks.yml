@@ -29,4 +29,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run browser E2E
-        run: npm run e2e
+        env:
+          PROJECTX_E2E_EMAIL: ${{ secrets.PROJECTX_E2E_EMAIL }}
+          PROJECTX_E2E_PASSWORD: ${{ secrets.PROJECTX_E2E_PASSWORD }}
+        run: npm run e2e:ci
