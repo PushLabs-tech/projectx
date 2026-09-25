@@ -42,15 +42,17 @@ function hintedFiles(failure={}, files={}) {
   if (matches.length) return [...new Set(matches)].slice(0,20);
   const category = categoryForFailure(failure);
   if (category === 'security') {
-    const textCorpus = Object.entries(files||{}).filter(([,v])=>String(v||'').length).filter(([,v])=>{
-      const v=String(v||'');
-      if(/shell execution/i.test(failure.name||'')) return /child_process|Deno\.Command|Bun\.spawn|process\.exec\(/i.test(v);
-      if(/eval constructors/i.test(failure.name||'')) return /\b(?:eval|new Function)\s*\(/i.test(v);
-      if(/javascript url/i.test(failure.name||'')) return /javascript\s*:/i.test(v);
-      if(/insecure http/i.test(failure.name||'')) return /(?:src|href|fetch\s*\()[^\n]{0,80}http:\/\//i.test(v);
-      if(/credential/i.test(failure.name||'')) return /(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i.test(v);
-      return true;
-    }).map(([p])=>p);
+    const textCorpus = Object.entries(files||{})
+      .filter(([,value])=>String(value||'').length)
+      .filter(([,value])=>{
+        const valueText=String(value||'');
+        if(/shell execution/i.test(failure.name||'')) return /child_process|Deno\.Command|Bun\.spawn|process\.exec\(/i.test(valueText);
+        if(/eval constructors/i.test(failure.name||'')) return /\b(?:eval|new Function)\s*\(/i.test(valueText);
+        if(/javascript url/i.test(failure.name||'')) return /javascript\s*:/i.test(valueText);
+        if(/insecure http/i.test(failure.name||'')) return /(?:src|href|fetch\s*\()[^\n]{0,80}http:\/\//i.test(valueText);
+        if(/credential/i.test(failure.name||'')) return /(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i.test(valueText);
+        return true;
+      }).map(([p])=>p);
     if (textCorpus.length) return textCorpus.slice(0,20);
   }
   if (category === 'structure' || category === 'runtime' || category === 'placeholder') {
