@@ -18,7 +18,7 @@ assert.doesNotMatch(index, /dashboard-clean\.js|projectx-adaptive\.js|projectx-o
 assert.match(ui, /id="px-project-switch"/);
 assert.match(ui, /id="px-bottom"/);
 assert.match(ui, /replit-shell/);
-assert.match(ui, /class="px-launcher"/);
+assert.match(ui, /px-home-builder/);
 assert.match(ui, /What are you building\?/);
 assert.match(ui, /Tell ProjectX what you want to accomplish/);
 assert.match(ui, /execNote/);
