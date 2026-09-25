@@ -84,13 +84,13 @@ async function push(user:any,workspaceId:string,body:any){const c=await connecti
 Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{headers:corsHeaders});try{const url=new URL(req.url);if(req.method==="GET" && url.searchParams.get("code") && url.searchParams.get("state")){return new Response("",{status:302,headers:{Location:(await callback(url.searchParams.get("code")!,url.searchParams.get("state")!)).redirect,...corsHeaders}});}const body=await req.json().catch(()=>({}));const action=String(body.action||"");if(action==="callback")return new Response("",{status:302,headers:{Location:(await callback(String(body.code||""),String(body.state||""))).redirect,...corsHeaders}});const u=await auth(req);let ws=String(body.workspaceId||"");if(action==="startOAuth"){return json({ok:true,...await start(u,ws,String(body.projectId||""))});}if(!ws)throw new Error("WORKSPACE_REQUIRED");if(action==="status")return json({ok:true,...await status(u,ws,String(body.projectId||""))});if(action==="listRepos")return json({ok:true,...await repos(u,ws)});if(action==="createRepo")return json({ok:true,...await createRepo(u,ws,body)});if(action==="pushFiles")return json({ok:true,...await push(u,ws,body)});
 
 if(action==="installBuildRunner"){
-  const full=String(body.fullName||"");if(!/^[^/]+\\/[^/]+$/.test(full))throw new Error("Invalid repository");
+  const full=String(body.fullName||"");if(!/^[^/]+\/[^/]+$/.test(full))throw new Error("Invalid repository");
   const con=await connection(u.id,ws);const repo=await gh(`/repos/${full}`,con.accessToken);const defaultBranch=String(repo.default_branch||"main");
   return json({ok:true,...await ensureBuildWorkflow(con.accessToken,full,defaultBranch)});
 }
 if(action==="startBuild"){
   const project=await projectAccess(u.id,String(body.projectId||""));const full=String(body.fullName||"");
-  if(!/^[^/]+\\/[^/]+$/.test(full))throw new Error("Invalid repository");
+  if(!/^[^/]+\/[^/]+$/.test(full))throw new Error("Invalid repository");
   const con=await connection(u.id,project.workspace_id);const repo=await gh(`/repos/${full}`,con.accessToken);const defaultBranch=String(repo.default_branch||"main");
   await ensureBuildWorkflow(con.accessToken,full,defaultBranch);
   const branch=String(body.branch||defaultBranch).trim()||defaultBranch;const commitSha=await headCommit(con.accessToken,full,String(body.commitSha||branch));
