@@ -14,6 +14,7 @@ import {
   buildImpactGraph,
   projectArtifactKind,
   normalizeProjectType,
+  inputNodeIds,
 } from './projectx-core.js';
 import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
@@ -1185,40 +1186,53 @@ function projectSecurityChecks(project){
 }
 function renderImpact(project){
   const impact=project.impact||buildImpactGraph(project,project.spec||{},project.spec||{},{});
-  const changed=Array.isArray(impact.changed)?impact.changed:[];
-  const affected=Array.isArray(impact.affected)?impact.affected:[];
-  const invalidated=Array.isArray(impact.invalidated)?impact.invalidated:[];
-  const actions=Array.isArray(impact.suggestedActions)?impact.suggestedActions:[];
-  const sections=Array.isArray(impact.affectedSections)?impact.affectedSections:[];
+  const changedNodes=Array.isArray(impact.changedNodes)?impact.changedNodes:[];
+  const affectedNodes=Array.isArray(impact.affectedNodes)?impact.affectedNodes:[];
+  const staleNodes=Array.isArray(impact.staleNodes)?impact.staleNodes:[];
+  const invalidatedNodes=Array.isArray(impact.invalidatedNodes)?impact.invalidatedNodes:[];
+  const reviewNodes=Array.isArray(impact.reviewNodes)?impact.reviewNodes:[];
+  const actions=Array.isArray(impact.actions)?impact.actions:[];
+  const verification=Array.isArray(impact.verification)?impact.verification:[];
   const nodes=Array.isArray(impact.nodes)?impact.nodes:[];
   const edges=Array.isArray(impact.edges)?impact.edges:[];
   const pill=(label,value)=>'<div class="box"><div class="kicker">'+esc(label)+'</div><div style="font-size:24px;font-weight:700;margin-top:4px">'+esc(value)+'</div></div>';
-  const list=(items,empty)=>items.length?items.map(x=>'<div class="item"><b>'+esc(x)+'</b></div>').join(''):'<div class="sub">'+esc(empty)+'</div>';
-  const graphNodes=nodes.slice(0,80);
+  const nodeRow=(item)=>{
+    const n=item.node||item;
+    const why=item.reason?' · '+item.reason:'';
+    return '<div class="item"><b>'+esc(n.label||n.id)+'</b><div class="sub">'+esc((n.kind||'node')+(item.depth!=null?' · depth '+item.depth:'')+(item.confidence?' · '+item.confidence:'')+why)+'</div></div>';
+  };
+  const actionRows=actions.map(a=>'<div class="item"><b>'+esc(a.label||a.type||'Reconciliation action')+'</b><div class="sub">'+esc(a.reason||'')+'</div></div>').join('')||'<div class="sub">No reconciliation action is required.</div>';
+  const verifyRows=verification.map(v=>'<div class="item"><b>'+esc(v.label||v.type)+'</b><div class="sub">'+esc(v.reason||'')+'</div></div>').join('')||'<div class="sub">No verification step is queued.</div>';
+  const graphNodes=nodes.slice(0,100);
   const nodeMap=new Map(graphNodes.map(n=>[n.id,n]));
-  const graphEdges=edges.filter(e=>nodeMap.has(e.from)&&nodeMap.has(e.to)).slice(0,140);
+  const graphEdges=edges.filter(e=>nodeMap.has(e.from)&&nodeMap.has(e.to)).slice(0,160);
   const graph=graphNodes.length?'<div class="px-impact-graph">'+graphNodes.map(n=>'<div class="px-impact-node '+esc(n.status||'active')+'"><span class="px-impact-kind">'+esc(n.kind)+'</span><b>'+esc(n.label)+'</b></div>').join('')+'</div>':'<div class="sub">Make a project change to build the dependency graph.</div>';
   const body=[
-    '<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">',
-    pill('Inputs changed',changed.length),pill('Nodes affected',graphNodes.length),pill('Dependency edges',graphEdges.length),
+    '<div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px">',
+    pill('Changed',changedNodes.length),pill('Affected',affectedNodes.length),pill('Stale',staleNodes.length),pill('Invalidated',invalidatedNodes.length),
     '</div>',
     '<div class="sub" style="margin-bottom:14px">'+esc(impact.summary||'No downstream impact detected.')+'</div>',
-    '<div class="box"><div class="kicker">DEPENDENCY MAP</div><h3 style="margin:4px 0 10px">What this change touches</h3>'+graph+'</div>',
+    '<div class="box"><div class="kicker">DEPENDENCY MAP</div><h3 style="margin:4px 0 10px">What this change touches</h3><div class="sub" style="margin-bottom:10px">'+esc(graphEdges.length+' dependency edges · '+reviewNodes.length+' objects need review')+'</div>'+graph+'</div>',
     '<div class="grid" style="margin-top:14px">',
-    '<div class="box"><h3 style="margin-top:0">Changed</h3>'+list(changed,'No changed inputs.')+'</div>',
-    '<div class="box"><h3 style="margin-top:0">Affected</h3>'+list(affected,'No downstream areas.')+'</div>',
-    '<div class="box"><h3 style="margin-top:0">Needs review</h3>'+list(invalidated,'Nothing currently invalidated.')+'</div>',
+    '<div class="box"><h3 style="margin-top:0">Changed state</h3>'+(changedNodes.map(nodeRow).join('')||'<div class="sub">No changed objects.</div>')+'</div>',
+    '<div class="box"><h3 style="margin-top:0">Affected work</h3>'+(affectedNodes.slice(0,30).map(nodeRow).join('')||'<div class="sub">No downstream objects.</div>')+'</div>',
+    '<div class="box"><h3 style="margin-top:0">Stale</h3>'+(staleNodes.map(nodeRow).join('')||'<div class="sub">Nothing is stale.</div>')+'</div>',
+    '<div class="box"><h3 style="margin-top:0">Invalidated</h3>'+(invalidatedNodes.map(nodeRow).join('')||'<div class="sub">Nothing invalidated.</div>')+'</div>',
     '</div>',
-    sections.length?'<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Affected workspace sections</h3>'+list(sections,'None')+'</div>':'',
-    '<div class="box" style="margin-top:14px"><h3 style="margin-top:0">Suggested next actions</h3>'+list(actions,'No follow-up action required.')+'</div>',
-    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="primary" id="impact-apply">Open affected work</button></div>',
+    '<div class="grid" style="margin-top:14px"><div class="box"><h3 style="margin-top:0">Reconciliation actions</h3>'+actionRows+'</div><div class="box"><h3 style="margin-top:0">Verification queue</h3>'+verifyRows+'</div></div>',
+    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="primary" id="impact-chat">Reconcile in Assistant</button></div>',
     '<div id="impact-status" class="sub" style="margin-top:10px"></div>'
   ].join('');
-  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces changes through the current project state and shows the work connected to that change.',body);
-  $('#impact-refresh').onclick=()=>{project.impact=buildImpactGraph(project,project.spec||{},project.spec||{},{});saveProject(project);renderImpact(project);};
-  $('#impact-apply').onclick=()=>{const target=sections.length?project.sections.find(s=>sections.includes(s.name)):project.sections.find(s=>s.kind==='planning');if(target){project.selectedSection=target.id;project.uiNav='overview';saveProject(project);}else{$('#impact-status').textContent='No affected workspace section is available yet.';}};
+  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces a state change through the dependency graph, marks stale work, and produces a concrete reconciliation queue.',body);
+  $('#impact-refresh').onclick=()=>{
+    const rebuilt=buildImpactGraph(project,project.spec||{},project.spec||{});
+    project.impact=rebuilt;saveProject(project);renderImpact(project);
+  };
+  $('#impact-chat').onclick=()=>{
+    const summary=(actions.slice(0,8).map(a=>a.label||a.type).join('; ')||'Review the current impact and reconcile affected work.');
+    project.uiNav='assistant';saveProject(project);renderProjectChat(project,'Reconcile this change. Review the affected decisions, stale artifacts, invalidated work, and verification queue before making any further changes. '+summary);
+  };
 }
-
 function renderProjectSecurity(project){
   const checks=projectSecurityChecks(project);
   toolShell('SECURITY','Project security checks','Fast local checks on generated files. Credential-like findings are advisory; critical execution and transport checks block a verified build. This does not replace a full security review.','<div class="result-list">'+checks.map(x=>'<div class="result '+(x.pass?'pass':'fail')+'"><b>'+ (x.pass?'PASS':'FAIL')+' · '+esc(x.name)+'</b><div class="sub">'+esc(x.detail)+'</div></div>').join('')+'</div>');
@@ -1251,6 +1265,21 @@ function refreshConversationViews(project){
   const log=$('#project-log');if(log){log.innerHTML=html;log.scrollTop=log.scrollHeight;}
   const dock=$('#assistant-dock-log');if(dock){dock.innerHTML=html;dock.scrollTop=dock.scrollHeight;}
 }
+function buildMutationPreview(project,data){
+  const preview=JSON.parse(JSON.stringify(project));
+  try{
+    const outcome=applyProjectMutation(preview,{
+      specPatch:data?.specPatch||{},
+      plan:Array.isArray(data?.plan)?data.plan:undefined,
+      workspaceSections:Array.isArray(data?.workspaceSections)?data.workspaceSections:undefined,
+      agents:Array.isArray(data?.agents)?data.agents:undefined,
+      fileOperations:Array.isArray(data?.fileOperations)?data.fileOperations:[]
+    });
+    return outcome.impact || null;
+  }catch(error){
+    return {error:String(error?.message||error),baseVersion:Number(project.specVersion||1),targetVersion:Number(project.specVersion||1)};
+  }
+}
 async function sendProjectMessage(project,userText){
   const text=String(userText||'').trim();
   if(!text)return;
@@ -1269,8 +1298,9 @@ async function sendProjectMessage(project,userText){
       addTask(project,text.slice(0,80),{status:settingsState.executionMode==='Ask Me'&&wantsMutation?'awaiting approval':(wantsMutation?'active':'draft'),agent:intent==='research'?'researcher':intent==='test'?'tester':intent==='build'?'builder':'orchestrator',description:text,affectedFiles:(data.fileOperations||[]).map(x=>x.path).filter(Boolean)});
     }
     if(wantsMutation&&settingsState.executionMode==='Ask Me'){
-      project.pendingMutation={...data,message:String(data.message||'Review the proposed change.'),createdAt:now()};
-      messages.push({role:'assistant',text:'I prepared the requested change for approval. Nothing has been applied yet.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);renderProjectChat(project);return;
+      const impactPreview=buildMutationPreview(project,data);
+      project.pendingMutation={...data,impactPreview,message:String(data.message||'Review the proposed change.'),createdAt:now(),baseVersion:Number(project.specVersion||1)};
+      messages.push({role:'assistant',text:'I prepared the requested change for approval. Review the dependency impact before applying it.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);renderProjectChat(project);return;
     }
     if(wantsMutation){
       snapshot(project,'Before change');
@@ -1310,19 +1340,21 @@ async function sendProjectMessage(project,userText){
 function renderProjectChat(project,prefill=''){
   const body=$('#project-body'),messages=project.conversation.length?project.conversation.slice(-MAX_HISTORY):[{role:'assistant',text:'I have the canonical project state in context. What should we change or work on next?'}],pending=project.pendingMutation;
   body.innerHTML='<div class="box"><div class="sub">Project Chat controls the canonical project state. Ask Me pauses mutations for approval; other modes follow their configured automation level.</div><div id="project-log" class="conversation"></div>'+
-    (pending?'<div class="approval-card"><div class="kicker">APPROVAL REQUIRED</div><b>ProjectX prepared a change</b><div class="sub">'+esc(pending.message||'Review the proposed project change before applying it.')+'</div><div class="brain-group"><b>Change preview</b><div class="brain-row">'+esc((Object.keys(pending.specPatch||{}).length)+' spec fields · '+(pending.plan||[]).length+' plan items · '+(pending.fileOperations||[]).length+' file operations · '+(pending.workspaceSections||[]).length+' workspace sections · '+(pending.agents||[]).length+' specialists')+'</div><div class="brain-row">Files: '+esc((pending.fileOperations||[]).map(x=>x.path).join(', ')||'None')+'</div></div><div class="actions"><button class="primary" id="approve-pending">Approve and apply</button><button class="ghost" id="reject-pending">Reject</button></div></div>':'')+
+    (pending?'<div class="approval-card"><div class="kicker">APPROVAL REQUIRED</div><b>ProjectX prepared a change</b><div class="sub">'+esc(pending.message||'Review the proposed project change before applying it.')+'</div><div class="brain-group"><b>CHANGE PREVIEW</b><div class="brain-row">'+esc((pending.impactPreview?.changed||[]).slice(0,8).join(' · ')||'No changed inputs detected.')+'</div><div class="brain-row">'+esc((pending.impactPreview?.affected?.length||0)+' affected objects · '+(pending.impactPreview?.stale?.length||0)+' stale · '+(pending.impactPreview?.invalidated?.length||0)+' invalidated')+'</div><div class="brain-row">'+esc((pending.impactPreview?.actions||[]).slice(0,5).map(x=>x.label||x).join(' · ')||'No reconciliation actions.')+'</div><div class="brain-row">Files: '+esc((pending.fileOperations||[]).map(x=>x.path).join(', ')||'None')+'</div></div><div class="actions"><button class="primary" id="approve-pending">Approve and apply</button><button class="ghost" id="reject-pending">Reject</button></div></div>':'')+
     '<form id="project-form" class="form"><textarea id="project-input" placeholder="Ask ProjectX to change, build, research, test, or explain something..."></textarea><button class="primary" id="project-send">Send</button></form></div>';
   drawConversation(messages,'#project-log');
   const approve=$('#approve-pending'),reject=$('#reject-pending');
   if(approve)approve.onclick=async()=>{
     approve.disabled=true;reject.disabled=true;
     try{
+      if(pending.baseVersion!=null&&Number(pending.baseVersion)!==Number(project.specVersion||1)) throw new Error('This proposal is stale because the project changed after it was prepared. Reopen the latest impact and review again.');
+      if(pending.impactPreview?.targetVersion&&Number(pending.impactPreview.targetVersion)!==Number(project.specVersion||1)+1) throw new Error('This proposal no longer matches the current project version.');
       snapshot(project,'Before approved change');
       const mutation=applyProjectMutation(project,{specPatch:pending.specPatch||{},plan:Array.isArray(pending.plan)?pending.plan:undefined,workspaceSections:Array.isArray(pending.workspaceSections)?pending.workspaceSections:undefined,agents:Array.isArray(pending.agents)?pending.agents:undefined,fileOperations:Array.isArray(pending.fileOperations)?pending.fileOperations:[]});
       project.pendingMutation=null;
       if(!mutation.changed)throw new Error('The approved change produced no canonical project mutation.');
       project.status=pending.needsBuild?'needs-build':'changed';project.executionState={...(project.executionState||{}),lastAgent:'orchestrator'};
-      messages.push({role:'assistant',text:'Approved. The prepared change has been applied to the canonical project state.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);await syncRemoteProject(project);
+      messages.push({role:'assistant',text:'Approved. The prepared change has been applied. Review the Impact tab for the reconciliation queue.'});project.conversation=messages.slice(-MAX_HISTORY);saveProject(project);await syncRemoteProject(project);
       if(pending.needsBuild){renderOutput(project);await buildArtifact(project);return;}
       renderProject(project);
     }catch(error){project.pendingMutation=null;saveProject(project);await syncRemoteProject(project);messages.push({role:'assistant',text:'The approved change could not be applied: '+error.message});project.conversation=messages.slice(-MAX_HISTORY);drawConversation(messages,'#project-log');}
@@ -1453,6 +1485,15 @@ async function buildArtifact(project,repairResults=[]){
 
     snapshot(project,'Before rebuild');
     project.files=files;
+    const lineageDependencies=inputNodeIds(project);
+    const outputArtifact=project.artifacts?.output;
+    if(outputArtifact){
+      outputArtifact.derivedFromVersion=Number(project.specVersion||1);
+      outputArtifact.specVersion=Number(project.specVersion||1);
+      outputArtifact.dependencyNodeIds=lineageDependencies.slice(0,240);
+      outputArtifact.filePaths=Object.keys(files).slice(0,160);
+      outputArtifact.stale=false;
+    }
     project.status='built';
     if(session?.access_token){
       const committed=await edge('createArtifactVersion',{
