@@ -427,5 +427,7 @@ html, body {
 .px-impact-node{min-height:64px;border:1px solid var(--px-line);border-radius:10px;background:var(--px-bg-raised);padding:10px;display:flex;flex-direction:column;gap:5px;min-width:0}
 .px-impact-node.changed{border-color:var(--px-accent);background:#eef1ff}
 .px-impact-node.stale{border-color:var(--px-warn);background:#fff8e8}
+.px-impact-node.review{border-color:#8b79c9;background:#f5f1ff}
+.px-impact-node.invalidated{border-color:var(--px-bad);background:#fff0f0}
 .px-impact-kind{font:10px/1 var(--px-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--px-soft)}
 @media(max-width:760px){.px-impact-graph{grid-template-columns:repeat(2,minmax(0,1fr))}}
