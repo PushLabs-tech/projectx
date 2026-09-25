@@ -919,30 +919,33 @@ function renderDiscoveryPoll(poll,meta,history){
   const options=[...new Set(aiOptions)].filter(v=>v.toLowerCase()!=='describe in your own words').slice(0,4);
 
   if(!decision||/\?\s*$/.test(decision)||options.length!==4||options.some(v=>/\?\s*$/.test(v))){
-    root.innerHTML='<div class="poll-card"><div class="poll-title">The AI could not generate a contextual poll.</div><div class="sub" style="margin-top:6px">Nothing generic was substituted. Generate a fresh decision from the current project context.</div><div class="actions"><button type="button" class="ghost" id="poll-retry">Regenerate poll</button></div></div>';
+    root.innerHTML='<div class="poll-card"><div class="poll-title">I need one more thought from you.</div><div class="sub" style="margin-top:6px">I could not phrase the next choice clearly. Nothing has been changed.</div><div class="actions"><button type="button" class="ghost" id="poll-retry">Try again</button></div></div>';
     $('#poll-retry')?.addEventListener('click',async()=>{
       const button=$('#poll-retry'); if(button)button.disabled=true;
-      if(status)status.textContent='Generating a new contextual poll…';
+      if(status)status.textContent='Thinking…';
       try{await regenerateDiscoveryPoll(history,meta);}
-      catch(error){if(status)status.textContent='Could not regenerate the poll: '+String(error?.message||error);if(button)button.disabled=false;}
+      catch(error){if(status)status.textContent='Something went wrong. Try again.';if(button)button.disabled=false;}
     });
     return;
   }
 
-  const renderedOptions=[...options,'Describe in your own words'];
-  root.innerHTML=`<div class="poll-card">
+  const step=Math.max(1,(Array.isArray(meta?.answers)?meta.answers.length:0)+1);
+  const renderedOptions=[...options,'Something else'];
+  const stepNode=$('#interview-step');
+  if(stepNode)stepNode.textContent='Step '+step;
+  root.innerHTML=`<div class="poll-card px-question-card">
     <div class="poll-head">
-      <div class="poll-eyebrow">PROJECT DECISION</div>
       <div class="poll-title">${esc(decision)}</div>
+      <div class="sub" style="margin-top:5px">Pick one, or tell me what you have in mind.</div>
     </div>
     <div class="poll-options" role="radiogroup" aria-label="${esc(decision)}">
       ${renderedOptions.map((option,i)=>`<button type="button" class="poll-option" data-poll-index="${i}" aria-pressed="false"><span class="poll-radio" aria-hidden="true"></span><span>${esc(option)}</span></button>`).join('')}
     </div>
     <div class="poll-actions actions">
-      <button type="button" class="ghost" id="poll-regenerate">Regenerate</button>
+      <button type="button" class="ghost" id="poll-regenerate">Show me different options</button>
     </div>
     <div id="poll-custom" class="poll-custom" hidden>
-      <textarea id="poll-custom-input" placeholder="Describe it in your own words..." maxlength="1200"></textarea>
+      <textarea id="poll-custom-input" placeholder="Tell me what you want instead…" maxlength="1200"></textarea>
       <button type="button" class="primary" id="poll-custom-send">Continue</button>
     </div>
   </div>`;
@@ -968,9 +971,9 @@ function renderDiscoveryPoll(poll,meta,history){
   $('#poll-regenerate')?.addEventListener('click',async()=>{
     const button=$('#poll-regenerate'); if(button)button.disabled=true;
     root.querySelectorAll('[data-poll-index]').forEach(x=>x.disabled=true);
-    if(status)status.textContent='Generating a new contextual poll…';
+    if(status)status.textContent='Thinking…';
     try{await regenerateDiscoveryPoll(history,meta);}
-    catch(error){if(status)status.textContent='Could not regenerate the poll: '+String(error?.message||error);if(button)button.disabled=false;root.querySelectorAll('[data-poll-index]').forEach(x=>x.disabled=false);}
+    catch(error){if(status)status.textContent='Something went wrong. Try again.';if(button)button.disabled=false;root.querySelectorAll('[data-poll-index]').forEach(x=>x.disabled=false);}
   });
 
   $('#poll-custom-send')?.addEventListener('click',async()=>{
@@ -982,7 +985,6 @@ function renderDiscoveryPoll(poll,meta,history){
     if((e.ctrlKey||e.metaKey)&&e.key==='Enter')$('#poll-custom-send')?.click();
   });
 }
-
 async function regenerateDiscoveryPoll(history,meta={}){
   const latest=String(history?.[history.length-1]?.text||meta?.initialIntent||'').trim();
   if(!latest)throw new Error('No current project context is available.');
@@ -1140,7 +1142,11 @@ const interviewSystem = "You are ProjectX's discovery architect. Treat the user'
     await syncRemoteProject(project);
     openProject(project.id);
   }catch(error){
-    $('#interview-status')&&($('#interview-status').textContent='Discovery failed safely: '+String(error.message||error)+'. No project was created from partial or fallback data.');
+    const message=String(error?.message||error);
+    const status=$('#interview-status');
+    if(status)status.innerHTML='<span>Something went wrong while setting this up.</span> <button type="button" class="ghost" id="interview-retry">Try again</button>';
+    $('#interview-retry')?.addEventListener('click',()=>continueInterview(history,answers,meta));
+    console.warn('ProjectX creation flow error:',message);
   }
 }
 
