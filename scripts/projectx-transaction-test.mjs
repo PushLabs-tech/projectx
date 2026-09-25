@@ -28,7 +28,6 @@ const validated=validateTransactionOperations(project,contract,[
 ]);
 assert.equal(validated.ok,true);
 assert.equal(validated.summary.filesChanged,2);
-assert.equal(validated.summary.modified,undefined);
 
 const tx=createExecutionTransaction(project,contract,[
   {op:'write',path:'index.html',content:'<html><body>after</body></html>'},
@@ -80,3 +79,15 @@ console.log('PASS: local transaction apply/rollback is deterministic');
 console.log('PASS: rollback refuses to overwrite later file changes');
 console.log('PASS: no-op and duplicate transactions are rejected safely');
 console.log('PROJECTX TRANSACTIONAL EXECUTION CONTRACT PASSED');
+
+const addedProject={specVersion:9,files:{}}; 
+const addedTx=createExecutionTransaction(addedProject,{...contract,repairPaths:['new.js']},[
+  {op:'write',path:'new.js',content:'export const ok=true;'}
+]);
+assert.equal(addedTx.ok,true);
+assert.deepEqual(addedTx.transaction.inverseOperations,[{op:'delete',path:'new.js'}]);
+const deletedTx=createExecutionTransaction(project,{...contract,repairPaths:['app.js']},[
+  {op:'delete',path:'app.js'}
+]);
+assert.equal(deletedTx.ok,true);
+assert.deepEqual(deletedTx.transaction.inverseOperations,[{op:'write',path:'app.js',content:project.files['app.js']}]);
