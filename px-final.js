@@ -392,7 +392,8 @@ async function requestIsolatedBuild(project) {
   }
 }
 async function deployProject(projectId, provider = 'vercel', label = 'default') { return integrationEdge('deploy', 'deploy', { projectId, provider, label }); }
-async function deploymentStatus(projectId) { return integrationEdge('deploy', 'status', { projectId }); }
+async function deploymentStatus(projectId, deploymentId = '', label = 'default') { return integrationEdge('deploy', 'status', { projectId, deploymentId, label }); }
+async function rollbackDeployment(projectId, deploymentId, label = 'default') { return integrationEdge('deploy', 'rollbackDeployment', { projectId, deploymentId, label }); }
 async function saveDeploymentTarget(workspaceId, provider, token, options = {}) { return integrationEdge('deploy', 'saveTarget', { workspaceId, provider, token, projectId: integrationProjectId(), ...options }); }
 async function inviteWorkspaceMember(workspaceId, email, role = 'editor') { return integrationEdge('collaboration', 'invite', { workspaceId, email, role }); }
 async function acceptWorkspaceInvite(token) { return integrationEdge('collaboration', 'accept', { token }); }
@@ -2645,12 +2646,63 @@ function renderTerminal(){
 function renderCollab(){
   toolShell('MEMBERS','Collaboration','Presence uses Supabase Realtime when signed in. Additional members appear only after they exist on the project.','<div class="box"><div class="row"><b>'+(session?.user?.email||'Guest')+'</b><span class="sub">Owner</span></div></div>'+(session?'<div class="sub" style="margin-top:8px">Realtime channel is attached while this project is open.</div>':'<div class="placeholder">Sign in to sync collaboration events.</div>'));
 }
-function renderDeploy(project){
-  toolShell('DEPLOY','Publish',DeploymentProvider.note,'<div class="grid"><div class="box"><b>Status</b><div class="sub">Not deployed</div></div><div class="box"><b>Provider</b><div class="sub">'+esc(DeploymentProvider.kind)+'</div></div><div class="box"><b>Domain</b><div class="sub">Add a domain after a host is connected. DNS is not applied automatically.</div></div></div><form id="domain-form" class="form" style="margin-top:12px"><input id="domain-host" class="input full" placeholder="example.com"><button class="ghost">Record domain</button></form><div id="domain-list"></div><div class="actions"><button class="ghost" id="export-deploy">Export artifact</button></div>');
+async function renderDeploy(project){
+  const current=project.artifacts?.output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
+  const verified=project.tests?.specVersion===project.specVersion&&project.tests?.status==='passed';
+  toolShell('DEPLOY','Publish','Deploy the current verified artifact to a connected Vercel or Netlify target. ProjectX records external state and runs a post-deploy HTTPS health check.','<div id="deployment-panel"><div class="sub">Loading deployment history…</div></div><div class="grid" style="margin-top:10px"><div class="box"><b>Artifact gate</b><div class="sub">'+(current?(verified?'Current build verified.':'Current build exists but is not verified.'):'Build a current artifact first.')+'</div></div><div class="box"><b>Provider</b><select id="deploy-provider" class="select"><option value="vercel">Vercel</option><option value="netlify">Netlify</option></select><div class="sub" style="margin-top:5px">Connect the provider in Settings → Integrations.</div></div></div><div class="actions" style="margin-top:10px"><button class="primary" id="deploy-now" '+(!current||!verified?'disabled':'')+'>Deploy current artifact</button><button class="ghost" id="export-deploy">Export artifact</button></div><div class="box" style="margin-top:10px"><b>Custom domains</b><div class="sub">Recording a domain here does not change DNS automatically.</div><form id="domain-form" class="form" style="margin-top:10px"><input id="domain-host" class="input full" placeholder="example.com"><button class="ghost">Record domain</button></form><div id="domain-list"></div></div>');
   const names=Array.isArray(project.executionState?.domains)?project.executionState.domains:[];
-  $('#domain-list').innerHTML=names.map(d=>`<div class="row"><b>${esc(d.host)}</b><span class="status warn">${esc(d.status)}</span></div>`).join('')||'<div class="placeholder">No domains recorded.</div>';
+  $('#domain-list').innerHTML=names.map(d=>'<div class="row"><b>'+esc(d.host)+'</b><span class="status warn">'+esc(d.status)+'</span></div>').join('')||'<div class="placeholder">No domains recorded.</div>';
   $('#domain-form')?.addEventListener('submit',e=>{e.preventDefault();const host=String($('#domain-host').value||'').trim().toLowerCase();if(!host||!/^[a-z0-9.-]+$/.test(host))return notify('Enter a hostname. Verification is manual.','info');const next=[...names.filter(x=>x.host!==host),{host,status:'awaiting DNS'}];applyProjectMutation(project,{executionStatePatch:{domains:next}});saveProject(project);renderDeploy(project);});
   $('#export-deploy')?.addEventListener('click',()=>renderDelivery(project));
+  const panel=$('#deployment-panel');
+  const draw=deployments=>{
+    const rows=Array.isArray(deployments)?deployments:[];
+    if(!rows.length){panel.innerHTML='<div class="placeholder">No deployments recorded yet.</div>';return;}
+    const latest=rows[0];
+    project.executionState={...(project.executionState||{}),deployment:{id:latest.id,status:latest.status,provider:latest.provider,url:latest.url,healthStatus:latest.health_status,healthEvidence:latest.health_evidence,previousDeploymentId:latest.previous_deployment_id||latest.metadata?.deploymentPipeline?.previousDeploymentId||null,updatedAt:latest.updated_at}};
+    saveProject(project);
+    panel.innerHTML=rows.slice(0,8).map(row=>{
+      const health=String(row.health_status||'pending');
+      const live=String(row.status||'')==='ready'&&health==='passed';
+      const statusClass=live?'ok':String(row.status||'').includes('fail')||health==='failed'||row.status==='unhealthy'?'bad':'warn';
+      const runUrl=row.url?'<a class="ghost" href="'+esc(row.url)+'" target="_blank" rel="noreferrer">Open</a>':'';
+      const rollback=row.previous_deployment_id&&row.provider==='netlify'?'<button class="ghost" data-rollback="'+esc(row.id)+'">Rollback</button>': '';
+      const label=live?'LIVE':String(row.status||'PENDING').toUpperCase()+(health==='passed'?' · HEALTHY':health==='failed'?' · UNHEALTHY':'');
+      const evidence=row.health_evidence?.httpStatus?'HTTP '+row.health_evidence.httpStatus:'Health check pending';
+      return '<div class="row"><div><b>'+esc(row.provider)+' · '+label+'</b><div class="sub">'+esc(row.created_at||'')+' · '+esc(String(row.source_hash||row.metadata?.deploymentPipeline?.sourceHash||'').slice(0,12))+' · '+esc(evidence)+'</div></div><div class="actions">'+runUrl+rollback+'</div></div>';
+    }).join('');
+    $('[data-rollback]',panel).forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{await rollbackDeployment(project.id,btn.dataset.rollback);notify('Rollback requested.','success');await refresh();}catch(error){notify(error.message||String(error),'error');}finally{btn.disabled=false;}});
+  };
+  const refresh=async()=>{
+    if(!session){panel.innerHTML='<div class="placeholder">Sign in to deploy and inspect deployment health.</div>';return;}
+    try{const result=await deploymentStatus(project.sync?.remoteId||project.id);draw(result.deployments||[]);}catch(error){panel.innerHTML='<div class="placeholder">Deployment history unavailable: '+esc(error.message)+'</div>';}
+  };
+  $('#deploy-now')?.addEventListener('click',async()=>{
+    if(!current||!verified)return notify('Build and verify the current artifact before deploying.','info');
+    const btn=$('#deploy-now');const provider=$('#deploy-provider')?.value||'vercel';btn.disabled=true;btn.textContent='Deploying…';
+    try{
+      const result=await deployProject(project.sync?.remoteId||project.id,provider);
+      const row=result?.deployment;
+      if(!row?.id)throw new Error('Deployment service did not return a deployment record.');
+      notify('Deployment created. ProjectX is waiting for provider readiness and health verification.','success');
+      await refresh();
+      const started=Date.now();
+      while(Date.now()-started<6*60*1000){
+        await sleep(5000);
+        const state=await deploymentStatus(project.sync?.remoteId||project.id,row.id);
+        draw(state.deployments||[]);
+        const currentRow=(state.deployments||[]).find(x=>x.id===row.id);
+        if(currentRow&&['ready','failed','unhealthy','rolled_back'].includes(String(currentRow.status))){
+          if(currentRow.status==='ready'&&currentRow.health_status==='passed')notify('Deployment is live and health-checked.','success');
+          else if(currentRow.status==='unhealthy')notify('Deployment reached the provider but failed ProjectX health verification.','error');
+          else if(currentRow.status==='failed')notify('Deployment failed at the provider.','error');
+          break;
+        }
+      }
+    }catch(error){notify(error.message||String(error),'error');}
+    finally{btn.disabled=false;btn.textContent='Deploy current artifact';}
+  });
+  refresh();
 }
 function openPalette(){
   const pal=$('#px-palette');if(!pal)return;pal.hidden=false;$('#px-palette-input').value='';drawPalette('');$('#px-palette-input').focus();
@@ -2698,6 +2750,6 @@ window.addEventListener('hashchange',()=>{
 });
 async function boot(){installCss();installOptionalAnalytics();window.addEventListener('online',()=>{flushSyncOutbox().catch(()=>{});});await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();}
 window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot,
-  integrations:{startGitHubConnection,githubListRepositories,githubCreateRepository,githubPushFiles,startIsolatedBuild,isolatedBuildStatus,isolatedBuildRuns,cancelIsolatedBuild,deployProject,deploymentStatus,saveDeploymentTarget,
+  integrations:{startGitHubConnection,githubListRepositories,githubCreateRepository,githubPushFiles,startIsolatedBuild,isolatedBuildStatus,isolatedBuildRuns,cancelIsolatedBuild,deployProject,deploymentStatus,rollbackDeployment,saveDeploymentTarget,
     inviteWorkspaceMember,acceptWorkspaceInvite,listWorkspaceMembers,ingestProjectResource,billingStatus,cancelBillingSubscription,collaborationChannel}};
 boot();
