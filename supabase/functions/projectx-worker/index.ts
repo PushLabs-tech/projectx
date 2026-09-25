@@ -80,8 +80,8 @@ async function executeExecutionJob(token:string,job:any) {
   const execution=executeToolCalls(project,contract,Array.isArray(ai?.toolCalls)?ai.toolCalls:[]);
   const plannerEvidence=(ai?.diagnosis || ai?.repairPlan) ? [{plannerDiagnosis:ai?.diagnosis||null,repairPlan:ai?.repairPlan||null}] : [];
   const evidence=[...(Array.isArray(ai?.evidence)?ai.evidence:[]),...plannerEvidence,...execution.evidence].slice(0,30);
-  if (action.type === "repair" && execution.operations.length === 0) {
-    throw new Error("Repair execution produced no file patch.");
+  if (["rebuild","update","repair"].includes(action.type) && execution.operations.length === 0) {
+    throw new Error("Execution produced no file changes.");
   }
   if (!execution.ok) {
     const failed=buildExecutionSettings(runningSettings,{...action,id:contract.actionId},{kind:action.type,ok:false,error:execution.errors?.[0]?.error || "Tool execution failed",message:"Remote execution failed.",evidence,outputVersion:project.specVersion},"failed");
