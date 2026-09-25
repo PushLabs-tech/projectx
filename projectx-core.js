@@ -1,4 +1,6 @@
-export const CORE_VERSION = 3;
+import { reconcileChange, markReconciliationState, inputNodeIds } from './projectx-reconciliation.js';
+
+export const CORE_VERSION = 4;
 
 const PROJECT_TYPES = ['Game','Website','App','Mobile','Business','Business system','Research','Document','Presentation','Data','Dashboard','Internal tool','Agent','Automation','API','Creative project','Other'];
 const SOFTWARE_TYPES = new Set(['Game','Website','App','Mobile','API','Agent','Automation','Business system','Data','Dashboard','Internal tool','Presentation']);
@@ -198,66 +200,70 @@ export function normalizeSections(sections = [], type = 'Other') {
   return [{id:'chat',name:'Chat',purpose:'The project conversation and change interface.',dependsOn:[],kind:'conversation',agent:'interviewer',capabilities:SECTION_CAPABILITIES.conversation,artifactTypes:[]},...out].slice(0,12);
 }
 
-export function invalidateArtifacts(project) {
+export function invalidateArtifacts(project, impactedNodeIds = null) {
   project.artifacts = project.artifacts || {};
-  for (const artifact of Object.values(project.artifacts)) if (artifact) artifact.stale = Number(artifact.specVersion || 0) !== Number(project.specVersion);
   project.outputs = project.outputs || {};
-  for (const output of Object.values(project.outputs)) if (output) output.stale = Number(output.specVersion || 0) !== Number(project.specVersion);
+  const impacted = impactedNodeIds == null ? null : new Set(impactedNodeIds instanceof Set ? [...impactedNodeIds] : impactedNodeIds);
+  const check = (value, prefix, target) => {
+    if (!value || typeof value !== 'object') return;
+    const depIds = Array.isArray(value.dependencyNodeIds) ? value.dependencyNodeIds : [];
+    if (impacted && depIds.length) {
+      const stale = depIds.some(id => impacted.has(id));
+      if (stale) { value.stale = true; value.staleFromVersion = Number(project.specVersion || 1); }
+      return;
+    }
+    target.stale = Number(value.specVersion || 0) !== Number(project.specVersion || 0);
+    if (target.stale) target.staleFromVersion = Number(project.specVersion || 1);
+    if (prefix === 'artifact:' && !Array.isArray(value.dependencyNodeIds) && Number(value.specVersion || 0) === Number(project.specVersion || 0)) {
+      target.stale = false;
+    }
+  };
+  for (const [key, value] of Object.entries(project.artifacts)) if (value) check(value, 'artifact:', value);
+  for (const [key, value] of Object.entries(project.outputs)) if (value) check(value, 'output:', value);
 }
 
 export function buildImpactGraph(project = {}, beforeSpec = {}, afterSpec = {}, mutation = {}) {
-  const labels = { goal:'Goal', users:'Users', requirements:'Requirements', constraints:'Constraints', features:'Features', decisions:'Decisions', dependencies:'Dependencies', resources:'Resources', assets:'Assets', deliverables:'Deliverables', acceptanceCriteria:'Acceptance criteria', successCriteria:'Success criteria', openQuestions:'Open questions', platform:'Platform', technology:'Technology', visualDirection:'Visual direction', currentState:'Current state', assumptions:'Assumptions', risks:'Risks', uncertainties:'Uncertainties', projectType:'Project type', projectTitle:'Project title', plan:'Plan', research:'Research', files:'Files' };
-  const same = (x,y) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
-  const changed = [];
-  const fields = Object.keys(labels).filter(x => !['projectType','projectTitle','plan','research','files'].includes(x));
-  for (const field of fields) if (!same(beforeSpec?.[field], afterSpec?.[field])) changed.push(field);
-  if (mutation.projectType && String(mutation.projectType) !== String(project.type || '')) changed.push('projectType');
-  if (mutation.projectTitle && String(mutation.projectTitle) !== String(project.title || '')) changed.push('projectTitle');
-  if (mutation.plan && !same(mutation.beforePlan, mutation.afterPlan)) changed.push('plan');
-  if (mutation.researchPatch && !same(mutation.beforeResearch, mutation.afterResearch)) changed.push('research');
-  if (mutation.fileOperations?.length && mutation.filesActuallyChanged !== false) changed.push('files');
-  const unique = [...new Set(changed)];
-  const downstream = {
-    goal:['requirements','constraints','decisions','deliverables','plan','files','tests'], users:['requirements','features','decisions','deliverables','plan','files'],
-    requirements:['decisions','plan','files','tasks','tests'], constraints:['decisions','plan','deliverables','files','tasks','tests'], features:['plan','files','tasks','tests'],
-    decisions:['requirements','plan','deliverables','files','tasks','experiments','tests'], dependencies:['plan','files','tasks','tests'], resources:['research','decisions','plan','files'],
-    assets:['files','preview','tests'], deliverables:['files','preview','tasks','tests','deployment'], acceptanceCriteria:['tests','verification'], successCriteria:['tests','verification'],
-    openQuestions:['discovery','decisions','plan'], assumptions:['decisions','plan','verification'], risks:['decisions','plan','tasks','verification'], uncertainties:['decisions','plan','verification'],
-    platform:['files','tests','deployment'], technology:['files','tests','deployment'], visualDirection:['design','files','preview'], currentState:['plan','research','verification'],
-    projectType:['architecture','files','tests','deployment'], projectTitle:['metadata'], plan:['tasks','execution'], research:['evidence','decisions','plan'], files:['artifacts','preview','tests','deployment']
+  const before = {
+    ...project,
+    spec: beforeSpec || {},
+    plan: mutation.beforePlan ?? project.plan ?? [],
+    research: mutation.beforeResearch ?? project.research ?? {},
+    files: mutation.beforeFiles ?? project.files ?? {}
   };
-  const affected = new Set(); unique.forEach(k => (downstream[k] || []).forEach(v => affected.add(v)));
-  const nodes=[]; const edges=[];
-  const addNode=(id,kind,label,status='active')=>{if(id&&!nodes.some(n=>n.id===id))nodes.push({id,kind,label,status});};
-  const addEdge=(from,to,kind)=>{if(from&&to&&!edges.some(e=>e.from===from&&e.to===to&&e.kind===kind))edges.push({from,to,kind});};
-  unique.forEach(k=>addNode('input:'+k,'input',labels[k],'changed'));
-  const inputs=['requirements','constraints','features','decisions','deliverables','technology','visualDirection','files'];
-  const source=unique.find(k=>inputs.includes(k));
-  Object.entries(project.artifacts||{}).slice(0,50).forEach(([key,v])=>{const id='artifact:'+key;addNode(id,'artifact',String(v?.summary||key),v?.stale?'stale':'active');if(source)addEdge('input:'+source,id,'affects');});
-  Object.keys(project.files||{}).slice(0,80).forEach(path=>{const id='file:'+path;addNode(id,'file',path,'active');if(source)addEdge('input:'+source,id,'implements');});
-  (Array.isArray(project.plan)?project.plan:[]).slice(0,50).forEach((task,i)=>{const id='task:'+String(task?.id||i);addNode(id,'task',String(task?.title||id),String(task?.status||'proposed'));if(source)addEdge('input:'+source,id,'affects');});
-  (Array.isArray(project.tests?.results)?project.tests.results:[]).slice(0,50).forEach((t,i)=>{const id='test:'+i;addNode(id,'test',String(t?.name||'Verification '+(i+1)),String(t?.status||'not_checked'));if(source)addEdge('input:'+source,id,'verifies');});
-  const sections=Array.isArray(project.sections)?project.sections:[]; const sectionNames=[];
-  for(const section of sections){const kind=String(section?.kind||'workspace'),name=String(section?.name||'').trim();if(!name||section.id==='chat')continue;if(affected.has(kind)||affected.has(name.toLowerCase())||(affected.has('files')&&/code|workspace|output/i.test(kind)))sectionNames.push(name);}
-  const invalidated=[];
-  if(affected.has('files')||affected.has('preview')||affected.has('deployment')||affected.has('artifacts'))invalidated.push('Current build/output');
-  if(affected.has('tests')||affected.has('verification'))invalidated.push('Verification results');
-  if(affected.has('plan')||affected.has('tasks')||affected.has('execution'))invalidated.push('Execution plan');
-  if(affected.has('decisions'))invalidated.push('Dependent decisions');
-  if(affected.has('research')||affected.has('evidence'))invalidated.push('Research context');
-  const suggestedActions=[];
-  if(affected.has('decisions'))suggestedActions.push('Review decisions affected by this change');
-  if(affected.has('plan')||affected.has('tasks'))suggestedActions.push('Regenerate affected plan/tasks');
-  if(affected.has('files')||affected.has('preview')||affected.has('artifacts'))suggestedActions.push('Rebuild affected artifacts');
-  if(affected.has('tests')||affected.has('verification'))suggestedActions.push('Rerun verification');
-  if(affected.has('deployment'))suggestedActions.push('Review deployment before publishing');
-  const changedLabels=unique.map(x=>labels[x]||x);
-  return {version:Number(project.specVersion||1),changed:changedLabels,affected:[...affected],affectedSections:[...new Set(sectionNames)].slice(0,20),invalidated:[...new Set(invalidated)],suggestedActions:[...new Set(suggestedActions)],nodes:nodes.slice(0,180),edges:edges.slice(0,360),impactScore:Math.min(100,unique.length*12+affected.size*5+invalidated.length*8),summary:unique.length?changedLabels.length+' project inputs changed; '+affected.size+' downstream areas may need review.':'No downstream impact detected.',generatedAt:new Date().toISOString()};
+  const after = {
+    ...project,
+    spec: afterSpec || project.spec || {},
+    plan: mutation.afterPlan ?? project.plan ?? [],
+    research: mutation.afterResearch ?? project.research ?? {},
+    files: mutation.afterFiles ?? project.files ?? {}
+  };
+  return reconcileChange(before, after, mutation);
 }
+
+export function reconcileProjectChange(beforeProject = {}, afterProject = {}, options = {}) {
+  return reconcileChange(beforeProject, afterProject, options);
+}
+
 export function applyProjectMutation(project, mutation = {}) {
   project.files = project.files || {};
   project.agents = normalizeAgents(project.agents || [], project.type);
-  const before = JSON.stringify({title:project.title,type:project.type,status:project.status,plan:project.plan||[],spec:project.spec,understanding:project.understanding || {},sections:project.sections,files:project.files,agents:project.agents,research:project.research || {},executionState:project.executionState || {}});
+  const beforeState = JSON.parse(JSON.stringify({
+    title:project.title,
+    type:project.type,
+    status:project.status,
+    specVersion:Number(project.specVersion || 1),
+    plan:project.plan || [],
+    spec:project.spec,
+    understanding:project.understanding || {},
+    sections:project.sections,
+    files:project.files,
+    agents:project.agents,
+    artifacts:project.artifacts || {},
+    outputs:project.outputs || {},
+    tests:project.tests || {},
+    research:project.research || {},
+    executionState:project.executionState || {}
+  }));
   const beforeSpec = JSON.stringify(project.spec || {});
   const beforeType = project.type;
   const beforeTitle = project.title;
@@ -305,21 +311,47 @@ export function applyProjectMutation(project, mutation = {}) {
   }
   project.resources = Array.isArray(project.spec?.resources) ? [...project.spec.resources] : [];
   if (typeof project.spec?.goal === 'string' && project.spec.goal.trim()) project.intent = project.spec.goal.trim();
-  const after = JSON.stringify({title:project.title,type:project.type,status:project.status,plan:project.plan||[],spec:project.spec,understanding:project.understanding || {},sections:project.sections,files:project.files,agents:project.agents,research:project.research || {},executionState:project.executionState || {}});
-  const changed = before !== after, specChanged = beforeSpec !== JSON.stringify(project.spec || {}), typeChanged = beforeType !== project.type, titleChanged = beforeTitle !== project.title;
+
+  const beforeJson = JSON.stringify(beforeState);
+  const afterJson = JSON.stringify({
+    title:project.title,type:project.type,status:project.status,plan:project.plan||[],spec:project.spec,understanding:project.understanding || {},
+    sections:project.sections,files:project.files,agents:project.agents,artifacts:project.artifacts||{},outputs:project.outputs||{},
+    tests:project.tests||{},research:project.research || {},executionState:project.executionState || {}
+  });
+  const changed = beforeJson !== afterJson, specChanged = beforeSpec !== JSON.stringify(project.spec || {}), typeChanged = beforeType !== project.type, titleChanged = beforeTitle !== project.title;
   if (changed) {
     project.specVersion = Number(project.specVersion || 1) + 1;
     project.updatedAt = new Date().toISOString();
-    invalidateArtifacts(project);
+
+    const reconciliation = reconcileChange(beforeState, project, mutation);
+    project.impact = reconciliation;
+    markReconciliationState(project, reconciliation);
+    invalidateArtifacts(project, (reconciliation.staleNodes || []).map(x => x.id));
+
     project.sectionContent = {};
     project.tests = {status:'stale',specVersion:project.specVersion,results:[],updatedAt:null};
     project.research = {...(project.research || {queries:[],sources:[],findings:[]}),status:researchChanged?'ready':'stale'};
-    project.executionState = {...(project.executionState || {}),status:'dirty',lastMutationId:globalThis.crypto?.randomUUID?.() || `mutation-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,staleFromVersion:project.specVersion};
-    project.impact = buildImpactGraph(project, JSON.parse(beforeSpec || '{}'), project.spec || {}, mutation);
+    project.executionState = {
+      ...(project.executionState || {}),
+      status:'dirty',
+      lastMutationId:globalThis.crypto?.randomUUID?.() || `mutation-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      staleFromVersion:project.specVersion
+    };
+    project.executionState.reconciliation = {
+      ...(project.executionState.reconciliation || {}),
+      baseVersion:reconciliation.baseVersion,
+      targetVersion:project.specVersion,
+      changedNodeIds:(reconciliation.changedNodes || []).map(x => x.id),
+      affectedNodeIds:(reconciliation.affectedNodes || []).map(x => x.id),
+      staleNodeIds:(reconciliation.staleNodes || []).map(x => x.id),
+      invalidatedNodeIds:(reconciliation.invalidatedNodes || []).map(x => x.id),
+      generatedAt:reconciliation.generatedAt
+    };
     project.versions = Array.isArray(project.versions) ? project.versions : [];
   }
-  return {changed,specChanged,typeChanged,titleChanged,researchChanged};
+  return {changed,specChanged,typeChanged,titleChanged,researchChanged,impact:project.impact || null};
 }
+
 export function restoreProjectSnapshot(project, snapshot = {}) {
   if (!project || !snapshot || typeof snapshot !== 'object') return {changed:false};
   const nextSpec = mergeSpec(emptySpec(), snapshot.spec || {});
@@ -525,9 +557,21 @@ export function approveAction(project, approval = {}) {
 export function createArtifactVersion(project, artifact = {}) {
   const key = String(artifact.key || 'primary').trim() || 'primary';
   const current = project.artifacts || {};
-  const entry = {kind:String(artifact.kind || projectArtifactKind(project.type)).slice(0,40),specVersion:Number(project.specVersion || 1),summary:String(artifact.summary || '').slice(0,500),deliverables:Array.isArray(artifact.deliverables)?artifact.deliverables.slice(0,30):[],stale:false,updatedAt:new Date().toISOString(),verification:{status:'not_checked'}};
-  applyProjectMutation(project, { executionStatePatch:{status:'artifact_updated'} });
+  const entry = {
+    kind:String(artifact.kind || projectArtifactKind(project.type)).slice(0,40),
+    specVersion:Number(project.specVersion || 1),
+    derivedFromVersion:Number(project.specVersion || 1),
+    dependencyNodeIds:Array.isArray(artifact.dependencyNodeIds) ? artifact.dependencyNodeIds.slice(0,240) : inputNodeIds(project).slice(0,240),
+    filePaths:Array.isArray(artifact.filePaths) ? artifact.filePaths.slice(0,160) : [],
+    summary:String(artifact.summary || '').slice(0,500),
+    deliverables:Array.isArray(artifact.deliverables)?artifact.deliverables.slice(0,30):[],
+    stale:false,
+    updatedAt:new Date().toISOString(),
+    verification:{status:'not_checked'}
+  };
+  project.executionState = {...(project.executionState || {}),status:'artifact_updated'};
   project.artifacts = {...current,[key]:entry};
+  project.updatedAt = new Date().toISOString();
   return entry;
 }
 
@@ -552,7 +596,7 @@ export function getUsageSummary(project) {
 
 export function createProject({id,title,type='Other',intent='',spec={},sections=[],conversation=[],agents=[],research={},plan=[]} = {}) {
   const normalizedType = normalizeProjectType(type), projectId = id || globalThis.crypto?.randomUUID?.() || `px-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, normalizedSpec = mergeSpec(emptySpec(),spec);
-  return {id:projectId,title:String(title || 'Untitled project').trim().slice(0,120),type:normalizedType,intent:String(intent || normalizedSpec.goal || '').trim(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),specVersion:1,understanding:{confidence:0,missing:[],ambiguities:[],method:'pending'},plan:Array.isArray(plan)?plan.slice(0,50):[],spec:normalizedSpec,sections:buildDependencyMap(normalizeSections(sections,normalizedType)),selectedSection:'chat',conversation:Array.isArray(conversation)?conversation:[],sectionContent:{},artifacts:{},outputs:{},tests:{status:'stale',specVersion:0,results:[],updatedAt:null},research:{status:'ready',queries:Array.isArray(research.queries)?research.queries:[],sources:Array.isArray(research.sources)?research.sources:[],findings:Array.isArray(research.findings)?research.findings:[]},resources:Array.isArray(normalizedSpec.resources)?[...normalizedSpec.resources]:[],agents:normalizeAgents(agents,normalizedType),executionState:{status:'ready',lastMutationId:null,lastAgent:null,staleFromVersion:null},impact:{version:1,changed:[],affected:[],affectedSections:[],invalidated:[],suggestedActions:[],impactScore:0,summary:'No downstream impact detected.',generatedAt:null},files:{},versions:[],status:'discovery',sync:{remoteId:null,lastSyncedAt:null,baseUpdatedAt:null,mode:'local'}};
+  return {id:projectId,title:String(title || 'Untitled project').trim().slice(0,120),type:normalizedType,intent:String(intent || normalizedSpec.goal || '').trim(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),specVersion:1,understanding:{confidence:0,missing:[],ambiguities:[],method:'pending'},plan:Array.isArray(plan)?plan.slice(0,50):[],spec:normalizedSpec,sections:buildDependencyMap(normalizeSections(sections,normalizedType)),selectedSection:'chat',conversation:Array.isArray(conversation)?conversation:[],sectionContent:{},artifacts:{},outputs:{},tests:{status:'stale',specVersion:0,results:[],updatedAt:null},research:{status:'ready',queries:Array.isArray(research.queries)?research.queries:[],sources:Array.isArray(research.sources)?research.sources:[],findings:Array.isArray(research.findings)?research.findings:[]},resources:Array.isArray(normalizedSpec.resources)?[...normalizedSpec.resources]:[],agents:normalizeAgents(agents,normalizedType),executionState:{status:'ready',lastMutationId:null,lastAgent:null,staleFromVersion:null},impact:{version:1,changed:[],changedNodes:[],affected:[],affectedNodes:[],stale:[],staleNodes:[],invalidated:[],invalidatedNodes:[],reviewNodes:[],suggestedActions:[],actions:[],verification:[],nodes:[],edges:[],summary:'No downstream impact detected.',generatedAt:null},files:{},versions:[],status:'discovery',sync:{remoteId:null,lastSyncedAt:null,baseUpdatedAt:null,mode:'local'}};
 }
 
 export function assemblePreviewHtml(files = {}) {
