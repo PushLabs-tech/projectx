@@ -204,6 +204,13 @@ html, body {
 .chips { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; margin: 16px 0; }
 .chip { border: 1px solid var(--px-line); background: var(--px-surface); border-radius: 999px; padding: 6px 10px; font-size: 11px; color: var(--px-muted); cursor: pointer; }
 .conversation { display: grid; gap: 8px; overflow: auto; margin: 0; padding: 12px; flex: 1; }
+.px-creation-chat { max-width: 760px; margin: 0 auto; padding: 34px 18px 40px; }
+.px-creation-top { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.px-creation-title { margin:5px 0 7px; font-size:28px; line-height:1.12; letter-spacing:-.03em; }
+.px-creation-step { flex:0 0 auto; border:1px solid var(--px-line); border-radius:999px; padding:6px 10px; font-size:11px; color:var(--px-muted); }
+.px-creation-understanding { display:flex; gap:8px; align-items:flex-start; margin-top:22px; color:var(--px-muted); font-size:12px; line-height:1.45; }
+.px-creation-check { color:var(--px-accent); font-weight:800; }
+.px-question-card { margin-top:12px; box-shadow:none; }
 .discovery-poll { max-width: 720px; margin: 26px auto 0; }
 .poll-card { border: 1px solid var(--px-line); border-radius: 14px; background: var(--px-surface); box-shadow: var(--px-shadow); padding: 18px; }
 .poll-head { padding: 2px 4px 13px; }

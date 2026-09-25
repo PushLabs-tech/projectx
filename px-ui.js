@@ -283,9 +283,15 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
 }
 
 export function interviewMarkup() {
-  return `<div class="interview poll-interview">
-    <div class="kicker">DISCOVERY</div>
-    <div id="px-agent-status" class="sub">Thinking</div>
+  return `<div class="interview poll-interview px-creation-chat">
+    <div class="px-creation-top">
+      <div>
+        <div class="kicker">LET'S BUILD IT</div>
+        <h1 class="px-creation-title">A few quick questions, then I'll start.</h1>
+        <p class="sub">You can answer in your own words. I'll handle the technical details.</p>
+      </div>
+      <div class="px-creation-step" id="interview-step">Step 1</div>
+    </div>
     <div id="interview-understanding" class="understanding"></div>
     <div id="interview-poll" class="discovery-poll" aria-live="polite"></div>
     <div id="interview-status" class="poll-status" aria-live="polite"></div>
