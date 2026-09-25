@@ -171,7 +171,14 @@ export function executeToolCalls(project: any, contract: any, toolCalls: any[]) 
 
   if (errors.length) return { ok: false, operations, evidence, errors, files: working.files };
   if (!calls.length) return { ok: false, operations, evidence, errors: [{ error: "No tool calls returned." }], files: working.files };
-  return { ok: true, operations, evidence, errors: [], files: working.files };
+  const validation = validateExecutionOperations(project, contract, operations);
+  if (!validation.ok) {
+    const error = { error: validation.reason || "transaction_validation_failed", path: validation.path || null };
+    evidence.push({ tool: "transaction_validator", ok: false, ...error });
+    return { ok: false, operations: [], evidence, errors: [error], files: working.files, transaction: validation };
+  }
+  evidence.push({ tool: "transaction_validator", ok: true, changedPaths: validation.changedPaths, summary: validation.summary });
+  return { ok: true, operations, evidence, errors: [], files: working.files, transaction: validation };
 }
 
 export function buildExecutionSettings(settings: any, action: any, result: any, status: string, nowIso = new Date().toISOString()) {
@@ -194,6 +201,8 @@ export function buildExecutionSettings(settings: any, action: any, result: any, 
           provider: result.provider ? text(result.provider, 80) : null,
           diagnosis: result.diagnosis && typeof result.diagnosis === "object" ? clone(result.diagnosis) : null,
           repairPlan: result.repairPlan && typeof result.repairPlan === "object" ? clone(result.repairPlan) : null,
+          transactionId: result.transactionId ? text(result.transactionId, 80) : null,
+          transaction: result.transaction && typeof result.transaction === "object" ? clone(result.transaction) : null,
           evidence: Array.isArray(result.evidence) ? result.evidence.slice(0, 20).map(clone) : [],
           outputVersion: Number(result.outputVersion ?? queue.targetVersion ?? 1),
           recordedAt: nowIso
