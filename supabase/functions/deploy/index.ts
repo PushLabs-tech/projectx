@@ -57,8 +57,8 @@ async function syncDeployment(row:any,token:string){
   if(error)throw error;
   return data;
 }
-async function previousSuccessfulDeployment(projectId:string,currentId:string){
-  const {data,error}=await admin.from("deployments").select("id,provider,status,url,provider_project,metadata,created_at").eq("project_id",projectId).in("status",["ready"]).neq("id",currentId).order("created_at",{ascending:false}).limit(1);
+async function previousSuccessfulDeployment(projectId:string,provider:string,currentId:string){
+  const {data,error}=await admin.from("deployments").select("id,provider,status,url,provider_project,metadata,created_at").eq("project_id",projectId).eq("provider",provider).eq("status","ready").eq("health_status","passed").neq("id",currentId).order("created_at",{ascending:false}).limit(1);
   if(error)throw error;
   return data?.[0]||null;
 }
@@ -90,22 +90,42 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   const t=await target(u.id,p.workspace_id,provider,String(b.label||"default"));
   const fs=await files(p.id);
   if(!fs.length)throw new Error("PROJECT_HAS_NO_FILES");
-  const previous=await previousSuccessfulDeployment(p.id,"00000000-0000-0000-0000-000000000000");
+  const previous=await previousSuccessfulDeployment(p.id,provider,"00000000-0000-0000-0000-000000000000");
   const sourceHash=await deploymentSourceHash(fs);
   const name=p.title.replace(/[^a-z0-9-]+/gi,"-").toLowerCase().slice(0,50)||"projectx-app";
-  const result=provider==="vercel"?await vercelDeploy(t.credential,name,fs,t.metadata?.projectId):await netlifyDeploy(t.credential,name,fs,t.metadata?.siteId);
   const metadata={
-    externalId:result.externalId,
-    ...(result.metadata||{}),
-    deploymentPipeline:{phase:"deployed",health:"pending",sourceSpecVersion:p.spec_version||null,sourceHash,previousDeploymentId:previous?.id||null}
+    deploymentPipeline:{phase:"queued",health:"pending",sourceSpecVersion:p.spec_version||null,sourceHash,previousDeploymentId:previous?.id||null}
   };
   const {data:d,error}=await admin.from("deployments").insert({
-    project_id:p.id,provider,status:"pending",url:result.url,provider_project:result.providerProject,
+    project_id:p.id,provider,status:"pending",url:null,provider_project:t.metadata?.projectId||t.metadata?.siteId||null,
     source_spec_version:p.spec_version||null,source_hash:sourceHash,previous_deployment_id:previous?.id||null,
-    external_status:result.status||"pending",health_status:"pending",metadata
+    external_status:"queued",health_status:"pending",metadata
   }).select().single();
   if(error)throw error;
-  return json({ok:true,deployment:d});
+  try{
+    const result=provider==="vercel"
+      ?await vercelDeploy(t.credential,name,fs,t.metadata?.projectId)
+      :await netlifyDeploy(t.credential,name,fs,t.metadata?.siteId);
+    const nextMetadata={
+      ...(metadata||{}),
+      externalId:result.externalId,
+      ...(result.metadata||{}),
+      deploymentPipeline:{...(metadata.deploymentPipeline||{}),phase:"deployed",health:"pending"}
+    };
+    const {data:updated,error:updateError}=await admin.from("deployments").update({
+      status:"pending",url:result.url||null,provider_project:result.providerProject||null,
+      external_status:result.status||"pending",metadata:nextMetadata,updated_at:new Date().toISOString()
+    }).eq("id",d.id).select().single();
+    if(updateError)throw updateError;
+    return json({ok:true,deployment:updated});
+  }catch(error){
+    await admin.from("deployments").update({
+      status:"failed",external_status:"failed",
+      metadata:{...(metadata||{}),deploymentPipeline:{...(metadata.deploymentPipeline||{}),phase:"failed"},pipelineError:String(error?.message||error)},
+      updated_at:new Date().toISOString()
+    }).eq("id",d.id);
+    throw error;
+  }
 }if(action==="status"){
   const projectId=String(b.projectId||"");
   const p=await projectAccess(u.id,projectId);
