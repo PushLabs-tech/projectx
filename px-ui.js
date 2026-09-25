@@ -33,7 +33,7 @@ export const PROJECT_NAV = [
   ['settings', 'Settings']
 ];
 
-export const CORE_NAV = ['overview', 'assistant', 'build', 'preview', 'files', 'tasks', 'settings'];
+export const CORE_NAV = ['overview', 'build', 'preview', 'files', 'settings'];
 export const ADVANCED_NAV = PROJECT_NAV.filter(([id]) => !CORE_NAV.includes(id));
 
 export const TEMPLATES = [
@@ -202,16 +202,14 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   const recent = recents.map(p => `<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('') || '<div class="sub" style="padding:6px 10px">No projects yet</div>';
   const title = project ? esc(project.title) : 'ProjectX';
   const sync = project?.sync?.mode === 'cloud' ? 'Synced' : session ? 'Account' : 'Local';
-  const rightPane = right != null ? right : `<div class="label">Assistant</div><div class="sub" style="padding:12px">Open Assistant to work on the current project, file, or selection.</div>`;
   const extra = project ? `<button class="ghost px-add-tool" data-cmd="more-tools">More tools</button>` : '';
-  const queueNote = execNote || 'No isolated cloud workers are connected. Independent tasks can be queued; execution is sequential through the Assistant.';
-  return `<div class="px-shell ${project ? '' : 'no-right'}" id="px-shell">
+  return `<div class="px-shell no-right" id="px-shell">
     <aside class="px-left side" id="px-left">
       <button class="logo" data-nav="home" title="Home">ProjectX</button>
       <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'Projects'} ▾</button>
       <div class="px-switch-list" id="px-switch-list" hidden>${recent}</div>
       <button class="new" data-nav="home">New project</button>
-      <input class="input px-side-search" id="px-side-search" placeholder="Search tools and files" aria-label="Search project">
+      <input class="input px-side-search" id="px-side-search" placeholder="Search" aria-label="Search project">
       <nav class="nav" id="px-tool-nav">${left}${extra}</nav>
       <div class="divider"></div>
       <div class="label">Recent</div>
@@ -221,41 +219,26 @@ export function chrome({esc, session, recents, active, body, project, nav, right
     <header class="px-topbar top">
       <button class="ghost px-nav-toggle" id="px-nav-toggle" aria-label="Open navigation">Menu</button>
       <strong style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${title}</strong>
-      <span class="sub">${esc(project?.type || '')}</span>
-      <span class="px-dot ${session ? '' : 'warn'}" title="${esc(sync)}"></span>
-      <span class="sub">${esc(sync)}</span>
+      ${project ? '<button class="ghost" data-project-tool="assistant">Agent</button><button class="ghost" data-project-tool="preview">Preview</button>' : ''}
       <span style="flex:1"></span>
       <button class="ghost" data-cmd="palette" title="Command palette">⌘K</button>
-      ${project ? '<button class="ghost" data-cmd="toggle-assistant" title="Hide assistant">Agent</button><button class="ghost" data-cmd="share">Share</button><button class="ghost" data-project-tool="preview">Preview</button><button class="ghost" data-project-tool="deploy">Deploy</button>' : ''}
+      ${project ? '<button class="ghost" data-cmd="share">Share</button>' : ''}
       ${session ? '<button data-action="signout">Sign out</button>' : '<button data-action="signin">Sign in</button>'}
     </header>
     <main class="px-center main">${body}</main>
-    ${project ? '<div class="px-split" id="px-split-right" data-split="right" title="Resize assistant"></div>' : ''}
-    <aside class="px-right" id="px-assistant-dock">${rightPane}</aside>
     <div class="px-bottom" id="px-bottom" hidden>
       <div class="label">Queue</div>
-      <div class="sub" style="padding:8px 12px">${esc(queueNote)}</div>
       <div id="px-bottom-log" class="conversation"></div>
     </div>
-    <footer class="px-statusbar" id="px-statusbar"><button class="ghost" data-cmd="toggle-bottom" type="button">Output</button><span>${status || 'Ready'} · ${session ? 'Signed in' : 'Guest'} · ${esc((project && project.status) || 'idle')}</span><span style="flex:1"></span><span class="sub">⌘K command · ⌘S save · ⌘B nav · ⌘J output</span></footer>
+    <footer class="px-statusbar" id="px-statusbar"><span>${status || 'Ready'}</span><span style="flex:1"></span><span class="sub">ProjectX</span></footer>
   </div>
   <div class="px-palette" id="px-palette" hidden>
     <div class="px-palette-box">
-      <input id="px-palette-input" placeholder="Search commands, projects, surfaces…" aria-label="Command palette">
+      <input id="px-palette-input" placeholder="Search…" aria-label="Command palette">
       <div class="px-palette-list" id="px-palette-list"></div>
-    </div>
-  </div>
-  <div class="px-ctx" id="px-ctx" hidden></div>
-  <div class="px-share" id="px-share" hidden>
-    <div class="px-share-box">
-      <div class="label">Share</div>
-      <p class="sub">Copy the workspace URL. This does not publish hosting or create OAuth invites.</p>
-      <input class="input full" id="px-share-url" readonly>
-      <div class="actions"><button class="ghost" data-cmd="share-close">Close</button><button class="primary" data-cmd="share-copy">Copy link</button></div>
     </div>
   </div>`;
 }
-
 export function launcherMarkup({esc, session, projects, guestReady}) {
   const cards = projects.slice(0, 8).map(p => `<button class="box" data-open="${esc(p.id)}" style="text-align:left;cursor:pointer"><b>${esc(p.title)}</b><div class="sub">${esc(p.type)} · ${esc(p.status)}</div><div class="sub">${esc(String(p.intent || p.spec?.goal || '').slice(0,140))}</div></button>`).join('') || '<div class="px-empty">No projects yet. Describe an outcome to create one.</div>';
   const recentFiles = projects.flatMap(p => Object.keys(p.files || {}).slice(0, 2).map(f => `${p.title} · ${f}`)).slice(0, 4);
