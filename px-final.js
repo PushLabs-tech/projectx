@@ -28,6 +28,9 @@ import {
   canExecuteAction,
   shouldRepairAfterFailure,
   prepareReconciliationRepair,
+  diagnoseFailures,
+  createRepairActionContract,
+  scheduleRepairCycle,
 } from './projectx-core.js';
 import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
@@ -71,9 +74,9 @@ const DEFAULT_SETTINGS = {
   splitFiles: false
 };
 const ExecutionProvider = {
-  kind: 'orchestrated-local',
-  isolatedWorkers: false,
-  note: 'Execution uses explicit action contracts and bounded local adapters. Browser verification runs in a sandboxed iframe; remote workers are not connected.'
+  kind: 'orchestrated-remote',
+  isolatedWorkers: true,
+  note: 'Signed-in rebuild, update, and repair actions execute through the ProjectX remote worker; browser verification remains the final local truth gate.'
 };
 const DeploymentProvider = {
   kind: 'github-pages-export',
@@ -212,7 +215,6 @@ async function enqueueRemoteExecutionJob(project,action,contract){
   return result?.job||null;
 }
 async function waitForRemoteExecutionJob(jobId,timeoutMs=90000){
-async function cancelRemoteExecutionJob(jobId){if(!jobId)throw new Error('Remote execution job id is missing.');return edge('cancelJob',{jobId});}
   const deadline=Date.now()+Math.max(15000,Math.min(180000,Number(timeoutMs)||90000));
   while(Date.now()<deadline){
     const result=await edge('getJob',{jobId});
@@ -221,6 +223,10 @@ async function cancelRemoteExecutionJob(jobId){if(!jobId)throw new Error('Remote
     await sleep(2500);
   }
   throw new Error('The remote worker did not finish this action before the execution window expired.');
+}
+async function cancelRemoteExecutionJob(jobId){
+  if(!jobId)throw new Error('Remote execution job id is missing.');
+  return edge('cancelJob',{jobId});
 }
 
 function integrationWorkspaceId() {
@@ -1354,7 +1360,7 @@ async function executeReconciliationQueue(project){
     appendExecutionJournal(project,{event:'action_started',actionId:action.id,status:'running',executor:contract.executor,message:'Executor started.',evidence:[{type:action.type,boundary:contract.boundary,risk:contract.risk,attempt:Number(started.action.attempts||1)}],outputVersion:project.specVersion});
     let result,remoteHandled=false;
     try{
-      if(session?.access_token&&project?.sync?.remoteId&&['rebuild','update'].includes(action.type)){
+      if(session?.access_token&&project?.sync?.remoteId&&['rebuild','update','repair'].includes(action.type)){
         const remoteJob=await enqueueRemoteExecutionJob(project,action,contract);
         if(!remoteJob?.id)throw new Error('Remote execution job could not be queued.');
         const remoteQueue=getReconciliationQueue(project);
@@ -1438,15 +1444,15 @@ async function executeReconciliationQueue(project){
 
     if(result.ok===false){
       if(action.type==='verify'&&shouldRepairAfterFailure(action,contract,policy)){
-        const repair=prepareReconciliationRepair(project,action.id,{mode});
-        if(repair.reset){
+        const repair=scheduleRepairCycle(project,action.id,result.evidence||[],policy);
+        if(repair.scheduled){
           plan=createExecutionPlan(project,getReconciliationQueue(project),{mode});
           const liveQueue=getReconciliationQueue(project);
           if(liveQueue){
             liveQueue.execution={...(liveQueue.execution||{}),plan,repairCycles:repair.cycle};
             project.executionState={...(project.executionState||{}),reconciliationQueue:liveQueue,status:'reconciling'};
           }
-          appendExecutionJournal(project,{event:'repair_cycle_started',actionId:action.id,status:'pending',executor:'projectx-orchestrator',message:'Verification failed, so the bounded repair loop reopened an eligible apply action.',evidence:[{cycle:repair.cycle,repairActionId:repair.repairAction?.id}],outputVersion:project.specVersion});
+          appendExecutionJournal(project,{event:'repair_cycle_started',actionId:action.id,status:'pending',executor:'projectx-orchestrator',message:'Verification failed; ProjectX diagnosed the failure and scheduled a bounded minimal repair.',evidence:[{cycle:repair.cycle,repairActionId:repair.repairAction.id,diagnosisId:repair.diagnosis.diagnosisId,category:repair.diagnosis.category,affectedFiles:repair.diagnosis.affectedFiles}],outputVersion:project.specVersion});
           saveProject(project);
           await syncRemoteProject(project);
           verificationPassed=false;
@@ -1543,12 +1549,15 @@ function renderImpact(project){
     '<div class="box"><h3 style="margin-top:0">Invalidated</h3>'+(invalidatedNodes.map(nodeRow).join('')||'<div class="sub">Nothing invalidated.</div>')+'</div>',
     '</div>',
     '<div class="grid" style="margin-top:14px"><div class="box"><h3 style="margin-top:0">Reconciliation actions</h3>'+actionRows+'</div><div class="box"><h3 style="margin-top:0">Verification queue</h3>'+verifyRows+'</div></div>',
-    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="ghost" id="impact-chat">Open in Assistant</button></div><div id="impact-status" class="sub" style="margin-top:10px"></div>'
+    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="ghost" id="impact-chat">Open in Assistant</button></div><div id="impact-status" class="sub" style="margin-top:10px"></div><div id="impact-repair-status" class="sub" style="margin-top:6px"></div>'
   ].join('');
   toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces a state change through the dependency graph and can now execute eligible reconciliation actions against the current state.',body);
   $('#impact-refresh').onclick=()=>{const rebuilt=buildImpactGraph(project,project.spec||{},project.spec||{});project.impact=rebuilt;saveProject(project);renderImpact(project);};
   $('#impact-run-reconcile').onclick=async()=>{const button=$('#impact-run-reconcile'),status=$('#impact-run-status');if(button)button.disabled=true;if(status)status.textContent='Executing reconciliation actions and validating the resulting state…';try{const result=await executeReconciliationQueue(project);if(status)status.textContent='Reconciliation '+reconciliationStatusLabel(result.queue)+'. '+result.executed+' action(s) executed.';renderImpact(project);}catch(error){if(status)status.textContent='Reconciliation stopped: '+String(error.message||error);renderImpact(project);}finally{button?.removeAttribute('disabled');}};
   $('#impact-retry-reconcile')?.addEventListener('click',async()=>{retryFailedReconciliation(project);saveProject(project);renderImpact(project);});
+  const repairStatus=$('#impact-repair-status');
+  const repairExecution=project.executionState?.repairHistory?.at(-1);
+  if(repairStatus&&repairExecution)repairStatus.textContent='Self-healing cycle '+repairExecution.cycle+' · '+String(repairExecution.category||'failure')+' · '+(repairExecution.affectedFiles||[]).slice(0,4).join(', ');
   $('#impact-chat').onclick=()=>{const summary=(actions.slice(0,8).map(a=>a.label||a.type).join('; ')||'Review the current impact and reconcile affected work.');project.uiNav='assistant';saveProject(project);renderProjectChat(project,'Reconcile this change. Review affected decisions, stale artifacts, invalidated work, and verification before making further changes. '+summary);};
 }
 function renderProjectSecurity(project){
