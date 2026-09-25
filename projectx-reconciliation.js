@@ -378,8 +378,8 @@ export function markReconciliationState(project={}, reconciliation={}) {
 
 
 const ACTION_TERMINAL = new Set(['completed','failed','blocked','skipped']);
-const EXECUTION_ACTION_TYPES = new Set(['rebuild','update','verify','replan','review-decision','review-task','reevaluate-evidence','review']);
-function actionPhase(type){ if(['review-decision','review-task','reevaluate-evidence','review'].includes(type)) return 'review'; if(type==='replan') return 'plan'; if(['update','rebuild'].includes(type)) return 'apply'; if(type==='verify') return 'verify'; return 'review'; }
+const EXECUTION_ACTION_TYPES = new Set(['rebuild','update','repair','verify','replan','review-decision','review-task','reevaluate-evidence','review']);
+function actionPhase(type){ if(['review-decision','review-task','reevaluate-evidence','review'].includes(type)) return 'review'; if(type==='replan') return 'plan'; if(['update','rebuild','repair'].includes(type)) return 'apply'; if(type==='verify') return 'verify'; return 'review'; }
 function actionId(action,index=0){ return 'reconcile:'+slug(action?.id||action?.targetId||action?.label||index); }
 export function createReconciliationQueue(reconciliation={},options={}){
   const baseVersion=Number(options.baseVersion??reconciliation.baseVersion??1), targetVersion=Number(options.targetVersion??reconciliation.targetVersion??baseVersion);
