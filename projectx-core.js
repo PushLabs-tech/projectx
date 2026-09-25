@@ -240,6 +240,8 @@ export function buildImpactGraph(project = {}, beforeSpec = {}, afterSpec = {}, 
   return reconcileChange(before, after, mutation);
 }
 
+export { inputNodeIds };
+
 export function reconcileProjectChange(beforeProject = {}, afterProject = {}, options = {}) {
   return reconcileChange(beforeProject, afterProject, options);
 }
