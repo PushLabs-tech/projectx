@@ -418,7 +418,7 @@ export function completeReconciliationAction(project,actionIdValue,result={}){co
 export function retryFailedReconciliation(project={}){return resetFailedReconciliation(project);}
 
 export { getReconciliationQueue, getReadyReconciliationActions };
-export { getExecutionPolicy, getExecutorDefinition, selectExecutor, createActionContract, createExecutionPlan, appendExecutionJournal, canExecuteAction, shouldRepairAfterFailure, prepareReconciliationRepair };
+export { getExecutionPolicy, getExecutorDefinition, selectExecutor, createActionContract, createExecutionPlan, appendExecutionJournal, canExecuteAction, shouldRepairAfterFailure, prepareReconciliationRepair, diagnoseFailures, createRepairActionContract, scheduleRepairCycle };
 
 function appendMutationAudit(project, entry) {
   const execution = project.executionState || {};
