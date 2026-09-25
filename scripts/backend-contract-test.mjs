@@ -5,6 +5,7 @@ const read = p => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const ai = read('supabase/functions/ai/index.ts');
 const cors = read('supabase/functions/_shared/cors.ts');
 const payments = read('supabase/functions/payments/index.ts');
+const deploy = read('supabase/functions/deploy/index.ts');
 const schema = read('supabase/schema.sql');
 
 assert.match(ai, /corsHeaders/);
@@ -29,6 +30,14 @@ assert.match(payments, /signature/i);
 
 assert.match(schema, /create table/i);
 assert.match(schema, /projects/i);
+
+assert.match(deploy, /deploymentUrlHealthCheck/);
+assert.match(deploy, /api\\.vercel\\.com\\/v13\\/deployments/);
+assert.match(deploy, /api\\.netlify\\.com\\/api\\/v1\\/deploys/);
+assert.match(deploy, /health_status/);
+assert.match(deploy, /previous_deployment_id/);
+assert.match(deploy, /rollbackDeployment/);
+assert.match(deploy, /WORKSPACE_REQUIRED|FORBIDDEN/);
 
 console.log('PASS AI edge-function contract');
 console.log('PASS CORS contract');
