@@ -1,8 +1,9 @@
 import { reconcileChange, markReconciliationState, inputNodeIds, createReconciliationQueue, getReconciliationQueue, getReadyReconciliationActions, updateReconciliationAction, recordReconciliationResult, resetFailedReconciliation } from './projectx-reconciliation.js';
 import { getExecutionPolicy, getExecutorDefinition, selectExecutor, createActionContract, createExecutionPlan, appendExecutionJournal, canExecuteAction, shouldRepairAfterFailure, prepareReconciliationRepair, diagnoseFailures, createRepairActionContract, scheduleRepairCycle } from './projectx-execution.js';
+import { createSandboxRuntimeScript, SANDBOX_POLICY_VERSION } from './projectx-sandbox.js';
 export { sanitizeTransactionPath, validateTransactionOperations, createExecutionTransaction, applyTransaction, rollbackTransaction, transactionDigest } from './projectx-transaction.js';
 
-export const CORE_VERSION = 4;
+export const CORE_VERSION = 5;
 
 const PROJECT_TYPES = ['Game','Website','App','Mobile','Business','Business system','Research','Document','Presentation','Data','Dashboard','Internal tool','Agent','Automation','API','Creative project','Other'];
 const SOFTWARE_TYPES = new Set(['Game','Website','App','Mobile','API','Agent','Automation','Business system','Data','Dashboard','Internal tool','Presentation']);
@@ -645,18 +646,30 @@ export function createProject({id,title,type='Other',intent='',spec={},sections=
   return {id:projectId,title:String(title || 'Untitled project').trim().slice(0,120),type:normalizedType,intent:String(intent || normalizedSpec.goal || '').trim(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),specVersion:1,understanding:{confidence:0,missing:[],ambiguities:[],method:'pending'},plan:Array.isArray(plan)?plan.slice(0,50):[],spec:normalizedSpec,sections:buildDependencyMap(normalizeSections(sections,normalizedType)),selectedSection:'chat',conversation:Array.isArray(conversation)?conversation:[],sectionContent:{},artifacts:{},outputs:{},tests:{status:'stale',specVersion:0,verifiedAgainstVersion:null,results:[],updatedAt:null},research:{status:'ready',queries:Array.isArray(research.queries)?research.queries:[],sources:Array.isArray(research.sources)?research.sources:[],findings:Array.isArray(research.findings)?research.findings:[]},resources:Array.isArray(normalizedSpec.resources)?[...normalizedSpec.resources]:[],agents:normalizeAgents(agents,normalizedType),executionState:{status:'ready',lastMutationId:null,lastAgent:null,staleFromVersion:null},impact:{version:1,changed:[],changedNodes:[],affected:[],affectedNodes:[],stale:[],staleNodes:[],invalidated:[],invalidatedNodes:[],reviewNodes:[],suggestedActions:[],actions:[],verification:[],nodes:[],edges:[],summary:'No downstream impact detected.',generatedAt:null},files:{},versions:[],status:'discovery',sync:{remoteId:null,lastSyncedAt:null,baseUpdatedAt:null,mode:'local'}};
 }
 
-export function assemblePreviewHtml(files = {}) {
+export function assemblePreviewHtml(files = {}, options = {}) {
   const safeFiles = Object.fromEntries(Object.entries(files).map(([path,content]) => [sanitizePath(path),String(content ?? '')]).filter(([path]) => path));
   let html = safeFiles['index.html'] || safeFiles['src/index.html'];
-  if (!html) { const first = Object.keys(safeFiles).find(p => /\.html?$/i.test(p)); html = first ? safeFiles[first] : '<!doctype html><html><body><div id="app"></div></body></html>'; }
+  if (!html) { const first = Object.keys(safeFiles).find(p => /\.html?$/i.test(p)); html = first ? safeFiles[first] : '<!doctype html><html><head></head><body><div id="app"></div></body></html>'; }
   html = String(html);
-  html = html.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi,(tag,href) => { const path = sanitizePath(href.replace(/^\.\//,'')); const css = path && safeFiles[path]; return css != null ? `<style data-projectx-file="${path}">${css}</style>` : tag; });
-  html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi,(tag,src) => { const path = sanitizePath(src.replace(/^\.\//,'')); const js = path && safeFiles[path]; return js != null ? `<script data-projectx-file="${path}">${js.replace(/<\/script/gi,'<\\/script')}</script>` : tag; });
-  if (!/<meta[^>]+name=["']viewport["']/i.test(html)) html = html.replace(/<head>/i,'<head><meta name="viewport" content="width=device-width,initial-scale=1">');
-  const guard = `<script>(function(){window.addEventListener('error',function(e){parent.postMessage({type:'PROJECTX_RUNTIME_ERROR',message:String(e.message||'Runtime error')},'*');});window.addEventListener('unhandledrejection',function(e){var r=e.reason;parent.postMessage({type:'PROJECTX_RUNTIME_ERROR',message:String((r&&r.message)||r||'Unhandled rejection')},'*');});})();<\/script>`;
-  return html.replace(/<head>/i,`<head>${guard}`);
-}
+  if (!/<head\b/i.test(html)) html = html.replace(/<html[^>]*>/i,'$&<head></head>');
 
+  html = html.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi,(tag,href) => {
+    const path = sanitizePath(href.replace(/^\.\//,''));
+    const css = path && safeFiles[path];
+    return css != null ? `<style data-projectx-file="${path}">${css}</style>` : tag;
+  });
+  html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi,(tag,src) => {
+    const path = sanitizePath(src.replace(/^\.\//,''));
+    const js = path && safeFiles[path];
+    return js != null ? `<script data-projectx-file="${path}">${js.replace(/<\/script/gi,'<\\/script')}</script>` : tag;
+  });
+
+  if (!/<meta[^>]+name=["']viewport["']/i.test(html)) {
+    html = html.replace(/<head>/i,'<head><meta name="viewport" content="width=device-width,initial-scale=1">');
+  }
+  const sandboxScript = createSandboxRuntimeScript({strict:Boolean(options.runtimeVerification)});
+  return html.replace(/<head>/i,`<head>${sandboxScript}`);
+}
 export function serializeForPersistence(project) {
   return {schemaVersion:4,id:project.id,title:project.title,type:project.type,intention:project.intent,specVersion:project.specVersion,spec:project.spec,understanding:project.understanding,workspace:{sections:project.sections},plan:Array.isArray(project.plan)?project.plan:[],selectedSection:project.selectedSection,status:project.status,conversation:(project.conversation || []).slice(-100),files:project.files || {},artifacts:project.artifacts || {},outputs:project.outputs || {},sectionContent:project.sectionContent || {},tests:project.tests || {status:'stale'},research:project.research || {status:'ready',queries:[],sources:[],findings:[]},agents:project.agents || [],resources:project.resources || [],executionState:project.executionState || {},impact:project.impact || null,versions:project.versions || [],sync:{remoteId:project.sync?.remoteId || null,lastSyncedAt:project.sync?.lastSyncedAt || null,baseUpdatedAt:project.sync?.baseUpdatedAt || null,mode:project.sync?.mode || 'local'},updatedAt:project.updatedAt};
 }
