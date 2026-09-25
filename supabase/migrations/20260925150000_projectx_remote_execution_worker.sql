@@ -165,7 +165,7 @@ begin
       then raise exception 'Unsafe execution file path'; end if;
 
     if op->>'op' = 'delete' then
-      delete from public.project_files where project_id=p_project_id and path=path;
+      delete from public.project_files pf where pf.project_id=p_project_id and pf.path=path;
     elsif op->>'op' = 'write' then
       content := coalesce(op->>'content','');
       if length(content)>600000 then raise exception 'Execution file exceeds 600KB'; end if;
