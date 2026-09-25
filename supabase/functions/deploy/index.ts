@@ -126,6 +126,29 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
     }).eq("id",d.id);
     throw error;
   }
+}if(action==="rollbackDeployment"){
+  const deploymentId=String(b.deploymentId||"").trim();
+  const current=await admin.from("deployments").select("*").eq("id",deploymentId).maybeSingle();
+  if(current.error||!current.data)throw new Error("DEPLOYMENT_NOT_FOUND");
+  const p=await projectAccess(u.id,current.data.project_id);
+  const previousId=String(current.data.previous_deployment_id||current.data.metadata?.deploymentPipeline?.previousDeploymentId||"");
+  if(!previousId)throw new Error("NO_PREVIOUS_DEPLOYMENT");
+  const previous=await admin.from("deployments").select("*").eq("id",previousId).eq("project_id",p.id).maybeSingle();
+  if(previous.error||!previous.data)throw new Error("PREVIOUS_DEPLOYMENT_NOT_FOUND");
+  if(String(previous.data.provider)!==String(current.data.provider))throw new Error("ROLLBACK_PROVIDER_MISMATCH");
+  const provider=String(current.data.provider);
+  if(provider!=="netlify")throw new Error("VERCEL_ROLLBACK_REQUIRES_PROVIDER_PROMOTION");
+  const t=await target(u.id,p.workspace_id,provider,String(b.label||"default"));
+  const siteId=String(t.metadata?.siteId||previous.data.provider_project||"");
+  const externalId=String(previous.data.metadata?.externalId||"");
+  if(!siteId||!externalId)throw new Error("NETLIFY_ROLLBACK_TARGET_MISSING");
+  const rr=await fetch("https://api.netlify.com/api/v1/sites/"+encodeURIComponent(siteId)+"/deploys/"+encodeURIComponent(externalId)+"/restore",{method:"POST",headers:{Authorization:`Bearer ${t.credential}`,"Content-Type":"application/json"},body:"{}"});
+  const rj=await rr.json().catch(()=>({}));
+  if(!rr.ok)throw new Error(rj?.message||"Netlify rollback failed");
+  const at=new Date().toISOString();
+  await admin.from("deployments").update({status:"rolled_back",metadata:{...(current.data.metadata||{}),deploymentPipeline:{...(current.data.metadata?.deploymentPipeline||{}),phase:"rolled_back",rolledBackTo:previousId,rolledBackAt:at}},updated_at:at}).eq("id",current.data.id);
+  await admin.from("deployments").update({status:"ready",health_status:"passed",metadata:{...(previous.data.metadata||{}),deploymentPipeline:{...(previous.data.metadata?.deploymentPipeline||{}),activeAfterRollback:true}},updated_at:at}).eq("id",previous.data.id);
+  return json({ok:true,rolledBackTo:previousId,provider});
 }if(action==="status"){
   const projectId=String(b.projectId||"");
   const p=await projectAccess(u.id,projectId);
