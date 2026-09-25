@@ -1205,7 +1205,11 @@ async function executeTargetedFileUpdate(project,action){
   if(op.content===project.files[path])return {ok:true,message:path+' was already current.',evidence:['Target file content was unchanged.'],outputVersion:project.specVersion};
   project.files[path]=op.content;
   project.tests={status:'stale',specVersion:project.specVersion,verifiedAgainstVersion:null,results:[],updatedAt:null};
-  project.artifacts={...(project.artifacts||{}),output:{...(project.artifacts?.output||{}),stale:true,specVersion:project.specVersion}};
+  project.artifacts={...(project.artifacts||{})};
+  for(const [key,artifact] of Object.entries(project.artifacts)){
+    if(!artifact||!Array.isArray(artifact.filePaths)||!artifact.filePaths.includes(path))continue;
+    project.artifacts[key]={...artifact,stale:true,specVersion:project.specVersion,staleFromVersion:project.specVersion};
+  }
   project.status='needs-build';
   project.updatedAt=now();
   return {ok:true,message:'Updated '+path+'.',evidence:['Targeted AI reconciliation update applied to the existing file.'],outputVersion:project.specVersion};
@@ -1281,6 +1285,16 @@ async function executeReconciliationQueue(project){
   queue=getReconciliationQueue(project);
   if(queue&&queue.status!=='failed'&&queue.status!=='blocked'){
     const final=await executeLocalVerification(project);
+    queue=getReconciliationQueue(project);
+    if(final.ok){
+      for(const [key,artifact] of Object.entries(project.artifacts||{})){
+        if(!artifact||!artifact.stale)continue;
+        const paths=Array.isArray(artifact.filePaths)?artifact.filePaths:[];
+        if(!paths.length||paths.some(path=>Object.hasOwn(project.files||{},path))){
+          project.artifacts[key]={...artifact,stale:false,specVersion:project.specVersion,derivedFromVersion:project.specVersion,verification:{status:'passed',verifiedAgainstVersion:project.specVersion,verifiedAt:now()}};
+        }
+      }
+    }
     queue=getReconciliationQueue(project);
     if(final.ok&&queue&&queue.actions.every(a=>['completed','skipped'].includes(a.status))){
       queue.status='complete';queue.completedAt=now();queue.updatedAt=now();
