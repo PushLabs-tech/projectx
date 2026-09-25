@@ -11,7 +11,8 @@
     "test": "npm run check && npm run security:scan",
     "serve": "npx serve .",
     "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed"
+    "e2e:headed": "playwright test --headed",
+    "e2e:ci": "playwright test --reporter=list"
   },
   "devDependencies": {
     "vite": "^7.0.0",
