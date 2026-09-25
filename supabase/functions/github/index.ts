@@ -56,7 +56,7 @@ async function headCommit(access:string,full:string,ref:string){
   return String(r.object.sha);
 }
 async function discoverBuildRun(access:string,full:string,row:any){
-  const q=await gh(`/repos/${full}/actions/workflows/${repoPath(full,BUILD_WORKFLOW_PATH)}/runs?event=repository_dispatch&per_page=20`,access);
+  const q=await gh(`/repos/${full}/actions/workflows/${encodeURIComponent(BUILD_WORKFLOW_PATH)}/runs?event=repository_dispatch&per_page=20`,access);
   const runs=Array.isArray(q?.workflow_runs)?q.workflow_runs:[];
   const id=String(row.id);
   return runs.find((run:any)=>String(run.name||"").includes(id)||String(run.display_title||"").includes(id))||null;
