@@ -234,6 +234,7 @@ declare
   op jsonb;
   path text;
   current_content text;
+  content text;
   current_exists boolean;
   conflict_paths jsonb := '[]'::jsonb;
   settings jsonb;
