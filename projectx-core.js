@@ -312,7 +312,9 @@ export function applyProjectMutation(project, mutation = {}) {
   project.resources = Array.isArray(project.spec?.resources) ? [...project.spec.resources] : [];
   if (typeof project.spec?.goal === 'string' && project.spec.goal.trim()) project.intent = project.spec.goal.trim();
 
-  const beforeJson = JSON.stringify(beforeState);
+  const beforeComparable = {...beforeState};
+  delete beforeComparable.specVersion;
+  const beforeJson = JSON.stringify(beforeComparable);
   const afterJson = JSON.stringify({
     title:project.title,type:project.type,status:project.status,plan:project.plan||[],spec:project.spec,understanding:project.understanding || {},
     sections:project.sections,files:project.files,agents:project.agents,artifacts:project.artifacts||{},outputs:project.outputs||{},
