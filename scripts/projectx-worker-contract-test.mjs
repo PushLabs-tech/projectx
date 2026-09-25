@@ -15,7 +15,7 @@ assert.match(worker,/commit_project_execution/);
 assert.match(worker,/explicitApproval/);
 assert.match(worker,/AbortController/);
 assert.match(worker,/executionToolDefinitions/);
-assert.match(worker,/executeToolCalls/);
+assert.match(worker,/executeToolCalls/);\nassert.match(tools,/repairPaths/);\nassert.match(tools,/contract\?\.type === "repair"/);\nassert.match(worker,/Repair execution produced no file patch/);\nassert.match(worker,/action\.type === "repair"/);
 assert.doesNotMatch(worker,/workerToken\s*\)\s*\{[\s\S]*workerToken/);
 assert.match(tools,/list_files/);
 assert.match(tools,/read_file/);
