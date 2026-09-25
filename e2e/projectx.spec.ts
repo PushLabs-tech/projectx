@@ -93,7 +93,7 @@ test("authenticated workspace smoke path syncs a real account", async ({ page })
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
 
-  await page.goto("/#login");
+  await page.goto("/?projectx_e2e_chaos=placeholder#login");
   await page.locator("#auth-email").fill(email!);
   await page.locator("#auth-password").fill(password!);
   await page.locator("#auth-submit").click();
@@ -160,6 +160,12 @@ test("authenticated autonomous loop can discover, reconcile, and verify a real p
 
   const status = page.locator("#impact-run-status");
   await expect(status).toContainText(/Reconciliation (complete|reconciled)|action\(s\) executed/i, { timeout: 180_000 });
+
+  const journalEvidence = await page.evaluate(() => {
+    const raw = Object.values(localStorage).join("\\n");
+    return /repair_cycle_started|repair_scheduled/i.test(raw);
+  });
+  expect(journalEvidence).toBe(true);
 
   const finalText = await status.innerText();
   expect(finalText).not.toMatch(/stopped|failed|blocked/i);

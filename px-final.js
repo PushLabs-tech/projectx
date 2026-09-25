@@ -1492,6 +1492,21 @@ async function executeTargetedFileUpdate(project,action){
   return {ok:true,message:'Updated '+path+'.',evidence:['Targeted AI reconciliation update applied to the existing file.'],outputVersion:project.specVersion};
 }
 
+function maybeInjectE2EVerificationFailure(project){
+  try{
+    const localHost=['127.0.0.1','localhost'].includes(String(location.hostname||''));
+    const params=new URLSearchParams(location.search);
+    if(!localHost||params.get('projectx_e2e_chaos')!=='placeholder')return false;
+    if(sessionStorage.getItem('projectx_e2e_chaos_used')==='1')return false;
+    const path=project.files?.['index.html']?'index.html':(project.files?.['src/index.html']?'src/index.html':null);
+    if(!path)return false;
+    project.files[path]=String(project.files[path]||'')+'\n<!-- TODO: PROJECTX_E2E_FAILURE_INJECTION -->\n';
+    sessionStorage.setItem('projectx_e2e_chaos_used','1');
+    project.tests={...(project.tests||{}),status:'failed',specVersion:project.specVersion,verifiedAgainstVersion:null,results:[],updatedAt:null};
+    project.status='needs-fix';
+    return true;
+  }catch{return false;}
+}
 async function executeLocalVerification(project){
   const results=await runTests(project);
   const security=projectSecurityChecks(project);
@@ -1637,6 +1652,7 @@ async function executeReconciliationQueue(project){
       }else if(action.type==='update'){
         result=await executeTargetedFileUpdate(project,action);
       }else if(action.type==='verify'){
+        maybeInjectE2EVerificationFailure(project);
         result=await executeLocalVerification(project);
         verificationPassed=Boolean(result?.ok);
       }else{
