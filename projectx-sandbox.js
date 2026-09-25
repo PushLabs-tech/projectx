@@ -12,7 +12,11 @@ export function createSandboxRuntimeScript(options = {}) {
 export function classifySandboxEvent(event = {}) {
   const kind = String(event?.kind || '');
   if (['runtime_error','unhandled_rejection'].includes(kind)) return 'critical';
-  if (['resource_error','console_error'].includes(kind)) return 'error';
+  if (kind === 'console_error') return 'error';
+  if (kind === 'resource_error') {
+    const url = String(event?.url || event?.src || event?.href || '');
+    return /^https?:\/\//i.test(url) ? 'warning' : 'error';
+  }
   if (['network_attempt','popup_attempt','form_attempt','external_navigation_attempt','console_warn'].includes(kind)) return 'warning';
   return 'info';
 }
