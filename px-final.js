@@ -1215,17 +1215,18 @@ function renderResources(project){
   $('#resource-form').onsubmit=async e=>{e.preventDefault();const input=$('#resource-value'),file=$('#resource-file'),value=input.value.trim();let resource=null;if(file.files?.[0]){const f=file.files[0];if(f.size>200000){notify('Text resource is too large. Limit: 200 KB.','error');return}resource={name:f.name,type:f.type||'text/plain',content:await f.text(),size:f.size};}else if(value){resource=/^https:\/\//i.test(value)?{name:value,type:'url',url:value}:value; }else return;const mutation=applyProjectMutation(project,{specPatch:{resources:{add:[resource]}}});if(mutation.changed){project.status='changed';saveProject(project);await syncRemoteProject(project);notify('Resource added to the project brain.','success');}renderResources(project);};
 }
 function projectSecurityChecks(project){
-  const files=project.files||{},text=Object.entries(files).map(([p,v])=>'FILE '+p+'\n'+v).join('\n');
+  const files=project.files||{},entries=Object.entries(files);
+  const matching=(rx)=>entries.filter(([,v])=>rx.test(String(v||''))).map(([p])=>p);
+  const all=entries.map(([p,v])=>'FILE '+p+'\n'+v).join('\n');
   return [
-    {name:'No shell execution APIs',pass:!(/(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i.test(text)),detail:'Generated project files are scanned for direct command execution APIs.',blockBuild:true},
-    {name:'No eval constructors',pass:!(/\b(?:eval|new Function)\s*\(/i.test(text)),detail:'Generated files are scanned for eval/new Function.',blockBuild:true},
-    {name:'No javascript URLs',pass:!(/javascript\s*:/i.test(text)),detail:'Generated files are scanned for javascript: URLs.',blockBuild:true},
-    {name:'No obvious embedded credentials',pass:!(/(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i.test(text)),detail:'Generated files are scanned for credential-like assignments.',blockBuild:false},
-    {name:'No insecure HTTP resources',pass:!(/(?:src|href|fetch\s*\()\s*[^\n]{0,80}http:\/\//i.test(text)),detail:'Generated files are scanned for plaintext HTTP resources.',blockBuild:true},
-    {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.',blockBuild:true}
+    {name:'No shell execution APIs',pass:!( /(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i.test(all)),detail:'Generated project files are scanned for direct command execution APIs.',blockBuild:true,affectedFiles:matching(/(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i)},
+    {name:'No eval constructors',pass:!( /\b(?:eval|new Function)\s*\(/i.test(all)),detail:'Generated files are scanned for eval/new Function.',blockBuild:true,affectedFiles:matching(/\b(?:eval|new Function)\s*\(/i)},
+    {name:'No javascript URLs',pass:!( /javascript\s*:/i.test(all)),detail:'Generated files are scanned for javascript: URLs.',blockBuild:true,affectedFiles:matching(/javascript\s*:/i)},
+    {name:'No obvious embedded credentials',pass:!( /(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i.test(all)),detail:'Generated files are scanned for credential-like assignments.',blockBuild:false,affectedFiles:matching(/(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i)},
+    {name:'No insecure HTTP resources',pass:!( /(?:src|href|fetch\s*\()[^\n]{0,80}http:\/\//i.test(all)),detail:'Generated files are scanned for plaintext HTTP resources.',blockBuild:true,affectedFiles:matching(/(?:src|href|fetch\s*\()[^\n]{0,80}http:\/\//i)},
+    {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.',blockBuild:true,affectedFiles:Object.keys(files).filter(p=>sanitizePath(p)!==p)}
   ];
 }
-
 function reconciliationStatusLabel(queue){
   return queue ? String(queue.status||'pending').replace(/_/g,' ') : 'not started';
 }
@@ -1999,20 +2000,25 @@ async function renderTests(project){
 async function runTests(project){
   const results=[],files=project.files||{},software=projectArtifactKind(project.type)==='software';
   if(software){
+    const entryPath=files['index.html']?'index.html':(files['src/index.html']?'src/index.html':'index.html');
     const html=files['index.html']||files['src/index.html']||'';
-    results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'});
-    results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'});
-    const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'));
-    results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});
+    results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.',affectedFiles:[entryPath]});
+    results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.',affectedFiles:[entryPath]});
+    const marker=/\b(TODO|FIXME|coming soon)\b/i;
+    const placeholderFiles=Object.entries(files).filter(([,v])=>marker.test(String(v||''))).map(([p])=>p);
+    const hasPlaceholderMarker=placeholderFiles.length>0;
+    results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.',affectedFiles:placeholderFiles});
     results.push(await browserRuntimeCheck(files));
     return results;
   }
   const docEntries=Object.entries(files).filter(([p])=>/\.(md|txt|csv|json)$/i.test(p));
-  const text=docEntries.map(([,v])=>String(v)).join('\\n').trim();
-  results.push({name:'Deliverable exists',pass:docEntries.length>0,detail:docEntries.length?'A document deliverable file exists.':'No Markdown/text/CSV/JSON deliverable was generated.'});
-  results.push({name:'Deliverable has substance',pass:text.length>40,detail:text.length>40?'The deliverable contains substantive content.':'The deliverable is too short to be useful.'});
-  const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(text);
-  results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});
+  const text=docEntries.map(([,v])=>String(v)).join('\n').trim();
+  const docPaths=docEntries.map(([p])=>p);
+  results.push({name:'Deliverable exists',pass:docEntries.length>0,detail:docEntries.length?'A document deliverable file exists.':'No Markdown/text/CSV/JSON deliverable was generated.',affectedFiles:docPaths});
+  results.push({name:'Deliverable has substance',pass:text.length>40,detail:text.length>40?'The deliverable contains substantive content.':'The deliverable is too short to be useful.',affectedFiles:docPaths});
+  const marker=/\b(TODO|FIXME|coming soon)\b/i;
+  const placeholderFiles=docEntries.filter(([,v])=>marker.test(String(v||''))).map(([p])=>p);
+  results.push({name:'No obvious placeholder markers',pass:!placeholderFiles.length,detail:placeholderFiles.length?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.',affectedFiles:placeholderFiles});
   return results;
 }
 function browserRuntimeCheck(files){
