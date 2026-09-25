@@ -32,8 +32,8 @@ assert.match(schema, /create table/i);
 assert.match(schema, /projects/i);
 
 assert.match(deploy, /deploymentUrlHealthCheck/);
-assert.match(deploy, /api\\.vercel\\.com\\/v13\\/deployments/);
-assert.match(deploy, /api\\.netlify\\.com\\/api\\/v1\\/deploys/);
+assert.match(deploy, /api[.]vercel[.]com[/]v13[/]deployments/);
+assert.match(deploy, /api[.]netlify[.]com[/]api[/]v1[/]deploys/);
 assert.match(deploy, /health_status/);
 assert.match(deploy, /previous_deployment_id/);
 assert.match(deploy, /rollbackDeployment/);
