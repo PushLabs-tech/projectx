@@ -294,31 +294,31 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   </div>`;
 }
 export function launcherMarkup({esc, session, projects, guestReady}) {
-  const cards = projects.slice(0, 8).map(p => `<button class="box px-recent-card" data-open="${esc(p.id)}" style="text-align:left;cursor:pointer"><b>${esc(p.title)}</b><span>${esc(p.type)} · ${esc(p.status)}</span><div class="sub">${esc(String(p.intent || p.spec?.goal || '').slice(0,120))}</div></button>`).join('');
-  return `<div class="px-launcher">
-    <div class="px-launcher-inner">
-      <div class="kicker">PROJECTX</div>
+  const cards = projects.slice(0, 6).map(p => `<button class="px-recent-card" data-open="${esc(p.id)}"><div class="px-recent-card-title">${esc(p.title)}</div><div class="px-recent-card-meta">${esc(p.type)} · ${esc(p.status)}</div><div class="sub">${esc(String(p.intent || p.spec?.goal || '').slice(0,110))}</div></button>`).join('');
+  return `<div class="px-home-builder">
+    <div class="px-home-builder-inner">
+      <div class="px-home-eyebrow">PROJECTX AGENT</div>
       <h1>What are you building?</h1>
-      <p class="sub px-launcher-lead">Describe your idea. ProjectX turns it into a working project and keeps the context while you iterate.</p>
-      <div class="composer px-launcher-composer">
+      <p>Describe an idea, product, site, game, or anything you want to bring to life.</p>
+      <div class="px-home-composer composer">
         <textarea id="start-input" placeholder="Build a website for my sneaker-cleaning business…"></textarea>
-        <div class="composer-foot">
-          <div class="px-build-type-row">
-            <button class="px-type-chip" data-template="website">Website</button>
-            <button class="px-type-chip" data-template="app">Web app</button>
-            <button class="px-type-chip" data-template="game">Game</button>
-            <button class="px-type-chip" data-template="business">Business</button>
-            <button class="px-type-chip" data-template="research">Research</button>
-            <button class="px-type-chip" data-template="deck">Deck</button>
+        <div class="px-home-composer-foot">
+          <div class="px-home-shortcuts">
+            <button class="px-shortcut" data-template="website">Website</button>
+            <button class="px-shortcut" data-template="app">Web app</button>
+            <button class="px-shortcut" data-template="game">Game</button>
+            <button class="px-shortcut" data-template="business">Business</button>
+            <button class="px-shortcut" data-template="research">Research</button>
+            <button class="px-shortcut" data-template="deck">Deck</button>
           </div>
-          <button class="send" id="start-send" aria-label="Start project">→</button>
+          <button class="send px-home-send" id="start-send" aria-label="Start project">↑</button>
         </div>
       </div>
-      <div class="px-launcher-meta"><span>${session ? 'Signed in · cloud workspace' : guestReady ? 'Guest AI ready' : 'Connect AI when you are ready'}</span><span>Start with one sentence</span></div>
+      <div class="px-home-hint"><span>${session ? 'Cloud workspace connected' : guestReady ? 'Guest AI ready' : 'Connect AI when you need it'}</span><span>⌘ Enter to start</span></div>
     </div>
-    <section class="px-launcher-section">
-      <div class="px-section-head"><div><div class="label">Recent projects</div><div class="sub">Pick up where you left off.</div></div></div>
-      <div class="px-recent-grid">${cards || '<div class="px-empty">No projects yet. Start with the box above.</div>'}</div>
+    <section class="px-home-recent">
+      <div class="px-section-head"><div><strong>Recent projects</strong><div class="sub">Jump back into something you've been building.</div></div></div>
+      <div class="px-recent-grid">${cards||'<div class="px-empty">No projects yet.</div>'}</div>
     </section>
   </div>`;
 }
@@ -341,17 +341,28 @@ export function interviewMarkup() {
 
 export function projectHead({esc, project}) {
   const hasFiles=Object.keys(project.files||{}).length>0;
+  const summary=String(project.understanding?.summary||project.intent||'').trim();
   return `<div class="px-replit-project">
+    <div class="px-workspace-title">
+      <div class="px-workspace-title-main">
+        <span class="px-workspace-kicker">PROJECT</span>
+        <strong>${esc(project.title)}</strong>
+        <span class="px-workspace-desc">${esc(summary||'Build, preview, and refine your project.')}</span>
+      </div>
+      <div class="px-workspace-actions">
+        <button class="ghost" data-project-tool="build">Build</button>
+        <button class="ghost" data-project-tool="preview">Preview</button>
+        <button class="ghost" data-project-tool="files">Code</button>
+      </div>
+    </div>
     <div class="px-stage" id="px-project-stage">
       <div class="px-stage-bar">
         <div class="px-stage-left">
-          <span class="px-stage-title">${hasFiles ? 'Preview' : 'Build'}</span>
-          <span class="px-stage-sub">${hasFiles ? 'Live artifact' : 'Start from the Agent'}</span>
+          <span class="px-stage-title">${hasFiles ? 'Live app' : 'Build workspace'}</span>
+          <span class="px-stage-sub">${hasFiles ? 'Interact with the current artifact' : 'Ask Agent to start building'}</span>
         </div>
         <div class="px-stage-tools">
-          <button class="ghost" data-project-tool="build">${hasFiles ? 'Edit' : 'Build'}</button>
-          <button class="ghost" data-project-tool="preview">Preview</button>
-          <button class="ghost" data-project-tool="files">Code</button>
+          <button class="ghost" data-project-tool="preview">Open preview</button>
         </div>
       </div>
       <div id="project-body" class="body px-project-body"></div>
