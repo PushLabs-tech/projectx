@@ -80,8 +80,8 @@ async function executeExecutionJob(token:string,job:any) {
   const execution=executeToolCalls(project,contract,Array.isArray(ai?.toolCalls)?ai.toolCalls:[]);
   const plannerEvidence=(ai?.diagnosis || ai?.repairPlan) ? [{plannerDiagnosis:ai?.diagnosis||null,repairPlan:ai?.repairPlan||null}] : [];
   const evidence=[...(Array.isArray(ai?.evidence)?ai.evidence:[]),...plannerEvidence,...execution.evidence].slice(0,30);
-  if (action.type === "repair" && execution.operations.length === 0) {
-    throw new Error("Repair execution produced no file patch.");
+  if (["rebuild","update","repair"].includes(action.type) && execution.operations.length === 0) {
+    throw new Error("Execution produced no file changes.");
   }
   if (!execution.ok) {
     const failed=buildExecutionSettings(runningSettings,{...action,id:contract.actionId},{kind:action.type,ok:false,error:execution.errors?.[0]?.error || "Tool execution failed",message:"Remote execution failed.",evidence,outputVersion:project.specVersion},"failed");
@@ -102,9 +102,10 @@ async function executeExecutionJob(token:string,job:any) {
   const finished=buildExecutionSettings(nextSettings,{...action,id:contract.actionId},result,"completed");
   const committed=await commitExecution(project,job.user_id,job,action,executor,"completed",finished,execution.operations,"action_finished",execution.operations.length?"write_file":null,result.message,evidence);
   if (committed?.status==="stale") throw new Error("Project changed while committing the worker result.");
-  const { error: finishError } = await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:{actionId:contract.actionId,executor,model:result.model,provider:result.provider,diagnosis:result.diagnosis,repairPlan:result.repairPlan,message:result.message,evidence:evidence.slice(0,20),filesChanged:execution.operations.map((op:any)=>op.path),outputVersion:project.specVersion},p_error:null,p_retry_seconds:60});
+  const transactionId=committed?.transactionId ? String(committed.transactionId) : null;
+  const { error: finishError } = await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:{actionId:contract.actionId,executor,model:result.model,provider:result.provider,diagnosis:result.diagnosis,repairPlan:result.repairPlan,message:result.message,evidence:evidence.slice(0,20),filesChanged:execution.operations.map((op:any)=>op.path),outputVersion:project.specVersion,transactionId},p_error:null,p_retry_seconds:60});
   if (finishError) throw finishError;
-  return {id:job.id,status:"succeeded",actionId:contract.actionId,executor,filesChanged:execution.operations.map((op:any)=>op.path)};
+  return {id:job.id,status:"succeeded",actionId:contract.actionId,executor,filesChanged:execution.operations.map((op:any)=>op.path),transactionId};
 }
 async function proxyQueuedJob(token:string,job:any) {
   const controller=new AbortController();

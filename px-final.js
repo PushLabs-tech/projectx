@@ -1515,6 +1515,11 @@ function renderImpact(project){
   const nodes=Array.isArray(impact.nodes)?impact.nodes:[];
   const edges=Array.isArray(impact.edges)?impact.edges:[];
   const queue=getReconciliationQueue(project);
+  const transactionId=String(project.executionState?.lastTransactionId||'').trim();
+  const transactionHistory=Array.isArray(project.executionState?.transactionHistory)?project.executionState.transactionHistory:[];
+  const rollbackHistory=Array.isArray(project.executionState?.rollbackHistory)?project.executionState.rollbackHistory:[];
+  const latestTransaction=transactionHistory.find(x=>String(x?.transactionId||'')===transactionId)||null;
+  const rollbackAvailable=Boolean(session?.access_token&&transactionId&&latestTransaction&&!rollbackHistory.some(x=>String(x?.transactionId||'')===transactionId));
   const pill=(label,value)=>'<div class="box"><div class="kicker">'+esc(label)+'</div><div style="font-size:24px;font-weight:700;margin-top:4px">'+esc(value)+'</div></div>';
   const nodeRow=item=>{const n=item.node||item;const why=item.reason?' · '+item.reason:'';return '<div class="item"><b>'+esc(n.label||n.id)+'</b><div class="sub">'+esc((n.kind||'node')+(item.depth!=null?' · depth '+item.depth:'')+(item.confidence?' · '+item.confidence:'')+why)+'</div></div>';};
   const actionRows=actions.map(a=>{const qid='reconcile:'+String(a.id||'').replace(/^reconcile:/,'').replace(/[^a-z0-9-]/gi,'-');const qa=queue?.actions?.find(x=>x.id===qid);return '<div class="item"><b>'+esc(a.label||a.type||'Reconciliation action')+'</b><div class="sub">'+esc(qa?('Status: '+qa.status+' · attempts '+qa.attempts):a.reason||'Pending')+'</div></div>';}).join('')||'<div class="sub">No reconciliation action is required.</div>';
@@ -1527,7 +1532,7 @@ function renderImpact(project){
     pill('Changed',changedNodes.length),pill('Affected',affectedNodes.length),pill('Stale',staleNodes.length),pill('Invalidated',invalidatedNodes.length),
     '</div>',
     '<div class="sub" style="margin-bottom:14px">'+esc(impact.summary||'No downstream impact detected.')+'</div>',
-    '<div class="box"><div class="kicker">EXECUTION</div><h3 style="margin:4px 0 10px">Reconcile this state</h3><div class="sub">'+esc(queueSummary)+'</div><div class="actions" style="margin-top:10px"><button class="primary" id="impact-run-reconcile">Run reconciliation</button>'+(queue?.status==='failed'?'<button class="ghost" id="impact-retry-reconcile">Retry failed</button>':'')+'</div><div id="impact-run-status" class="sub" style="margin-top:8px"></div></div>',
+    '<div class="box"><div class="kicker">EXECUTION</div><h3 style="margin:4px 0 10px">Reconcile this state</h3><div class="sub">'+esc(queueSummary)+'</div><div class="actions" style="margin-top:10px"><button class="primary" id="impact-run-reconcile">Run reconciliation</button>'+(queue?.status==='failed'?'<button class="ghost" id="impact-retry-reconcile">Retry failed</button>':'')+(rollbackAvailable?'<button class="ghost" id="impact-rollback">Rollback last change</button>':'')+'</div>'+(rollbackAvailable?'<div class="sub" style="margin-top:8px">Safe rollback available · '+esc((latestTransaction?.summary?.filesChanged||0)+' file(s)')+'</div>':'')+'<div id="impact-run-status" class="sub" style="margin-top:8px"></div></div>',
     '<div class="box"><div class="kicker">DEPENDENCY MAP</div><h3 style="margin:4px 0 10px">What this change touches</h3><div class="sub" style="margin-bottom:10px">'+esc(graphEdges.length+' dependency edges · '+reviewNodes.length+' objects need review')+'</div>'+graph+'</div>',
     '<div class="grid" style="margin-top:14px">',
     '<div class="box"><h3 style="margin-top:0">Changed state</h3>'+(changedNodes.map(nodeRow).join('')||'<div class="sub">No changed objects.</div>')+'</div>',
@@ -1542,6 +1547,23 @@ function renderImpact(project){
   $('#impact-refresh').onclick=()=>{const rebuilt=buildImpactGraph(project,project.spec||{},project.spec||{});project.impact=rebuilt;saveProject(project);renderImpact(project);};
   $('#impact-run-reconcile').onclick=async()=>{const button=$('#impact-run-reconcile'),status=$('#impact-run-status');if(button)button.disabled=true;if(status)status.textContent='Executing reconciliation actions and validating the resulting state…';try{const result=await executeReconciliationQueue(project);if(status)status.textContent='Reconciliation '+reconciliationStatusLabel(result.queue)+'. '+result.executed+' action(s) executed.';renderImpact(project);}catch(error){if(status)status.textContent='Reconciliation stopped: '+String(error.message||error);renderImpact(project);}finally{button?.removeAttribute('disabled');}};
   $('#impact-retry-reconcile')?.addEventListener('click',async()=>{retryFailedReconciliation(project);saveProject(project);renderImpact(project);});
+  $('#impact-rollback')?.addEventListener('click',async()=>{
+    const b=$('#impact-rollback'),status=$('#impact-run-status');
+    if(b)b.disabled=true;
+    if(status)status.textContent='Rolling back the last transaction and reopening verification…';
+    try{
+      const result=await edge('rollbackExecutionTransaction',{projectId:project.id,transactionId,reason:'User requested rollback from the Impact workspace.'});
+      if(result.ok===false){
+        if(status)status.textContent='Rollback blocked: '+String(result.status||'conflict')+'. No files were changed.';
+        return;
+      }
+      if(result.project)Object.assign(project,migrateProject(result.project));
+      saveProject(project);
+      renderImpact(project);
+    }catch(error){
+      if(status)status.textContent='Rollback stopped: '+String(error.message||error);
+    }finally{b?.removeAttribute('disabled');}
+  });
   const repairStatus=$('#impact-repair-status');
   const repairExecution=project.executionState?.repairHistory?.at(-1);
   if(repairStatus&&repairExecution)repairStatus.textContent='Self-healing cycle '+repairExecution.cycle+' · '+String(repairExecution.category||'failure')+' · '+(repairExecution.affectedFiles||[]).slice(0,4).join(', ');

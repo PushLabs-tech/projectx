@@ -1,5 +1,7 @@
 const MAX_FILE_BYTES = 600000;
 const MAX_TOOL_CALLS = 24;
+const MAX_TRANSACTION_OPERATIONS = 12;
+const MAX_TRANSACTION_WRITE_BYTES = 4000000;
 const MAX_PATH_LENGTH = 180;
 
 const clone = (value: any) => JSON.parse(JSON.stringify(value ?? null));
@@ -24,6 +26,48 @@ function allowedWrite(contract: any, path: string) {
     return repairPaths.includes(path);
   }
   return writes.includes("files") || writes.includes("target-file");
+}
+
+export function validateExecutionOperations(project: any, contract: any, operations: any[]) {
+  const files = project?.files && typeof project.files === "object" ? project.files : {};
+  const ops = Array.isArray(operations) ? operations : [];
+  if (ops.length > MAX_TRANSACTION_OPERATIONS) return { ok: false, reason: "transaction_operation_limit" };
+  const seen = new Set<string>();
+  let writeBytes = 0;
+  const normalized: any[] = [];
+  for (const raw of ops) {
+    const op = String(raw?.op || "");
+    const path = sanitizePath(raw?.path);
+    if (!path) return { ok: false, reason: "unsafe_file_path" };
+    if (seen.has(path)) return { ok: false, reason: "duplicate_transaction_path", path };
+    seen.add(path);
+    if (!allowedWrite(contract, path)) return { ok: false, reason: "write_outside_contract", path };
+    if (op === "write") {
+      const content = String(raw?.content ?? "");
+      if (content.length > MAX_FILE_BYTES) return { ok: false, reason: "file_size_limit", path };
+      writeBytes += content.length;
+      if (writeBytes > MAX_TRANSACTION_WRITE_BYTES) return { ok: false, reason: "transaction_write_limit" };
+      normalized.push({ op, path, content, changed: String(files[path] ?? "") !== content });
+    } else if (op === "delete") {
+      if (!Object.prototype.hasOwnProperty.call(files, path)) return { ok: false, reason: "delete_missing_file", path };
+      normalized.push({ op, path, changed: true });
+    } else {
+      return { ok: false, reason: "unsupported_transaction_operation", path };
+    }
+  }
+  const changed = normalized.filter((item) => item.changed);
+  const changedOperations = changed.map(({ changed: _changed, ...item }) => item);
+  return {
+    ok: true,
+    noop: changed.length === 0,
+    operations: changedOperations,
+    changedPaths: changed.map((item) => item.path),
+    summary: {
+      filesChanged: changed.length,
+      writeBytes,
+      operations: normalized.length
+    }
+  };
 }
 
 export function executionToolDefinitions() {
@@ -128,7 +172,14 @@ export function executeToolCalls(project: any, contract: any, toolCalls: any[]) 
 
   if (errors.length) return { ok: false, operations, evidence, errors, files: working.files };
   if (!calls.length) return { ok: false, operations, evidence, errors: [{ error: "No tool calls returned." }], files: working.files };
-  return { ok: true, operations, evidence, errors: [], files: working.files };
+  const validation = validateExecutionOperations(project, contract, operations);
+  if (!validation.ok) {
+    const error = { error: validation.reason || "transaction_validation_failed", path: validation.path || null };
+    evidence.push({ tool: "transaction_validator", ok: false, ...error });
+    return { ok: false, operations: [], evidence, errors: [error], files: working.files, transaction: validation };
+  }
+  evidence.push({ tool: "transaction_validator", ok: true, changedPaths: validation.changedPaths, summary: validation.summary });
+  return { ok: true, operations, evidence, errors: [], files: working.files, transaction: validation };
 }
 
 export function buildExecutionSettings(settings: any, action: any, result: any, status: string, nowIso = new Date().toISOString()) {
@@ -151,6 +202,8 @@ export function buildExecutionSettings(settings: any, action: any, result: any, 
           provider: result.provider ? text(result.provider, 80) : null,
           diagnosis: result.diagnosis && typeof result.diagnosis === "object" ? clone(result.diagnosis) : null,
           repairPlan: result.repairPlan && typeof result.repairPlan === "object" ? clone(result.repairPlan) : null,
+          transactionId: result.transactionId ? text(result.transactionId, 80) : null,
+          transaction: result.transaction && typeof result.transaction === "object" ? clone(result.transaction) : null,
           evidence: Array.isArray(result.evidence) ? result.evidence.slice(0, 20).map(clone) : [],
           outputVersion: Number(result.outputVersion ?? queue.targetVersion ?? 1),
           recordedAt: nowIso
