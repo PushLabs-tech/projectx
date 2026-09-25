@@ -66,7 +66,9 @@ assert.match(runtime, /openProject/);
 assert.match(runtime, /refresh:boot/);
 
 assert.match(runtime, /sandbox="allow-scripts"/);
-assert.match(runtime, /PROJECTX_RUNTIME_ERROR/);
+assert.match(runtime, /referrerpolicy="no-referrer"/);
+assert.match(runtime, /PROJECTX_SANDBOX_EVENT/);
+assert.match(runtime, /runtimeVerification/);
 
 const actionMatch = edge.match(/const ACTIONS = new Set\(\[([\s\S]*?)\]\)/);
 assert.ok(actionMatch, 'Edge ACTIONS set must exist');
@@ -87,6 +89,7 @@ const requiredActions = [
 ];
 for (const action of requiredActions) {
   assert.ok(actions.includes(action), `Edge action missing: ${action}`);
+assert.ok(actions.includes('rollbackExecutionTransaction'), 'Edge rollback action missing');
 }
 
 assert.doesNotMatch(index, /styles\.css/);
