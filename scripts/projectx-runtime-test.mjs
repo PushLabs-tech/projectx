@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createProject, normalizeSections, validateSpec, applySpecChange, applyProjectMutation, restoreProjectSnapshot, normalizeResources, projectArtifactKind, serializeForPersistence, assemblePreviewHtml, sanitizePath, applyBrainMutation, createProjectFromIntent, generateDiscoveryPoll, createPlan, startAgentRun, approveAction, createArtifactVersion, runVerification, getUsageSummary } from '../projectx-core.js';
+import { SANDBOX_POLICY_VERSION, SANDBOX_CSP, createSandboxRuntimeScript, summarizeSandboxEvents } from '../projectx-sandbox.js';
 
 const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf8');
 const appShellCss = fs.readFileSync(new URL('../px-app.css', import.meta.url), 'utf8');
@@ -150,7 +151,22 @@ const files = { 'index.html': '<!doctype html><html><head><link rel="stylesheet"
 const preview = assemblePreviewHtml(files);
 assert.match(preview, /body\{font-family/);
 assert.match(preview, /dataset\.ready/);
-assert.match(preview, /PROJECTX_RUNTIME_ERROR/);
+assert.match(preview, /PROJECTX_SANDBOX_EVENT/);
+assert.match(preview, /data-projectx-sandbox/);
+const strictPreview = assemblePreviewHtml(files,{runtimeVerification:true});
+assert.match(strictPreview, /connect-src 'none'/);
+assert.match(strictPreview, /worker-src 'none'/);
+assert.match(createSandboxRuntimeScript({strict:true}), /PROJECTX_SANDBOX_EVENT/);
+assert.equal(SANDBOX_POLICY_VERSION,2);
+assert.match(SANDBOX_CSP, /frame-src 'none'/);
+const sandboxSummary = summarizeSandboxEvents([
+  {kind:'ready',at:4},
+  {kind:'network_attempt',at:9,url:'https://example.com'},
+  {kind:'runtime_error',at:12,message:'boom'}
+]);
+assert.equal(sandboxSummary.passed,false);
+assert.equal(sandboxSummary.criticalCount,1);
+assert.equal(sandboxSummary.warningCount,1);
 
 assert.match(runtime, /canonical project/i);
 assert.match(runtime, /REAL_WORLD\\|NON_REAL_WORLD/);
