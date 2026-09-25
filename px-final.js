@@ -1259,9 +1259,11 @@ async function executeLocalVerification(project){
   project.tests={status:passed?'passed':'failed',specVersion:project.specVersion,verifiedAgainstVersion:project.specVersion,results:[...results,...security],updatedAt:now()};
   project.status=passed?'verified':'needs-fix';
   if(session?.access_token){
-    const checks=results.map(x=>({name:x.name,checkType:'local',status:x.pass?'pass':'fail',severity:x.pass?'info':'error',evidence:{detail:x.detail||''},verifier:'projectx-reconciliation'}))
-      .concat(security.map(x=>({name:x.name,checkType:'security',status:x.pass?'pass':(x.blockBuild?'fail':'warning'),severity:x.pass?'info':(x.blockBuild?'error':'warning'),evidence:{detail:x.detail||''},verifier:'projectx-reconciliation'})));
-    try{await edge('runVerification',{projectId:project.id,artifactVersion:String(project.artifacts?.output?.specVersion||project.specVersion||1),checks});}catch(error){notify('Local verification finished, but its durable server record could not be saved: '+String(error.message||error),'error');}
+    const checks=results.map(x=>({name:x.name,checkType:'local',status:x.pass?'pass':'fail',severity:x.pass?'info':'error',evidence:{detail:x.detail||'',affectedFiles:x.affectedFiles||[]},verifier:'projectx-reconciliation'}))
+      .concat(security.map(x=>({name:x.name,checkType:'security',status:x.pass?'pass':(x.blockBuild?'fail':'warning'),severity:x.pass?'info':(x.blockBuild?'error':'warning'),evidence:{detail:x.detail||'',affectedFiles:x.affectedFiles||[]},verifier:'projectx-reconciliation'})));
+    const queue=getReconciliationQueue(project);
+    const sourceAction=Array.isArray(queue?.actions)?queue.actions.slice().reverse().find(a=>a?.result?.model&&a?.result?.provider&&['rebuild','update','repair'].includes(a.type)):null;
+    try{await edge('runVerification',{projectId:project.id,artifactVersion:String(project.artifacts?.output?.specVersion||project.specVersion||1),sourceActionId:sourceAction?.id||'',checks});}catch(error){notify('Local verification finished, but its durable server record could not be saved: '+String(error.message||error),'error');}
   }
   const evidence=[...results,...security].map(x=>({name:x.name,pass:Boolean(x.pass),detail:x.detail||''}));
   return {ok:passed,message:passed?'Current project output passed runtime and security verification.':'Verification found failures in the current project output.',evidence,outputVersion:project.specVersion};
