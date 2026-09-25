@@ -78,7 +78,8 @@ async function executeExecutionJob(token:string,job:any) {
   }
   const ai=await invokeAI(token,job,project,contract);
   const execution=executeToolCalls(project,contract,Array.isArray(ai?.toolCalls)?ai.toolCalls:[]);
-  const evidence=[...(Array.isArray(ai?.evidence)?ai.evidence:[]),...execution.evidence].slice(0,30);
+  const plannerEvidence=(ai?.diagnosis || ai?.repairPlan) ? [{plannerDiagnosis:ai?.diagnosis||null,repairPlan:ai?.repairPlan||null}] : [];
+  const evidence=[...(Array.isArray(ai?.evidence)?ai.evidence:[]),...plannerEvidence,...execution.evidence].slice(0,30);
   if (action.type === "repair" && execution.operations.length === 0) {
     throw new Error("Repair execution produced no file patch.");
   }
