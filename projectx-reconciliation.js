@@ -65,10 +65,21 @@ function buildStateGraph(project={}) {
   };
 
   for (const [field,label,kind] of INPUT_DEFS) {
+    addNode(nodes,{id:'input:'+field,kind:'input',label,source:'spec.'+field,signature:digest(spec[field]),value:clone(spec[field]),version:Number(project.specVersion||1)});
     if (SCALAR_FIELDS.has(field)) {
-      if (meaningful(spec[field])) addNode(nodes,{id:'spec:'+field,kind,label: text(spec[field]).slice(0,180),source:'spec.'+field,signature:digest(spec[field]),value:spec[field],version:Number(project.specVersion||1)});
+      if (meaningful(spec[field])) addNode(nodes,{id:'spec:'+field,kind,label:text(spec[field]).slice(0,180),source:'spec.'+field,signature:digest(spec[field]),value:spec[field],version:Number(project.specVersion||1)});
     } else addCollection(field,label,kind);
   }
+
+  // Stable field containers let derived artifacts survive item replacement while still
+  // becoming stale whenever the underlying field changes.
+  for (const [field] of INPUT_DEFS) {
+    const container=nodes.get('input:'+field);
+    if (!container) continue;
+    const children=[...nodes.values()].filter(n=>n.source==='spec.'+field && n.id!=='input:'+field);
+    for (const child of children) addEdge(edges,container.id,child.id,'contains','Field-level project input contains this item.');
+  }
+
   if (text(project.title)) addNode(nodes,{id:'project:title',kind:'projectType',label:'Title: '+text(project.title),source:'project.title',signature:digest(project.title),version:Number(project.specVersion||1)});
   if (text(project.type)) addNode(nodes,{id:'project:type',kind:'projectType',label:'Type: '+text(project.type),source:'project.type',signature:digest(project.type),version:Number(project.specVersion||1)});
 
@@ -347,5 +358,5 @@ export function markReconciliationState(project={}, reconciliation={}) {
 }
 
 export function inputNodeIds(project={}) {
-  return buildStateGraph(project).nodes.filter(n => n.source?.startsWith('spec.') || n.kind==='projectType').map(n=>n.id);
+  return buildStateGraph(project).nodes.filter(n => n.kind==='input' || n.kind==='projectType').map(n=>n.id);
 }
