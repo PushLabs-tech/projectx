@@ -19,6 +19,10 @@ function allowedWrite(contract: any, path: string) {
   const writes = Array.isArray(contract?.writes) ? contract.writes.map((x: any) => String(x)) : [];
   const target = String(contract?.targetId || "").replace(/^file:/, "");
   if (contract?.type === "update") return path === target;
+  if (contract?.type === "repair") {
+    const repairPaths = Array.isArray(contract?.repairPaths) ? contract.repairPaths.map((x: any) => String(x)) : [];
+    return repairPaths.includes(path);
+  }
   return writes.includes("files") || writes.includes("target-file");
 }
 
