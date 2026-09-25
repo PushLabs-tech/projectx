@@ -107,6 +107,10 @@ function buildStateGraph(project={}) {
       name:item?.name,detail:item?.detail,evidence:item?.evidence,requiredHumanReview:item?.requiredHumanReview,checkType:item?.checkType
     }),value:clone(item),version:Number(project.tests?.specVersion||project.specVersion||1)});
   }
+  for (const [index,query] of arr(project.research?.queries).entries()) {
+    const id='research:'+slug(query||index);
+    addNode(nodes,{id,kind:'research',label:text(query)||('Research query '+(index+1)),source:'research.queries',signature:digest(query),value:query,version:Number(project.specVersion||1)});
+  }
   for (const [index,item] of arr(project.research?.findings).entries()) {
     const id='evidence:'+slug(item?.id||item?.sourceUrl||item?.url||item?.finding||index);
     addNode(nodes,{id,kind:'evidence',label:text(item?.finding||item?.title||item?.sourceUrl||item?.url)||('Evidence '+(index+1)),source:'research.findings',signature:digest(item),value:clone(item),version:Number(project.specVersion||1)});
@@ -149,6 +153,8 @@ function buildStateGraph(project={}) {
   linkAll('artifact','test','verifies','Artifacts should be verified before delivery.');
   linkAll('output','test','verifies','Outputs should be verified before delivery.');
   linkAll('file','test','verifies','Files are covered by runtime or content checks.');
+  linkAll('research','evidence','produces','Research queries produce saved evidence.');
+  linkAll('research','decision','informs','Research questions inform decisions.');
   linkAll('evidence','decision','supports','Evidence can support project decisions.');
   linkAll('uncertainty','decision','uncertainty_affects','Uncertainties should be resolved before dependent decisions.');
 
