@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build && cp -f config.js dist/config.js",
-    "check": "node --check px-final.js && node --check projectx-core.js && node --check projectx-execution.js && node --check projectx-transaction.js && node --check px-ui.js && node scripts/projectx-dom-contract-test.mjs && node scripts/projectx-runtime-test.mjs && node scripts/projectx-reconciliation-test.mjs && node scripts/projectx-execution-test.mjs && node scripts/projectx-repair-test.mjs && node scripts/projectx-transaction-test.mjs && node scripts/projectx-worker-contract-test.mjs && node scripts/projectx-routing-contract-test.mjs && node scripts/projectx-forensic-regression.mjs && node scripts/backend-contract-test.mjs",
+    "check": "node --check px-final.js && node --check projectx-core.js && node --check projectx-execution.js && node --check projectx-transaction.js && node --check px-ui.js && node scripts/projectx-dom-contract-test.mjs && node scripts/projectx-runtime-test.mjs && node scripts/projectx-reconciliation-test.mjs && node scripts/projectx-execution-test.mjs && node scripts/projectx-repair-test.mjs && node scripts/projectx-transaction-test.mjs && node scripts/projectx-runtime-sandbox-test.mjs && node scripts/projectx-worker-contract-test.mjs && node scripts/projectx-routing-contract-test.mjs && node scripts/projectx-forensic-regression.mjs && node scripts/backend-contract-test.mjs",
     "security:scan": "node scripts/security-scan.mjs",
     "test": "npm run check && npm run security:scan",
     "serve": "npx serve .",
