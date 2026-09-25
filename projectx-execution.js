@@ -71,7 +71,7 @@ const EXECUTOR_DEFS = {
     outputs:['review'],
     verifies:['human-review']
   },
-  reevaluate-evidence: {
+  'reevaluate-evidence': {
     key:'researcher-human-gate',
     agent:'researcher',
     capability:'evidence.record',
