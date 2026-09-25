@@ -150,7 +150,14 @@ function buildStateGraph(project={}) {
   linkAll('constraint','decision','constrains','Constraints bound project decisions.');
   linkAll('requirement','decision','requires','Requirements must be satisfied by decisions or work.');
   linkAll('feature','decision','influences','Features influence implementation decisions.');
-  linkAll('decision','task','produces','Decisions create or change executable work.');
+  // A task with an explicit dependency scope owns its causality; do not also attach the
+  // broad decision -> task relationship or unrelated decisions would leak into its impact set.
+  for (const decision of idsByKind('decision')) {
+    for (const task of idsByKind('task')) {
+      const refs=explicitRefs(task.value);
+      if (!refs.length) addEdge(edges,decision.id,task.id,'produces','Decisions create or change executable work.');
+    }
+  }
   // Explicit artifact dependency scopes are authoritative. Only artifacts without an explicit
   // dependency list receive the broader structural decision -> artifact relationship.
   for (const decision of idsByKind('decision')) {
@@ -163,8 +170,12 @@ function buildStateGraph(project={}) {
   linkAll('deliverable','output','produces','Deliverables are represented by outputs.');
   linkAll('acceptance','test','verifies','Acceptance criteria define verification checks.');
   linkAll('success','test','verifies','Success criteria define verification checks.');
-  linkAll('requirement','task','requires','Requirements create necessary work.');
-  linkAll('constraint','task','constrains','Constraints bound executable work.');
+  for (const requirement of idsByKind('requirement')) {
+    for (const task of idsByKind('task')) if (!explicitRefs(task.value).length) addEdge(edges,requirement.id,task.id,'requires','Requirements create necessary work.');
+  }
+  for (const constraint of idsByKind('constraint')) {
+    for (const task of idsByKind('task')) if (!explicitRefs(task.value).length) addEdge(edges,constraint.id,task.id,'constrains','Constraints bound executable work.');
+  }
   linkAll('platform','file','requires','Platform choices constrain implementation files.');
   linkAll('technology','file','requires','Technology choices constrain implementation files.');
   linkAll('visual','file','influences','Visual direction influences implementation files.');
