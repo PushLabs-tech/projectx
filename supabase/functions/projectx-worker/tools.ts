@@ -1,5 +1,7 @@
 const MAX_FILE_BYTES = 600000;
 const MAX_TOOL_CALLS = 24;
+const MAX_TRANSACTION_OPERATIONS = 12;
+const MAX_TRANSACTION_WRITE_BYTES = 4000000;
 const MAX_PATH_LENGTH = 180;
 
 const clone = (value: any) => JSON.parse(JSON.stringify(value ?? null));
@@ -24,6 +26,47 @@ function allowedWrite(contract: any, path: string) {
     return repairPaths.includes(path);
   }
   return writes.includes("files") || writes.includes("target-file");
+}
+
+export function validateExecutionOperations(project: any, contract: any, operations: any[]) {
+  const files = project?.files && typeof project.files === "object" ? project.files : {};
+  const ops = Array.isArray(operations) ? operations : [];
+  if (ops.length > MAX_TRANSACTION_OPERATIONS) return { ok: false, reason: "transaction_operation_limit" };
+  const seen = new Set<string>();
+  let writeBytes = 0;
+  const normalized: any[] = [];
+  for (const raw of ops) {
+    const op = String(raw?.op || "");
+    const path = sanitizePath(raw?.path);
+    if (!path) return { ok: false, reason: "unsafe_file_path" };
+    if (seen.has(path)) return { ok: false, reason: "duplicate_transaction_path", path };
+    seen.add(path);
+    if (!allowedWrite(contract, path)) return { ok: false, reason: "write_outside_contract", path };
+    if (op === "write") {
+      const content = String(raw?.content ?? "");
+      if (content.length > MAX_FILE_BYTES) return { ok: false, reason: "file_size_limit", path };
+      writeBytes += content.length;
+      if (writeBytes > MAX_TRANSACTION_WRITE_BYTES) return { ok: false, reason: "transaction_write_limit" };
+      normalized.push({ op, path, content, changed: String(files[path] ?? "") !== content });
+    } else if (op === "delete") {
+      if (!Object.prototype.hasOwnProperty.call(files, path)) return { ok: false, reason: "delete_missing_file", path };
+      normalized.push({ op, path, changed: true });
+    } else {
+      return { ok: false, reason: "unsupported_transaction_operation", path };
+    }
+  }
+  const changed = normalized.filter((item) => item.changed);
+  return {
+    ok: true,
+    noop: changed.length === 0,
+    operations: normalized,
+    changedPaths: changed.map((item) => item.path),
+    summary: {
+      filesChanged: changed.length,
+      writeBytes,
+      operations: normalized.length
+    }
+  };
 }
 
 export function executionToolDefinitions() {
