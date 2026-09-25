@@ -228,7 +228,7 @@ assert.match(runtime, /document-output/);
 assert.match(runtime, /Deliverable exists/);
 assert.match(runtime, /projectArtifactKind\(project\.type\)/);
 assert.match(runtime, /sessionStorage/);
-assert.match(runtime, /PROJECTX_RUNTIME_ERROR/);
+assert.match(runtime, /PROJECTX_SANDBOX_EVENT/);
 assert.doesNotMatch(runtime, /ctx\.arc\(bird\.x|Game over.*Flappy|Mode: \$\{kind\}/);
 assert.doesNotMatch(runtime, /window\.ProjectXAI/);
 
@@ -236,7 +236,7 @@ console.log('PASS: single runtime entrypoint');
 console.log('PASS: canonical project model');
 console.log('PASS: semantic add/remove mutation');
 console.log('PASS: spec version invalidation');
-console.log('PASS: real artifact assembly and runtime error bridge');
+console.log('PASS: real artifact assembly and sandbox runtime evidence bridge');
 console.log('PASS: cloud persistence hooks');
 console.log('PASS: no hardcoded game runtime in canonical shell');
 console.log('PROJECTX RUNTIME CONTRACT PASSED');
