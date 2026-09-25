@@ -157,3 +157,11 @@ Do not mark the external configuration section complete until those real service
 - [x] Contract test coverage for the control-plane invariants.
 - [ ] Live production soak test with real Supabase Edge Function deployment.
 - [ ] Multi-worker concurrency test against a deployed database.
+
+
+## Autonomous E2E gate
+- Public creation flow smoke test
+- Browser console/page-error capture during creation-shell boot
+- Runs navigation source contract
+- Mobile observability-release overflow check
+- Existing build/check/security suite remains the prerequisite gate
