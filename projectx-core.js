@@ -655,6 +655,7 @@ export function assemblePreviewHtml(files = {}, options = {}) {
   html = html.replace(/<meta[^>]+http-equiv=["']content-security-policy["'][^>]*>/gi,'');
   html = html.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi,(tag,href) => { const path = sanitizePath(href.replace(/^\.\//,'')); const css = path && safeFiles[path]; return css != null ? `<style data-projectx-file="${path}">${css}</style>` : tag; });
   html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi,(tag,src) => { const path = sanitizePath(src.replace(/^\.\//,'')); const js = path && safeFiles[path]; return js != null ? `<script data-projectx-file="${path}">${js.replace(/<\/script/gi,'<\\/script')}</script>` : tag; });
+  if (!/<head[\\s>]/i.test(html)) html = /<html[\\s>]/i.test(html) ? html.replace(/<html[^>]*>/i,m=>m+'<head></head>') : '<!doctype html><html><head></head><body>'+html+'</body></html>';
   if (!/<meta[^>]+name=["']viewport["']/i.test(html)) html = html.replace(/<head>/i,'<head><meta name="viewport" content="width=device-width,initial-scale=1">');
   const csp = sandboxed
     ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none';">`
