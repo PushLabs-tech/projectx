@@ -114,7 +114,8 @@ async function execution(user:any, body:any) {
   if(!creds.length) throw new Error("Connect an AI provider in Settings before remote execution.");
   const all=await modelsForCredentials(creds,"build");
   if(!all.length) throw new Error("No compatible AI models are reachable");
-  const candidates=deterministicCandidates(all,"build",String(body?.model || "auto"));
+  const feedback=await modelFeedbackForUser(user.id,"build");
+  const candidates=routedCandidates(all,"builder",String(body?.model || "auto"),feedback);
   if(!candidates.length) throw new Error("No compatible model is available for execution");
   const system=
     "You are ProjectX's remote execution planner. You propose tool calls; you do not execute anything. " +
@@ -134,13 +135,22 @@ async function execution(user:any, body:any) {
     const k=`${m.provider}:${m.id}`;
     if((RATE.get(k)||0)>Date.now())continue;
     attempted.push(m.id);
+    const startedAt=Date.now();
     try{
       const result=await providerChat(m.credential,m.id,messages,{providerKey:m.credential.providerKey,maxTokens:Math.min(9000,Number(body?.maxTokens||7000))});
       await admin.from("ai_usage").insert({user_id:user.id,project_id:project.id,action:"execution",provider:m.provider,model:m.id,units:1});
       let parsed:any=null;try{parsed=JSON.parse(result.text);}catch{parsed=parseDiscoveryJson(result.text);}
-      if(!parsed || !Array.isArray(parsed.toolCalls)) throw new Error("Execution model returned invalid tool-call JSON.");
+      if(!parsed || !Array.isArray(parsed.toolCalls)){
+        await writeModelFeedback(user.id,m.provider,m.id,"build","failure",Date.now()-startedAt,"invalid execution tool-call JSON",{execution:true,schema:true});
+        throw new Error("Execution model returned invalid tool-call JSON.");
+      }
+      await writeModelFeedback(user.id,m.provider,m.id,"build","success",Date.now()-startedAt,null,{execution:true});
       return {ok:true,message:String(parsed.message||"Execution plan prepared."),toolCalls:parsed.toolCalls.slice(0,24),evidence:Array.isArray(parsed.evidence)?parsed.evidence.slice(0,12):[],model:m.id,provider:m.provider,attempted};
-    }catch(e){last=e;if(is429(e))RATE.set(k,Date.now()+retryMs(e));}
+    }catch(e){
+      last=e;
+      await writeModelFeedback(user.id,m.provider,m.id,"build","failure",Date.now()-startedAt,e instanceof Error?e.message:String(e),{execution:true,providerError:true});
+      if(is429(e))RATE.set(k,Date.now()+retryMs(e));
+    }
   }
   throw new Error(`No compatible AI model was available. Tried: ${attempted.join(", ") || "none"}. ${last instanceof Error ? last.message : "Provider unavailable"}`);
 }
