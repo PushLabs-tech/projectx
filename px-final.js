@@ -64,8 +64,8 @@ const now = () => new Date().toISOString();
 const DEFAULT_SETTINGS = {
   model: MODELS[0], responseStyle: 'balanced', executionMode: 'Mostly Automatic', autoSave: true, confirmDelete: true,
   theme: 'light', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-  agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], orchestrator: MODELS[0] },
-  agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true },
+  agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], repairer: MODELS[0], orchestrator: MODELS[0] },
+  agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true, repairer: true },
   notifications: { build: true, test: true, deploy: true, credits: true, security: true },
   skills: [],
   hideNav: false,
@@ -2088,7 +2088,7 @@ else body.innerHTML=`<h2>Advanced</h2><div class="box"><button class="ghost" id=
   }
 }
 async function renderAgentSettings(body){
-  const roles={interviewer:'Discovery and ambiguity reduction.',planner:'Plans from the project brain.',builder:'Creates real files and outputs.',tester:'Validates current artifacts.',researcher:'Structures source-backed evidence.',orchestrator:'Coordinates project actions and execution.'};
+  const roles={interviewer:'Discovery and ambiguity reduction.',planner:'Plans from the project brain.',builder:'Creates real files and outputs.',tester:'Validates current artifacts.',researcher:'Structures source-backed evidence.',repairer:'Diagnoses failures and applies bounded minimal patches.',orchestrator:'Coordinates project actions and execution.'};
   body.innerHTML=`<h2>Agents</h2><p class="sub">Choose specialist models and enable or disable roles. Connected-account model preferences apply to the matching ProjectX specialist.</p><div class="box" id="agent-settings"><div class="sub">Loading available models…</div></div>`;
   let models=[];
   if(session){try{models=(await edge('listModels',{task:'chat'})).models||[]}catch{}}
