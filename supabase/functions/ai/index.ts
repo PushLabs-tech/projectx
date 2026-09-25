@@ -603,7 +603,7 @@ async function research(user: any, body: any) {
         finding: limitText(f?.finding,1800), sourceUrl: limitText(f?.sourceUrl,2000), sourceTitle: limitText(f?.sourceTitle,180), sourceDate: f?.sourceDate ? limitText(f.sourceDate,20) : null,
         confidence: Math.max(0, Math.min(1, Number(f?.confidence ?? 0)))
       })).filter((f:any)=>f.finding && sources.some(s=>s.url===f.sourceUrl)) : [];
-      const provider = m.id;
+      const provider = m.provider;
       if (findings.length) {
         const rows = findings.map((f: any) => ({ project_id: projectId, query, finding: f.finding, source_title: f.sourceTitle, source_url: f.sourceUrl, source_date: /^\d{4}-\d{2}-\d{2}$/.test(String(f.sourceDate||"")) ? f.sourceDate : null, confidence: f.confidence, provider, raw: { model: m.id, source_urls: sources.map(s=>s.url) } }));
         const { error } = await admin.from("research_findings").insert(rows);
@@ -955,6 +955,7 @@ async function chat(user: any, body: any) {
         if (mode === "understand") {
           const normalized = parsed?.project ? normalizeDiscoveryResult(parsed) : null;
           if (normalized?.project) {
+            await writeModelFeedback(user.id, m.provider, m.id, task, "success", Date.now() - startedAt, null, {mode,agent});
             return { ok: true, result: normalized, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
           }
           try {
@@ -978,7 +979,7 @@ async function chat(user: any, body: any) {
           return { ok: true, result: parsed, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
         }
         await writeModelFeedback(user.id, m.provider, m.id, task, "failure", Date.now() - startedAt, "invalid structured response", {mode,agent,schema:true});
-        return { ok: true, text: result.text, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
+        continue;
       }
       await writeModelFeedback(user.id, m.provider, m.id, task, "success", Date.now() - startedAt, null, {mode,agent});
       return { ok: true, text: result.text, model: m.id, provider: m.provider, attempted, projectVersion: project?.specVersion || 1 };
