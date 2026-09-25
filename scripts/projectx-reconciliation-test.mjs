@@ -7,7 +7,11 @@ import {
   createArtifactVersion,
   reconcileProjectChange,
   serializeForPersistence,
-  restoreProjectSnapshot
+  restoreProjectSnapshot,
+  createReconciliationRun,
+  beginReconciliationAction,
+  completeReconciliationAction,
+  retryFailedReconciliation
 } from '../projectx-core.js';
 
 const project=createProject({
@@ -163,3 +167,23 @@ console.log('PASS: artifact metadata does not mutate project version');
 console.log('PASS: repeated mutations do not duplicate graph edges');
 console.log('PASS: restore recomputes reconciliation');
 console.log('PROJECTX RECONCILIATION CONTRACT PASSED');
+
+
+const queueRun=createReconciliationRun(project);
+assert.equal(queueRun.created,true);
+assert.ok(queueRun.queue.actions.length>0);
+const firstReady=project.executionState.reconciliationQueue.actions.find(a=>a.status==='pending');
+assert.ok(firstReady);
+const started=beginReconciliationAction(project,firstReady.id);
+assert.equal(started.started,true);
+assert.equal(started.action.status,'running');
+const finished=completeReconciliationAction(project,firstReady.id,{ok:true,message:'Synthetic reconciliation completed',evidence:['test harness']});
+assert.equal(finished.completed,true);
+assert.equal(project.executionState.reconciliationQueue.actions.find(a=>a.id===firstReady.id).status,'completed');
+const failing=project.executionState.reconciliationQueue.actions.find(a=>a.status==='pending');
+if(failing){beginReconciliationAction(project,failing.id);completeReconciliationAction(project,failing.id,{ok:false,error:'synthetic failure'});assert.equal(project.executionState.reconciliationQueue.status,'failed');const retry=retryFailedReconciliation(project);assert.equal(retry.reset,true);assert.equal(failing.status,'pending');}
+const duplicate=createReconciliationRun(project);
+assert.equal(duplicate.created,false);
+console.log('PASS: reconciliation queue is durable and deduplicated');
+console.log('PASS: action lifecycle supports execution results');
+console.log('PASS: failed reconciliation actions can be retried');

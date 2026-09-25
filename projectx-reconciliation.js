@@ -376,6 +376,33 @@ export function markReconciliationState(project={}, reconciliation={}) {
   return project;
 }
 
+
+const ACTION_TERMINAL = new Set(['completed','failed','blocked','skipped']);
+const EXECUTION_ACTION_TYPES = new Set(['rebuild','update','verify','replan','review-decision','review-task','reevaluate-evidence','review']);
+function actionPhase(type){ if(['review-decision','review-task','reevaluate-evidence','review'].includes(type)) return 'review'; if(type==='replan') return 'plan'; if(['update','rebuild'].includes(type)) return 'apply'; if(type==='verify') return 'verify'; return 'review'; }
+function actionId(action,index=0){ return 'reconcile:'+slug(action?.id||action?.targetId||action?.label||index); }
+export function createReconciliationQueue(reconciliation={},options={}){
+  const baseVersion=Number(options.baseVersion??reconciliation.baseVersion??1), targetVersion=Number(options.targetVersion??reconciliation.targetVersion??baseVersion);
+  const actions=(Array.isArray(reconciliation.actions)?reconciliation.actions:[]).filter(a=>a&&EXECUTION_ACTION_TYPES.has(a.type)).map((a,i)=>({id:actionId(a,i),targetId:String(a.id||a.targetId||''),type:a.type,phase:actionPhase(a.type),label:String(a.label||a.id||'Reconciliation action').slice(0,240),reason:String(a.reason||'').slice(0,500),confidence:Math.max(0,Math.min(1,Number(a.confidence??0.7)||0.7)),status:'pending',attempts:0,dependsOn:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),result:null,error:null,verificationRequired:!['review-decision','review-task','review'].includes(a.type)}));
+  const out=[],seen=new Set(); for(const a of actions)if(!seen.has(a.id)){seen.add(a.id);out.push(a);}
+  for(const a of out)if(a.phase==='verify'){const dep=out.find(x=>x.targetId===a.targetId&&['apply','plan'].includes(x.phase));if(dep)a.dependsOn.push(dep.id);}
+  return {id:String(options.queueId||('rq-'+targetVersion+'-'+Date.now())),baseVersion,targetVersion,status:out.length?'pending':'complete',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),actions:out,completedAt:null,summary:String(reconciliation.summary||'').slice(0,600)};
+}
+export function getReconciliationQueue(project={}){return project.executionState?.reconciliationQueue||null;}
+export function getReadyReconciliationActions(project={}){const q=getReconciliationQueue(project);if(!q)return [];return q.actions.filter(a=>a.status==='pending'&&a.dependsOn.every(id=>{const d=q.actions.find(x=>x.id===id);return !d||d.status==='completed';}));}
+export function updateReconciliationAction(queue,actionIdValue,patch={}){
+  if(!queue?.actions)return {updated:false,reason:'queue_missing'};const a=queue.actions.find(x=>x.id===actionIdValue);if(!a)return {updated:false,reason:'action_missing'};
+  const status=patch.status==null?a.status:String(patch.status);if(!['pending','running','completed','failed','blocked','skipped'].includes(status))return {updated:false,reason:'invalid_status'};
+  a.status=status;if(status==='running')a.attempts=Number(a.attempts||0)+1;a.updatedAt=new Date().toISOString();if('result' in patch)a.result=clone(patch.result);if('error' in patch)a.error=patch.error?String(patch.error).slice(0,500):null;if(ACTION_TERMINAL.has(status))a.completedAt=new Date().toISOString();
+  const failed=queue.actions.some(x=>x.status==='failed'),blocked=queue.actions.some(x=>x.status==='blocked'),remaining=queue.actions.some(x=>!ACTION_TERMINAL.has(x.status));queue.status=failed?'failed':blocked?'blocked':remaining?(queue.actions.some(x=>x.status==='running')?'in_progress':'pending'):'complete';if(queue.status==='complete')queue.completedAt=new Date().toISOString();queue.updatedAt=new Date().toISOString();return {updated:true,action:a};
+}
+export function recordReconciliationResult(project={},queue,actionIdValue,result={}){
+  const a=queue?.actions?.find(x=>x.id===actionIdValue);if(!a)return {ok:false,reason:'action_missing'};
+  const updated=updateReconciliationAction(queue,actionIdValue,{status:result.status||(result.ok?'completed':'failed'),result:{kind:String(result.kind||a.type),ok:result.ok!==false,message:String(result.message||'').slice(0,700),outputVersion:Number(result.outputVersion??project.specVersion??queue.targetVersion),evidence:Array.isArray(result.evidence)?result.evidence.slice(0,20).map(x=>typeof x==='string'?x:clone(x)):[],recordedAt:new Date().toISOString()},error:result.error||null});
+  if(!updated.updated)return updated;project.executionState={...(project.executionState||{}),reconciliationQueue:queue};return {ok:true,queueStatus:queue.status,action:updated.action};
+}
+export function resetFailedReconciliation(project={}){const q=getReconciliationQueue(project);if(!q)return {reset:false,reason:'queue_missing'};for(const a of q.actions)if(a.status==='failed'){a.status='pending';a.error=null;a.updatedAt=new Date().toISOString();}q.status='pending';q.completedAt=null;q.updatedAt=new Date().toISOString();project.executionState={...(project.executionState||{}),reconciliationQueue:q};return {reset:true,status:q.status};}
+
 export function inputNodeIds(project={}) {
   return buildStateGraph(project).nodes.filter(n => n.kind==='input' || n.kind==='projectType').map(n=>n.id);
 }
