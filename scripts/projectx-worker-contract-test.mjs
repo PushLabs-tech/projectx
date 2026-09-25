@@ -18,7 +18,7 @@ assert.match(worker,/executionToolDefinitions/);
 assert.match(worker,/executeToolCalls/);
 assert.match(tools,/repairPaths/);
 assert.match(tools,/contract\?\.type === "repair"/);
-assert.match(worker,/Repair execution produced no file patch/);
+assert.match(worker,/Execution produced no file changes/);
 assert.match(worker,/action\.type === "repair"/);
 assert.doesNotMatch(worker,/workerToken\s*\)\s*\{[\s\S]*workerToken/);
 assert.match(tools,/list_files/);
