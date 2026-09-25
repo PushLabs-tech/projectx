@@ -41,6 +41,8 @@ assert.match(ui, /px-hero|px-product-shot/);
 assert.match(ui, /Continue the work/);
 assert.match(ui, /CORE_NAV = \['overview', 'assistant', 'build', 'preview', 'files', 'tasks', 'settings'\]/);
 assert.match(ui, /More tools/);
+assert.match(runtime, /px-home-hero/);
+assert.match(runtime, /Build with AI/);
 assert.match(runtime, /function openMoreTools\(/);
 
 assert.doesNotMatch(ui, /ExecutionProvider/);
