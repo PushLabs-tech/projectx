@@ -354,8 +354,16 @@ export function applyProjectMutation(project, mutation = {}) {
 
 export function restoreProjectSnapshot(project, snapshot = {}) {
   if (!project || !snapshot || typeof snapshot !== 'object') return {changed:false};
+  const beforeState = JSON.parse(JSON.stringify({
+    title:project.title,type:project.type,status:project.status,specVersion:Number(project.specVersion||1),
+    plan:project.plan||[],spec:project.spec,understanding:project.understanding||{},sections:project.sections,
+    files:project.files||{},agents:project.agents||[],artifacts:project.artifacts||{},outputs:project.outputs||{},
+    tests:project.tests||{},research:project.research||{},executionState:project.executionState||{}
+  }));
   const nextSpec = mergeSpec(emptySpec(), snapshot.spec || {});
-  const nextFiles = snapshot.files && typeof snapshot.files === 'object' ? Object.fromEntries(Object.entries(snapshot.files).filter(([p,v]) => sanitizePath(p) && typeof v === 'string')) : {};
+  const nextFiles = snapshot.files && typeof snapshot.files === 'object'
+    ? Object.fromEntries(Object.entries(snapshot.files).filter(([p,v]) => sanitizePath(p) && typeof v === 'string'))
+    : {};
   const nextType = normalizeProjectType(snapshot.type || project.type);
   const nextTitle = String(snapshot.title || project.title || 'Untitled project').trim().slice(0,120);
   const changed = JSON.stringify(project.spec) !== JSON.stringify(nextSpec) || JSON.stringify(project.files || {}) !== JSON.stringify(nextFiles) || project.type !== nextType || project.title !== nextTitle;
@@ -376,14 +384,24 @@ export function restoreProjectSnapshot(project, snapshot = {}) {
   if (snapshot.sectionContent && typeof snapshot.sectionContent === 'object') project.sectionContent = JSON.parse(JSON.stringify(snapshot.sectionContent));
   project.specVersion = Number(project.specVersion || 1) + 1;
   project.updatedAt = new Date().toISOString();
-  invalidateArtifacts(project);
+
+  const reconciliation = reconcileChange(beforeState, project, {kind:'restore',projectType:nextType,projectTitle:nextTitle});
+  project.impact = reconciliation;
+  markReconciliationState(project, reconciliation);
+  invalidateArtifacts(project, (reconciliation.staleNodes || []).map(x => x.id));
   project.sectionContent = {};
-  project.tests = {status:'stale',specVersion:project.specVersion,results:[],updatedAt:null};
-  project.research = {...(project.research || {status:'ready',queries:[],sources:[],findings:[]}),status:(project.research?.findings?.length?'ready':'stale')};
-  project.executionState = {...(project.executionState || {}),status:'dirty',lastMutationId:globalThis.crypto?.randomUUID?.() || `restore-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,staleFromVersion:project.specVersion};
-  project.impact = buildImpactGraph(project, snapshot.spec || {}, project.spec || {}, {projectType:nextType,projectTitle:nextTitle,files:true});
-  return {changed:true};
+  project.tests = {status:'stale',specVersion:project.specVersion,verifiedAgainstVersion:null,results:[],updatedAt:null};
+  project.research = {...(project.research || {queries:[],sources:[],findings:[]}),status:(project.research?.findings?.length?'ready':'stale')};
+  project.executionState = {
+    ...(project.executionState || {}),
+    status:'dirty',
+    lastMutationId:globalThis.crypto?.randomUUID?.() || `restore-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    staleFromVersion:project.specVersion,
+    reconciliation:{...(project.executionState?.reconciliation||{}),baseVersion:reconciliation.baseVersion,targetVersion:project.specVersion}
+  };
+  return {changed:true,impact:reconciliation};
 }
+
 export function applySpecChange(project,patch = {}) { return applyProjectMutation(project,{specPatch:patch}); }
 
 function appendMutationAudit(project, entry) {
@@ -576,11 +594,22 @@ export function createArtifactVersion(project, artifact = {}) {
 }
 
 export function runVerification(project, checks = []) {
-  const normalized = (Array.isArray(checks) ? checks : []).map(check => ({name:String(check?.name || 'Unnamed check').slice(0,120),status:['passed','not_checked','blocked','human_review'].includes(String(check?.status || 'not_checked')) ? String(check.status) : 'not_checked',evidence:String(check?.evidence || '').slice(0,500),requiredHumanReview:Boolean(check?.requiredHumanReview)}));
+  const normalized = (Array.isArray(checks) ? checks : []).map(check => ({
+    name:String(check?.name || 'Unnamed check').slice(0,120),
+    status:['passed','not_checked','blocked','human_review'].includes(String(check?.status || 'not_checked')) ? String(check.status) : 'not_checked',
+    evidence:String(check?.evidence || '').slice(0,500),
+    requiredHumanReview:Boolean(check?.requiredHumanReview)
+  }));
   const hasBlocker = normalized.some(check => check.status === 'blocked');
   const passed = normalized.length > 0 && normalized.every(check => check.status === 'passed');
   const status = hasBlocker ? 'blocked' : passed ? 'passed' : normalized.some(check => check.status === 'human_review' || check.requiredHumanReview) ? 'human_review' : 'not_checked';
-  project.tests = {specVersion:project.specVersion,results:normalized,updatedAt:new Date().toISOString(),status};
+  project.tests = {
+    specVersion:project.specVersion,
+    verifiedAgainstVersion:Number(project.specVersion || 1),
+    results:normalized,
+    updatedAt:new Date().toISOString(),
+    status
+  };
   project.status = status === 'passed' ? 'verified' : status;
   return project.tests;
 }
