@@ -212,6 +212,7 @@ async function enqueueRemoteExecutionJob(project,action,contract){
   return result?.job||null;
 }
 async function waitForRemoteExecutionJob(jobId,timeoutMs=90000){
+async function cancelRemoteExecutionJob(jobId){if(!jobId)throw new Error('Remote execution job id is missing.');return edge('cancelJob',{jobId});}
   const deadline=Date.now()+Math.max(15000,Math.min(180000,Number(timeoutMs)||90000));
   while(Date.now()<deadline){
     const result=await edge('getJob',{jobId});
@@ -1337,13 +1338,26 @@ async function executeReconciliationQueue(project){
       if(session?.access_token&&project?.sync?.remoteId&&['rebuild','update'].includes(action.type)){
         const remoteJob=await enqueueRemoteExecutionJob(project,action,contract);
         if(!remoteJob?.id)throw new Error('Remote execution job could not be queued.');
+        const remoteQueue=getReconciliationQueue(project);
+        const remoteAction=remoteQueue?.actions?.find(x=>x.id===action.id);
+        if(remoteQueue){
+          remoteQueue.execution={...(remoteQueue.execution||{}),activeJobId:remoteJob.id};
+          if(remoteAction)remoteAction.remoteJobId=remoteJob.id;
+          project.executionState={...(project.executionState||{}),reconciliationQueue:remoteQueue};
+        }
         appendExecutionJournal(project,{event:'remote_job_queued',actionId:action.id,status:'queued',executor:contract.executor,message:'Queued action for the remote ProjectX worker.',evidence:[{jobId:remoteJob.id}],outputVersion:project.specVersion});
-        saveProject(project);
+        saveProject(project); await syncRemoteProject(project);
+        const cancelStatus=$('#impact-run-status');
+        if(cancelStatus)cancelStatus.innerHTML='Remote worker job '+esc(remoteJob.id.slice(0,8))+'… is running. <button class="ghost" id="impact-cancel-worker">Cancel</button>';
+        $('#impact-cancel-worker')?.addEventListener('click',async()=>{const b=$('#impact-cancel-worker');if(b)b.disabled=true;try{await cancelRemoteExecutionJob(remoteJob.id);if(cancelStatus)cancelStatus.textContent='Cancellation requested. Waiting for the worker to stop safely…';}catch(error){if(cancelStatus)cancelStatus.textContent='Could not cancel: '+String(error.message||error);if(b)b.disabled=false;}});
         const finishedJob=await waitForRemoteExecutionJob(remoteJob.id);
         const refreshed=await edge('getProject',{projectId:project.sync?.remoteId||project.id});
         if(refreshed?.project)Object.assign(project,migrateProject(refreshed.project));
         const liveQueue=getReconciliationQueue(project);
         const liveAction=liveQueue?.actions?.find(x=>x.id===action.id);
+        if(liveQueue?.execution?.activeJobId===remoteJob.id)liveQueue.execution.activeJobId=null;
+        if(liveAction?.remoteJobId===remoteJob.id)liveAction.remoteJobId=null;
+        project.executionState={...(project.executionState||{}),reconciliationQueue:liveQueue};
         result=finishedJob.status==='succeeded'
           ? {ok:true,message:String(finishedJob.result?.message||'Remote worker completed the action.'),evidence:Array.isArray(finishedJob.result?.evidence)?finishedJob.result.evidence:[],outputVersion:project.specVersion}
           : {ok:false,error:String(finishedJob.error||'Remote worker failed the action.'),message:String(finishedJob.error||'Remote worker failed the action.'),outputVersion:project.specVersion};
