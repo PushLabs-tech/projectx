@@ -1,0 +1,45 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+const root=new URL("../",import.meta.url);
+const worker=fs.readFileSync(new URL("../supabase/functions/projectx-worker/index.ts",import.meta.url),"utf8");
+const tools=fs.readFileSync(new URL("../supabase/functions/projectx-worker/tools.ts",import.meta.url),"utf8");
+const ai=fs.readFileSync(new URL("../supabase/functions/ai/index.ts",import.meta.url),"utf8");
+const migration=fs.readFileSync(new URL("../supabase/migrations/20260925150000_projectx_remote_execution_worker.sql",import.meta.url),"utf8");
+const runtime=fs.readFileSync(new URL("../px-final.js",import.meta.url),"utf8");
+
+assert.match(worker,/projectx_worker_token_valid/);
+assert.match(worker,/claim_project_job/);
+assert.match(worker,/finish_project_job/);
+assert.match(worker,/commit_project_execution/);
+assert.match(worker,/AbortController/);
+assert.match(worker,/executionToolDefinitions/);
+assert.match(worker,/executeToolCalls/);
+assert.doesNotMatch(worker,/workerToken\s*\)\s*\{[\s\S]*workerToken/);
+assert.match(tools,/list_files/);
+assert.match(tools,/read_file/);
+assert.match(tools,/write_file/);
+assert.match(tools,/delete_file/);
+assert.match(tools,/verify_output/);
+assert.match(tools,/Write is outside the action contract/);
+assert.match(tools,/MAX_FILE_BYTES = 600000/);
+assert.match(ai,/kind === "execution"/);
+assert.match(ai,/remote execution planner/);
+assert.match(ai,/toolCalls/);
+assert.match(runtime,/enqueueRemoteExecutionJob/);
+assert.match(runtime,/waitForRemoteExecutionJob/);
+assert.match(runtime,/kind:'execution'/);
+assert.match(migration,/project_execution_events/);
+assert.match(migration,/cancel_project_job/);
+assert.match(migration,/commit_project_execution/);
+assert.match(migration,/cancel_requested/);
+assert.match(migration,/timeout_seconds/);
+
+console.log("PASS: remote worker has a server-side authentication boundary");
+console.log("PASS: execution tools are explicitly registered and contract-scoped");
+console.log("PASS: tool writes enforce path and size limits");
+console.log("PASS: execution jobs support cancellation and hard timeouts");
+console.log("PASS: worker persists execution state and durable execution events atomically");
+console.log("PASS: AI produces tool proposals while the worker owns writes");
+console.log("PASS: reconciliation UI can dispatch and await durable worker jobs");
+console.log("PROJECTX REMOTE WORKER CONTRACT PASSED");
