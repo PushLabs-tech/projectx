@@ -1,5 +1,5 @@
 import { reconcileChange, markReconciliationState, inputNodeIds, createReconciliationQueue, getReconciliationQueue, getReadyReconciliationActions, updateReconciliationAction, recordReconciliationResult, resetFailedReconciliation } from './projectx-reconciliation.js';
-import { getExecutionPolicy, getExecutorDefinition, selectExecutor, createActionContract, createExecutionPlan, appendExecutionJournal, canExecuteAction, shouldRepairAfterFailure, prepareReconciliationRepair } from './projectx-execution.js';
+import { getExecutionPolicy, getExecutorDefinition, selectExecutor, createActionContract, createExecutionPlan, appendExecutionJournal, canExecuteAction, shouldRepairAfterFailure, prepareReconciliationRepair, diagnoseFailures, createRepairActionContract, scheduleRepairCycle } from './projectx-execution.js';
 
 export const CORE_VERSION = 4;
 
@@ -418,7 +418,7 @@ export function completeReconciliationAction(project,actionIdValue,result={}){co
 export function retryFailedReconciliation(project={}){return resetFailedReconciliation(project);}
 
 export { getReconciliationQueue, getReadyReconciliationActions };
-export { getExecutionPolicy, getExecutorDefinition, selectExecutor, createActionContract, createExecutionPlan, appendExecutionJournal, canExecuteAction, shouldRepairAfterFailure, prepareReconciliationRepair };
+export { getExecutionPolicy, getExecutorDefinition, selectExecutor, createActionContract, createExecutionPlan, appendExecutionJournal, canExecuteAction, shouldRepairAfterFailure, prepareReconciliationRepair, diagnoseFailures, createRepairActionContract, scheduleRepairCycle };
 
 function appendMutationAudit(project, entry) {
   const execution = project.executionState || {};

@@ -28,6 +28,9 @@ import {
   canExecuteAction,
   shouldRepairAfterFailure,
   prepareReconciliationRepair,
+  diagnoseFailures,
+  createRepairActionContract,
+  scheduleRepairCycle,
 } from './projectx-core.js';
 import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
@@ -61,8 +64,8 @@ const now = () => new Date().toISOString();
 const DEFAULT_SETTINGS = {
   model: MODELS[0], responseStyle: 'balanced', executionMode: 'Mostly Automatic', autoSave: true, confirmDelete: true,
   theme: 'light', language: 'English', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-  agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], orchestrator: MODELS[0] },
-  agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true },
+  agentModels: { interviewer: MODELS[0], planner: MODELS[0], builder: MODELS[0], tester: MODELS[0], researcher: MODELS[0], repairer: MODELS[0], orchestrator: MODELS[0] },
+  agents: { interviewer: true, planner: true, builder: true, tester: true, researcher: true, repairer: true },
   notifications: { build: true, test: true, deploy: true, credits: true, security: true },
   skills: [],
   hideNav: false,
@@ -71,9 +74,9 @@ const DEFAULT_SETTINGS = {
   splitFiles: false
 };
 const ExecutionProvider = {
-  kind: 'orchestrated-local',
-  isolatedWorkers: false,
-  note: 'Execution uses explicit action contracts and bounded local adapters. Browser verification runs in a sandboxed iframe; remote workers are not connected.'
+  kind: 'orchestrated-remote',
+  isolatedWorkers: true,
+  note: 'Signed-in rebuild, update, and repair actions execute through the ProjectX remote worker; browser verification remains the final local truth gate.'
 };
 const DeploymentProvider = {
   kind: 'github-pages-export',
@@ -212,7 +215,6 @@ async function enqueueRemoteExecutionJob(project,action,contract){
   return result?.job||null;
 }
 async function waitForRemoteExecutionJob(jobId,timeoutMs=90000){
-async function cancelRemoteExecutionJob(jobId){if(!jobId)throw new Error('Remote execution job id is missing.');return edge('cancelJob',{jobId});}
   const deadline=Date.now()+Math.max(15000,Math.min(180000,Number(timeoutMs)||90000));
   while(Date.now()<deadline){
     const result=await edge('getJob',{jobId});
@@ -221,6 +223,10 @@ async function cancelRemoteExecutionJob(jobId){if(!jobId)throw new Error('Remote
     await sleep(2500);
   }
   throw new Error('The remote worker did not finish this action before the execution window expired.');
+}
+async function cancelRemoteExecutionJob(jobId){
+  if(!jobId)throw new Error('Remote execution job id is missing.');
+  return edge('cancelJob',{jobId});
 }
 
 function integrationWorkspaceId() {
@@ -1209,17 +1215,18 @@ function renderResources(project){
   $('#resource-form').onsubmit=async e=>{e.preventDefault();const input=$('#resource-value'),file=$('#resource-file'),value=input.value.trim();let resource=null;if(file.files?.[0]){const f=file.files[0];if(f.size>200000){notify('Text resource is too large. Limit: 200 KB.','error');return}resource={name:f.name,type:f.type||'text/plain',content:await f.text(),size:f.size};}else if(value){resource=/^https:\/\//i.test(value)?{name:value,type:'url',url:value}:value; }else return;const mutation=applyProjectMutation(project,{specPatch:{resources:{add:[resource]}}});if(mutation.changed){project.status='changed';saveProject(project);await syncRemoteProject(project);notify('Resource added to the project brain.','success');}renderResources(project);};
 }
 function projectSecurityChecks(project){
-  const files=project.files||{},text=Object.entries(files).map(([p,v])=>'FILE '+p+'\n'+v).join('\n');
+  const files=project.files||{},entries=Object.entries(files);
+  const matching=(rx)=>entries.filter(([,v])=>rx.test(String(v||''))).map(([p])=>p);
+  const all=entries.map(([p,v])=>'FILE '+p+'\n'+v).join('\n');
   return [
-    {name:'No shell execution APIs',pass:!(/(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i.test(text)),detail:'Generated project files are scanned for direct command execution APIs.',blockBuild:true},
-    {name:'No eval constructors',pass:!(/\b(?:eval|new Function)\s*\(/i.test(text)),detail:'Generated files are scanned for eval/new Function.',blockBuild:true},
-    {name:'No javascript URLs',pass:!(/javascript\s*:/i.test(text)),detail:'Generated files are scanned for javascript: URLs.',blockBuild:true},
-    {name:'No obvious embedded credentials',pass:!(/(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i.test(text)),detail:'Generated files are scanned for credential-like assignments.',blockBuild:false},
-    {name:'No insecure HTTP resources',pass:!(/(?:src|href|fetch\s*\()\s*[^\n]{0,80}http:\/\//i.test(text)),detail:'Generated files are scanned for plaintext HTTP resources.',blockBuild:true},
-    {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.',blockBuild:true}
+    {name:'No shell execution APIs',pass:!( /(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i.test(all)),detail:'Generated project files are scanned for direct command execution APIs.',blockBuild:true,affectedFiles:matching(/(?:child_process|Deno\.Command|Bun\.spawn|process\.exec\()/i)},
+    {name:'No eval constructors',pass:!( /\b(?:eval|new Function)\s*\(/i.test(all)),detail:'Generated files are scanned for eval/new Function.',blockBuild:true,affectedFiles:matching(/\b(?:eval|new Function)\s*\(/i)},
+    {name:'No javascript URLs',pass:!( /javascript\s*:/i.test(all)),detail:'Generated files are scanned for javascript: URLs.',blockBuild:true,affectedFiles:matching(/javascript\s*:/i)},
+    {name:'No obvious embedded credentials',pass:!( /(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i.test(all)),detail:'Generated files are scanned for credential-like assignments.',blockBuild:false,affectedFiles:matching(/(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{16,}['"]/i)},
+    {name:'No insecure HTTP resources',pass:!( /(?:src|href|fetch\s*\()[^\n]{0,80}http:\/\//i.test(all)),detail:'Generated files are scanned for plaintext HTTP resources.',blockBuild:true,affectedFiles:matching(/(?:src|href|fetch\s*\()[^\n]{0,80}http:\/\//i)},
+    {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.',blockBuild:true,affectedFiles:Object.keys(files).filter(p=>sanitizePath(p)!==p)}
   ];
 }
-
 function reconciliationStatusLabel(queue){
   return queue ? String(queue.status||'pending').replace(/_/g,' ') : 'not started';
 }
@@ -1243,23 +1250,7 @@ async function executeTargetedFileUpdate(project,action){
   project.updatedAt=now();
   return {ok:true,message:'Updated '+path+'.',evidence:['Targeted AI reconciliation update applied to the existing file.'],outputVersion:project.specVersion};
 }
-async function recordVerificationModelFeedback(project,passed,evidence=[]){
-  if(!session?.access_token||!project?.id)return;
-  const queue=getReconciliationQueue(project);
-  const candidates=Array.isArray(queue?.actions)?queue.actions.filter(a=>a?.result?.model&&a?.result?.provider&&a.result.kind!=='verify'):[];
-  const latest=candidates.sort((a,b)=>Number(new Date(b.updatedAt||0))-Number(new Date(a.updatedAt||0))).at(-1)||candidates[candidates.length-1];
-  if(!latest?.result?.model||!latest?.result?.provider)return;
-  try{
-    await edge('recordModelFeedback',{
-      projectId:project.sync?.remoteId||project.id,
-      provider:latest.result.provider,
-      model:latest.result.model,
-      agent:'builder',
-      outcome:passed?'verification_pass':'verification_fail',
-      evidence:{verification:evidence.slice(0,12),actionId:latest.id,specVersion:project.specVersion}
-    });
-  }catch{}
-}
+
 async function executeLocalVerification(project){
   const results=await runTests(project);
   const security=projectSecurityChecks(project);
@@ -1268,12 +1259,13 @@ async function executeLocalVerification(project){
   project.tests={status:passed?'passed':'failed',specVersion:project.specVersion,verifiedAgainstVersion:project.specVersion,results:[...results,...security],updatedAt:now()};
   project.status=passed?'verified':'needs-fix';
   if(session?.access_token){
-    const checks=results.map(x=>({name:x.name,checkType:'local',status:x.pass?'pass':'fail',severity:x.pass?'info':'error',evidence:{detail:x.detail||''},verifier:'projectx-reconciliation'}))
-      .concat(security.map(x=>({name:x.name,checkType:'security',status:x.pass?'pass':(x.blockBuild?'fail':'warning'),severity:x.pass?'info':(x.blockBuild?'error':'warning'),evidence:{detail:x.detail||''},verifier:'projectx-reconciliation'})));
-    try{await edge('runVerification',{projectId:project.id,artifactVersion:String(project.artifacts?.output?.specVersion||project.specVersion||1),checks});}catch(error){notify('Local verification finished, but its durable server record could not be saved: '+String(error.message||error),'error');}
+    const checks=results.map(x=>({name:x.name,checkType:'local',status:x.pass?'pass':'fail',severity:x.pass?'info':'error',evidence:{detail:x.detail||'',affectedFiles:x.affectedFiles||[]},verifier:'projectx-reconciliation'}))
+      .concat(security.map(x=>({name:x.name,checkType:'security',status:x.pass?'pass':(x.blockBuild?'fail':'warning'),severity:x.pass?'info':(x.blockBuild?'error':'warning'),evidence:{detail:x.detail||'',affectedFiles:x.affectedFiles||[]},verifier:'projectx-reconciliation'})));
+    const queue=getReconciliationQueue(project);
+    const sourceAction=Array.isArray(queue?.actions)?queue.actions.slice().reverse().find(a=>a?.result?.model&&a?.result?.provider&&['rebuild','update','repair'].includes(a.type)):null;
+    try{await edge('runVerification',{projectId:project.id,artifactVersion:String(project.artifacts?.output?.specVersion||project.specVersion||1),sourceActionId:sourceAction?.id||'',checks});}catch(error){notify('Local verification finished, but its durable server record could not be saved: '+String(error.message||error),'error');}
   }
   const evidence=[...results,...security].map(x=>({name:x.name,pass:Boolean(x.pass),detail:x.detail||''}));
-  await recordVerificationModelFeedback(project,passed,evidence);
   return {ok:passed,message:passed?'Current project output passed runtime and security verification.':'Verification found failures in the current project output.',evidence,outputVersion:project.specVersion};
 }
 async function executeReconciliationQueue(project){
@@ -1352,9 +1344,9 @@ async function executeReconciliationQueue(project){
     const started=beginReconciliationAction(project,action.id);
     if(!started.started)throw new Error(started.reason||'Could not start reconciliation action.');
     appendExecutionJournal(project,{event:'action_started',actionId:action.id,status:'running',executor:contract.executor,message:'Executor started.',evidence:[{type:action.type,boundary:contract.boundary,risk:contract.risk,attempt:Number(started.action.attempts||1)}],outputVersion:project.specVersion});
-    let result,remoteHandled=false;
+    let result,remoteHandled=false,finished={action:null,queueStatus:null};
     try{
-      if(session?.access_token&&project?.sync?.remoteId&&['rebuild','update'].includes(action.type)){
+      if(session?.access_token&&project?.sync?.remoteId&&['rebuild','update','repair'].includes(action.type)){
         const remoteJob=await enqueueRemoteExecutionJob(project,action,contract);
         if(!remoteJob?.id)throw new Error('Remote execution job could not be queued.');
         const remoteQueue=getReconciliationQueue(project);
@@ -1381,6 +1373,7 @@ async function executeReconciliationQueue(project){
           ? {ok:true,message:String(finishedJob.result?.message||'Remote worker completed the action.'),model:finishedJob.result?.model?String(finishedJob.result.model):null,provider:finishedJob.result?.provider?String(finishedJob.result.provider):null,evidence:Array.isArray(finishedJob.result?.evidence)?finishedJob.result.evidence:[],outputVersion:project.specVersion}
           : {ok:false,error:String(finishedJob.error||'Remote worker failed the action.'),message:String(finishedJob.error||'Remote worker failed the action.'),model:finishedJob.result?.model?String(finishedJob.result.model):null,provider:finishedJob.result?.provider?String(finishedJob.result.provider):null,outputVersion:project.specVersion};
         remoteHandled=Boolean(liveAction&&['completed','failed','blocked','skipped'].includes(liveAction.status));
+        if(remoteHandled)finished={action:liveAction,queueStatus:liveQueue?.status};
         verificationPassed=verificationPassed||false;
       }else if(action.type==='rebuild'){
         project.uiNav='build';
@@ -1438,15 +1431,15 @@ async function executeReconciliationQueue(project){
 
     if(result.ok===false){
       if(action.type==='verify'&&shouldRepairAfterFailure(action,contract,policy)){
-        const repair=prepareReconciliationRepair(project,action.id,{mode});
-        if(repair.reset){
+        const repair=scheduleRepairCycle(project,action.id,result.evidence||[],policy);
+        if(repair.scheduled){
           plan=createExecutionPlan(project,getReconciliationQueue(project),{mode});
           const liveQueue=getReconciliationQueue(project);
           if(liveQueue){
             liveQueue.execution={...(liveQueue.execution||{}),plan,repairCycles:repair.cycle};
             project.executionState={...(project.executionState||{}),reconciliationQueue:liveQueue,status:'reconciling'};
           }
-          appendExecutionJournal(project,{event:'repair_cycle_started',actionId:action.id,status:'pending',executor:'projectx-orchestrator',message:'Verification failed, so the bounded repair loop reopened an eligible apply action.',evidence:[{cycle:repair.cycle,repairActionId:repair.repairAction?.id}],outputVersion:project.specVersion});
+          appendExecutionJournal(project,{event:'repair_cycle_started',actionId:action.id,status:'pending',executor:'projectx-orchestrator',message:'Verification failed; ProjectX diagnosed the failure and scheduled a bounded minimal repair.',evidence:[{cycle:repair.cycle,repairActionId:repair.repairAction.id,diagnosisId:repair.diagnosis.diagnosisId,category:repair.diagnosis.category,affectedFiles:repair.diagnosis.affectedFiles}],outputVersion:project.specVersion});
           saveProject(project);
           await syncRemoteProject(project);
           verificationPassed=false;
@@ -1543,12 +1536,15 @@ function renderImpact(project){
     '<div class="box"><h3 style="margin-top:0">Invalidated</h3>'+(invalidatedNodes.map(nodeRow).join('')||'<div class="sub">Nothing invalidated.</div>')+'</div>',
     '</div>',
     '<div class="grid" style="margin-top:14px"><div class="box"><h3 style="margin-top:0">Reconciliation actions</h3>'+actionRows+'</div><div class="box"><h3 style="margin-top:0">Verification queue</h3>'+verifyRows+'</div></div>',
-    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="ghost" id="impact-chat">Open in Assistant</button></div><div id="impact-status" class="sub" style="margin-top:10px"></div>'
+    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="ghost" id="impact-chat">Open in Assistant</button></div><div id="impact-status" class="sub" style="margin-top:10px"></div><div id="impact-repair-status" class="sub" style="margin-top:6px"></div>'
   ].join('');
   toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces a state change through the dependency graph and can now execute eligible reconciliation actions against the current state.',body);
   $('#impact-refresh').onclick=()=>{const rebuilt=buildImpactGraph(project,project.spec||{},project.spec||{});project.impact=rebuilt;saveProject(project);renderImpact(project);};
   $('#impact-run-reconcile').onclick=async()=>{const button=$('#impact-run-reconcile'),status=$('#impact-run-status');if(button)button.disabled=true;if(status)status.textContent='Executing reconciliation actions and validating the resulting state…';try{const result=await executeReconciliationQueue(project);if(status)status.textContent='Reconciliation '+reconciliationStatusLabel(result.queue)+'. '+result.executed+' action(s) executed.';renderImpact(project);}catch(error){if(status)status.textContent='Reconciliation stopped: '+String(error.message||error);renderImpact(project);}finally{button?.removeAttribute('disabled');}};
   $('#impact-retry-reconcile')?.addEventListener('click',async()=>{retryFailedReconciliation(project);saveProject(project);renderImpact(project);});
+  const repairStatus=$('#impact-repair-status');
+  const repairExecution=project.executionState?.repairHistory?.at(-1);
+  if(repairStatus&&repairExecution)repairStatus.textContent='Self-healing cycle '+repairExecution.cycle+' · '+String(repairExecution.category||'failure')+' · '+(repairExecution.affectedFiles||[]).slice(0,4).join(', ');
   $('#impact-chat').onclick=()=>{const summary=(actions.slice(0,8).map(a=>a.label||a.type).join('; ')||'Review the current impact and reconcile affected work.');project.uiNav='assistant';saveProject(project);renderProjectChat(project,'Reconcile this change. Review affected decisions, stale artifacts, invalidated work, and verification before making further changes. '+summary);};
 }
 function renderProjectSecurity(project){
@@ -2007,20 +2003,25 @@ async function renderTests(project){
 async function runTests(project){
   const results=[],files=project.files||{},software=projectArtifactKind(project.type)==='software';
   if(software){
+    const entryPath=files['index.html']?'index.html':(files['src/index.html']?'src/index.html':'index.html');
     const html=files['index.html']||files['src/index.html']||'';
-    results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.'});
-    results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.'});
-    const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(Object.values(files).join('\\n'));
-    results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});
+    results.push({name:'Entry file exists',pass:Boolean(html),detail:html?'index.html exists.':'No index.html artifact exists.',affectedFiles:[entryPath]});
+    results.push({name:'HTML structure',pass:/<html[\s>]/i.test(html)&&/<body[\s>]/i.test(html),detail:/<html[\s>]/i.test(html)?'HTML document detected.':'Missing a complete HTML document.',affectedFiles:[entryPath]});
+    const marker=/\b(TODO|FIXME|coming soon)\b/i;
+    const placeholderFiles=Object.entries(files).filter(([,v])=>marker.test(String(v||''))).map(([p])=>p);
+    const hasPlaceholderMarker=placeholderFiles.length>0;
+    results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.',affectedFiles:placeholderFiles});
     results.push(await browserRuntimeCheck(files));
     return results;
   }
   const docEntries=Object.entries(files).filter(([p])=>/\.(md|txt|csv|json)$/i.test(p));
-  const text=docEntries.map(([,v])=>String(v)).join('\\n').trim();
-  results.push({name:'Deliverable exists',pass:docEntries.length>0,detail:docEntries.length?'A document deliverable file exists.':'No Markdown/text/CSV/JSON deliverable was generated.'});
-  results.push({name:'Deliverable has substance',pass:text.length>40,detail:text.length>40?'The deliverable contains substantive content.':'The deliverable is too short to be useful.'});
-  const hasPlaceholderMarker=/\b(TODO|FIXME|coming soon)\b/i.test(text);
-  results.push({name:'No obvious placeholder markers',pass:!hasPlaceholderMarker,detail:hasPlaceholderMarker?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.'});
+  const text=docEntries.map(([,v])=>String(v)).join('\n').trim();
+  const docPaths=docEntries.map(([p])=>p);
+  results.push({name:'Deliverable exists',pass:docEntries.length>0,detail:docEntries.length?'A document deliverable file exists.':'No Markdown/text/CSV/JSON deliverable was generated.',affectedFiles:docPaths});
+  results.push({name:'Deliverable has substance',pass:text.length>40,detail:text.length>40?'The deliverable contains substantive content.':'The deliverable is too short to be useful.',affectedFiles:docPaths});
+  const marker=/\b(TODO|FIXME|coming soon)\b/i;
+  const placeholderFiles=docEntries.filter(([,v])=>marker.test(String(v||''))).map(([p])=>p);
+  results.push({name:'No obvious placeholder markers',pass:!placeholderFiles.length,detail:placeholderFiles.length?'TODO/FIXME/coming-soon marker found.':'No obvious placeholder marker found.',affectedFiles:placeholderFiles});
   return results;
 }
 function browserRuntimeCheck(files){
@@ -2031,9 +2032,9 @@ function browserRuntimeCheck(files){
     document.body.appendChild(frame);
     let settled=false;
     const finish=result=>{if(settled)return;settled=true;window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove();resolve(result);};
-    const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.'});};
+    const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.',affectedFiles:Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6)});};
     window.addEventListener('message',onMessage);
-    const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.'}),2200);
+    const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.',affectedFiles:Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6)}),2200);
     frame.srcdoc=assemblePreviewHtml(files);
   });
 }
@@ -2090,7 +2091,7 @@ else body.innerHTML=`<h2>Advanced</h2><div class="box"><button class="ghost" id=
   }
 }
 async function renderAgentSettings(body){
-  const roles={interviewer:'Discovery and ambiguity reduction.',planner:'Plans from the project brain.',builder:'Creates real files and outputs.',tester:'Validates current artifacts.',researcher:'Structures source-backed evidence.',orchestrator:'Coordinates project actions and execution.'};
+  const roles={interviewer:'Discovery and ambiguity reduction.',planner:'Plans from the project brain.',builder:'Creates real files and outputs.',tester:'Validates current artifacts.',researcher:'Structures source-backed evidence.',repairer:'Diagnoses failures and applies bounded minimal patches.',orchestrator:'Coordinates project actions and execution.'};
   body.innerHTML=`<h2>Agents</h2><p class="sub">Choose specialist models and enable or disable roles. Connected-account model preferences apply to the matching ProjectX specialist.</p><div class="box" id="agent-settings"><div class="sub">Loading available models…</div></div>`;
   let models=[];
   if(session){try{models=(await edge('listModels',{task:'chat'})).models||[]}catch{}}

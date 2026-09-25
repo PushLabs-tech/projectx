@@ -14,6 +14,7 @@ for(const source of [router,bundledRouter]){
   assert.match(source,/planner:\s*'plan'/);
   assert.match(source,/builder:\s*'build'/);
   assert.match(source,/tester:\s*'build'/);
+  assert.match(source,/repairer:\s*'repair'/);
   assert.match(source,/researcher:\s*'research'/);
   assert.match(source,/orchestrator:\s*'discuss'/);
   assert.match(source,/export function routingTask/);
@@ -27,14 +28,14 @@ for(const source of [router,bundledRouter]){
 assert.match(ai,/routedCandidates\(all, agent/);
 assert.match(ai,/modelFeedbackForUser\(user\.id, task\)/);
 assert.match(ai,/record_ai_model_feedback/);
-assert.match(ai,/async function recordModelFeedback/);
-assert.match(ai,/action === "recordModelFeedback"/);
 assert.match(ai,/structured response repair failed/);
 assert.match(ai,/invalid structured response/);
 assert.match(ai,/continue;/);
 
-assert.match(runtime,/recordVerificationModelFeedback/);
-assert.match(runtime,/outcome:passed\?'verification_pass':'verification_fail'/);
+assert.doesNotMatch(runtime,/recordVerificationModelFeedback/);
+assert.match(ai,/sourceActionId/);
+assert.match(ai,/verification_pass/);
+assert.match(ai,/verification_fail/);
 assert.match(runtime,/finishedJob\.result\?\.model/);
 assert.match(runtime,/finishedJob\.result\?\.provider/);
 

@@ -1,3 +1,4 @@
+import { diagnoseFailures, createRepairContract as createRepairActionContract, scheduleRepairCycle } from './projectx-repair.js';
 const EXECUTOR_DEFS = {
   rebuild: {
     key:'builder-local-ai',
@@ -22,6 +23,18 @@ const EXECUTOR_DEFS = {
     writes:['target-file','artifacts','tests'],
     outputs:['file'],
     verifies:['target-file','runtime','security']
+  },
+  repair: {
+    key:'builder-repair-ai',
+    agent:'repairer',
+    capability:'files.repair',
+    boundary:'workspace-local',
+    risk:'medium',
+    maxAttempts:2,
+    autoModes:['Balanced','Powerful','Mostly Automatic','Autonomous'],
+    writes:['repair-files','tests'],
+    outputs:['repair-patch','diagnosis'],
+    verifies:['runtime','structure','security','target-files']
   },
   verify: {
     key:'tester-local-sandbox',
@@ -162,8 +175,12 @@ export function createActionContract(project={},action={},options={}){
     boundary:definition.boundary||'unknown',
     risk:definition.risk||'high',
     preconditions,
-    reads:action.type==='update'&&actionTarget?['files:'+actionTarget]:['project:'+targetVersion],
-    writes:(definition.writes||[]).slice(0,12),
+    reads:action.type==='update'&&actionTarget
+      ?['files:'+actionTarget]
+      :action.type==='repair'
+        ?(Array.isArray(action.repairPaths)?action.repairPaths.slice(0,12).map(p=>'files:'+p):['repair:'+String(action.targetId||'')])
+        :['project:'+targetVersion],
+    writes:action.type==='repair' ? (Array.isArray(action.repairPaths)?action.repairPaths.slice(0,12).map(p=>'file:'+p):[]) : (definition.writes||[]).slice(0,12),
     outputs:(definition.outputs||[]).slice(0,12),
     verification:(definition.verifies||[]).slice(0,12),
     idempotencyKey:'px:'+targetVersion+':'+String(action?.id||''),
@@ -172,6 +189,8 @@ export function createActionContract(project={},action={},options={}){
       maxRepairCycles:policy.maxRepairCycles,
       autoRepair:!humanGate&&['rebuild','update','verify'].includes(action.type)
     },
+    diagnosisId:action.type==='repair' ? String(action?.diagnosis?.diagnosisId||'') : null,
+    repairPaths:action.type==='repair' ? (Array.isArray(action?.repairPaths)?action.repairPaths.slice(0,12):[]) : [],
     humanReviewRequired:humanGate||!selected.selected,
     autoExecute: Boolean(autoAllowed&&selected.selected),
     limits:{
@@ -262,3 +281,6 @@ export function prepareReconciliationRepair(project={},actionId='',options={}){
 }
 
 export { HUMAN_TYPES };
+
+
+export { diagnoseFailures, createRepairActionContract, scheduleRepairCycle };

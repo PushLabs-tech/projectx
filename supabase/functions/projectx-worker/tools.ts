@@ -19,6 +19,10 @@ function allowedWrite(contract: any, path: string) {
   const writes = Array.isArray(contract?.writes) ? contract.writes.map((x: any) => String(x)) : [];
   const target = String(contract?.targetId || "").replace(/^file:/, "");
   if (contract?.type === "update") return path === target;
+  if (contract?.type === "repair") {
+    const repairPaths = Array.isArray(contract?.repairPaths) ? contract.repairPaths.map((x: any) => String(x)) : [];
+    return repairPaths.includes(path);
+  }
   return writes.includes("files") || writes.includes("target-file");
 }
 
@@ -145,6 +149,8 @@ export function buildExecutionSettings(settings: any, action: any, result: any, 
           message: text(result.message, 800),
           model: result.model ? text(result.model, 240) : null,
           provider: result.provider ? text(result.provider, 80) : null,
+          diagnosis: result.diagnosis && typeof result.diagnosis === "object" ? clone(result.diagnosis) : null,
+          repairPlan: result.repairPlan && typeof result.repairPlan === "object" ? clone(result.repairPlan) : null,
           evidence: Array.isArray(result.evidence) ? result.evidence.slice(0, 20).map(clone) : [],
           outputVersion: Number(result.outputVersion ?? queue.targetVersion ?? 1),
           recordedAt: nowIso
