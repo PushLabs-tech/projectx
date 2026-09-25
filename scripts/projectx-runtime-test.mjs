@@ -212,7 +212,9 @@ assert.match(runtime, /document-output/);
 assert.match(runtime, /Deliverable exists/);
 assert.match(runtime, /projectArtifactKind\(project\.type\)/);
 assert.match(runtime, /sessionStorage/);
-assert.match(runtime, /PROJECTX_RUNTIME_ERROR/);
+assert.match(runtime, /createRuntimeSandbox/);
+assert.match(runtime, /createRuntimeMonitor/);
+assert.match(runtime, /RUNTIME_SANDBOX_POLICY/);
 assert.doesNotMatch(runtime, /ctx\.arc\(bird\.x|Game over.*Flappy|Mode: \$\{kind\}/);
 assert.doesNotMatch(runtime, /window\.ProjectXAI/);
 
