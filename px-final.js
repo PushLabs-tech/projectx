@@ -1249,23 +1249,7 @@ async function executeTargetedFileUpdate(project,action){
   project.updatedAt=now();
   return {ok:true,message:'Updated '+path+'.',evidence:['Targeted AI reconciliation update applied to the existing file.'],outputVersion:project.specVersion};
 }
-async function recordVerificationModelFeedback(project,passed,evidence=[]){
-  if(!session?.access_token||!project?.id)return;
-  const queue=getReconciliationQueue(project);
-  const candidates=Array.isArray(queue?.actions)?queue.actions.filter(a=>a?.result?.model&&a?.result?.provider&&a.result.kind!=='verify'):[];
-  const latest=candidates.sort((a,b)=>Number(new Date(b.updatedAt||0))-Number(new Date(a.updatedAt||0))).at(-1)||candidates[candidates.length-1];
-  if(!latest?.result?.model||!latest?.result?.provider)return;
-  try{
-    await edge('recordModelFeedback',{
-      projectId:project.sync?.remoteId||project.id,
-      provider:latest.result.provider,
-      model:latest.result.model,
-      agent:'builder',
-      outcome:passed?'verification_pass':'verification_fail',
-      evidence:{verification:evidence.slice(0,12),actionId:latest.id,specVersion:project.specVersion}
-    });
-  }catch{}
-}
+
 async function executeLocalVerification(project){
   const results=await runTests(project);
   const security=projectSecurityChecks(project);
@@ -1279,7 +1263,6 @@ async function executeLocalVerification(project){
     try{await edge('runVerification',{projectId:project.id,artifactVersion:String(project.artifacts?.output?.specVersion||project.specVersion||1),checks});}catch(error){notify('Local verification finished, but its durable server record could not be saved: '+String(error.message||error),'error');}
   }
   const evidence=[...results,...security].map(x=>({name:x.name,pass:Boolean(x.pass),detail:x.detail||''}));
-  await recordVerificationModelFeedback(project,passed,evidence);
   return {ok:passed,message:passed?'Current project output passed runtime and security verification.':'Verification found failures in the current project output.',evidence,outputVersion:project.specVersion};
 }
 async function executeReconciliationQueue(project){
