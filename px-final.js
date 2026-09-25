@@ -206,7 +206,8 @@ async function enqueueRemoteExecutionJob(project,action,contract){
     projectId:project.sync?.remoteId||project.id,
     kind:'execution',
     payload:{action,contract},
-    maxAttempts:Number(contract?.retryPolicy?.maxAttempts||2)
+    maxAttempts:Number(contract?.retryPolicy?.maxAttempts||2),
+    timeoutSeconds:Math.max(30,Math.min(300,Number(contract?.limits?.timeoutSeconds||120)))
   });
   return result?.job||null;
 }
