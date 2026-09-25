@@ -184,7 +184,7 @@ assert.match(runtime, /renderMakeGreat/);
 assert.match(runtime, /renderOptimize/);
 assert.match(runtime, /renderTransform/);
 assert.match(runtime, /restoreProjectSnapshot/);
-assert.match(runtime, /Visual edit/);
+assert.match(runtime, /Edit with Agent/);
 assert.match(shellSource, /preview-mobile/);
 assert.match(runtime, /preview-file/);
 assert.match(runtime, /resource-file/);
