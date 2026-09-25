@@ -149,6 +149,8 @@ export function buildExecutionSettings(settings: any, action: any, result: any, 
           message: text(result.message, 800),
           model: result.model ? text(result.model, 240) : null,
           provider: result.provider ? text(result.provider, 80) : null,
+          diagnosis: result.diagnosis && typeof result.diagnosis === "object" ? clone(result.diagnosis) : null,
+          repairPlan: result.repairPlan && typeof result.repairPlan === "object" ? clone(result.repairPlan) : null,
           evidence: Array.isArray(result.evidence) ? result.evidence.slice(0, 20).map(clone) : [],
           outputVersion: Number(result.outputVersion ?? queue.targetVersion ?? 1),
           recordedAt: nowIso
