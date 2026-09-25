@@ -53,7 +53,7 @@ test("runs navigation contract is wired into the project UI", async ({ page }) =
   await expect(page.locator("#px-app")).toBeVisible();
 
   const creationContract = await page.evaluate(async () => {
-    const response = await fetch("/px-ui.js?v=53.0.0");
+    const response = await fetch("/projectx/px-ui.js?v=53.0.0");
     const source = await response.text();
     return {
       friendlyHeading: source.includes("A few quick questions, then I'll start."),
@@ -64,7 +64,7 @@ test("runs navigation contract is wired into the project UI", async ({ page }) =
   expect(creationContract.hidesTechnicalDiscovery).toBe(true);
 
   const sourceContract = await page.evaluate(async () => {
-    const response = await fetch("/px-ui.js?v=53.0.0");
+    const response = await fetch("/projectx/px-ui.js?v=53.0.0");
     const source = await response.text();
     return {
       runsNav: source.includes("'runs'") && source.includes("Runs"),
