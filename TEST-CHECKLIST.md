@@ -165,3 +165,9 @@ Do not mark the external configuration section complete until those real service
 - Runs navigation source contract
 - Mobile observability-release overflow check
 - Existing build/check/security suite remains the prerequisite gate
+
+### Authenticated browser gate
+- `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD` are optional CI secrets for a real Supabase account.
+- When supplied, Playwright signs in through the actual UI, verifies the signed-in workspace, creates a template project, and opens the project surface.
+- The test deliberately does not create accounts or require AI-provider secrets; it validates the authenticated application boundary without manufacturing provider success.
+- When the secrets are absent, the authenticated test is skipped and the public/browser contract suite still runs.
