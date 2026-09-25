@@ -70,7 +70,7 @@ const DEFAULT_SETTINGS = {
   notifications: { build: true, test: true, deploy: true, credits: true, security: true },
   skills: [],
   hideNav: false,
-  hideAssistant: false,
+  hideAssistant: true,
   showBottom: false,
   splitFiles: false
 };
@@ -699,6 +699,7 @@ function bindChrome(root){
   root.onclick=async e=>{
     const cmd=e.target.closest('[data-cmd]')?.dataset.cmd;
     if(cmd==='palette')return openPalette();
+    if(cmd==='more-tools')return openMoreTools(activeProject());
     if(cmd==='add-tool')return addProjectTool(activeProject());
     if(cmd==='toggle-assistant'){settingsState.hideAssistant=!settingsState.hideAssistant;persistSettings();applyChromeLayout();return;}
     if(cmd==='toggle-bottom'){settingsState.showBottom=!settingsState.showBottom;persistSettings();applyChromeLayout();return;}
@@ -737,6 +738,25 @@ function bindSplit(root){
     const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);};
     window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
   };
+}
+function openMoreTools(project){
+  if(!project)return;
+  closeModal();
+  const modal=document.createElement('div');
+  modal.className='modal-bg';
+  const tools=UI.ADVANCED_NAV||[];
+  modal.innerHTML=`<div class="modal px-tools-modal">
+    <div class="kicker">MORE TOOLS</div>
+    <h2 style="margin:4px 0 6px">Advanced tools</h2>
+    <p class="sub">Most projects only need the essentials. Open an advanced tool when you actually need it.</p>
+    <div class="grid" style="margin-top:14px">${tools.map(([id,name])=>`<button class="box" data-more-tool="${esc(id)}" style="text-align:left;cursor:pointer"><b>${esc(name)}</b><div class="sub">Open ${esc(name.toLowerCase())}</div></button>`).join('')}</div>
+    <div class="actions" style="margin-top:14px"><button class="ghost" id="more-tools-close">Close</button></div>
+  </div>`;
+  document.body.appendChild(modal); currentModal=modal;
+  $('#more-tools-close')?.addEventListener('click',closeModal);
+  modal.querySelectorAll('[data-more-tool]').forEach(btn=>btn.addEventListener('click',()=>{
+    const id=btn.dataset.moreTool; closeModal(); project.uiNav=id; saveProject(project); renderProjectTool(project,id);
+  }));
 }
 function addProjectTool(project){
   if(!project)return;

@@ -33,7 +33,8 @@ export const PROJECT_NAV = [
   ['settings', 'Settings']
 ];
 
-export const CORE_NAV = ['overview', 'runs', 'assistant', 'build', 'design', 'files', 'preview', 'tasks', 'artifacts', 'brain', 'impact', 'settings'];
+export const CORE_NAV = ['overview', 'assistant', 'build', 'preview', 'files', 'tasks', 'settings'];
+export const ADVANCED_NAV = PROJECT_NAV.filter(([id]) => !CORE_NAV.includes(id));
 
 export const TEMPLATES = [
   {id:'website',title:'Website',intent:'Build a polished landing page for a local service business.',type:'Website',deliverables:['Working website']},
@@ -202,7 +203,7 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   const title = project ? esc(project.title) : 'ProjectX';
   const sync = project?.sync?.mode === 'cloud' ? 'Synced' : session ? 'Account' : 'Local';
   const rightPane = right != null ? right : `<div class="label">Assistant</div><div class="sub" style="padding:12px">Open Assistant to work on the current project, file, or selection.</div>`;
-  const extra = project ? `<button class="ghost px-add-tool" data-cmd="add-tool">Add tool</button>` : '';
+  const extra = project ? `<button class="ghost px-add-tool" data-cmd="more-tools">More tools</button>` : '';
   const queueNote = execNote || 'No isolated cloud workers are connected. Independent tasks can be queued; execution is sequential through the Assistant.';
   return `<div class="px-shell ${project ? '' : 'no-right'}" id="px-shell">
     <aside class="px-left side" id="px-left">

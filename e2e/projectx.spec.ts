@@ -53,7 +53,7 @@ test("runs navigation contract is wired into the project UI", async ({ page }) =
   await expect(page.locator("#px-app")).toBeVisible();
 
   const sourceContract = await page.evaluate(async () => {
-    const response = await fetch("/px-ui.js?v=48.0.0");
+    const response = await fetch("/px-ui.js?v=49.0.0");
     const source = await response.text();
     return {
       runsNav: source.includes("'runs'") && source.includes("Runs"),
