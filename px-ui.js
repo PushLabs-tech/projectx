@@ -303,9 +303,9 @@ export function projectHead({esc, project}) {
   const summary = String(project.understanding?.summary || project.intent || '').trim();
   return `<div class="project px-work">
     <div class="px-work-head">
-      <div class="kicker">PROJECT · ${esc(category)}</div>
+      <div class="kicker">PROJECT</div>
       <h1 class="project-title">${esc(project.title)}</h1>
-      <div class="project-context"><span>${esc(summary || 'Working from the current project brain.')}</span></div>
+      <div class="project-context"><span>${esc(summary || 'Your project is ready to work on.')}</span></div>
     </div>
     <div class="sections">${project.sections.map(s => `<button class="tab ${project.selectedSection === s.id ? 'active' : ''}" data-section="${esc(s.id)}">${esc(s.name)}</button>`).join('')}</div>
     <div id="project-body" class="body"></div>
