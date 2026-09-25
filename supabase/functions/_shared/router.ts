@@ -71,7 +71,7 @@ const AGENT_TASKS: Record<string, string> = {
 
 export function routingTask(agent: string, fallback = 'discuss') {
   const value = String(agent || '').trim().toLowerCase();
-  return AGENT_TASKS[value] || value || fallback;
+  return AGENT_TASKS[value] || (TASK_FAMILIES[value] ? value : fallback);
 }
 
 /*
