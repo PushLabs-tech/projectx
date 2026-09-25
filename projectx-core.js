@@ -416,6 +416,8 @@ export function beginReconciliationAction(project,actionIdValue){const q=project
 export function completeReconciliationAction(project,actionIdValue,result={}){const q=project.executionState?.reconciliationQueue;if(!q)return {completed:false,reason:'queue_missing'};if(Number(q.targetVersion)!==Number(project.specVersion||1))return {completed:false,reason:'queue_stale',targetVersion:q.targetVersion,currentVersion:Number(project.specVersion||1)};const a=q.actions.find(x=>x.id===actionIdValue);if(!a||a.status!=='running')return {completed:false,reason:'not_running'};const requestedStatus=result.status||(result.ok?'completed':'failed');const outputVersion=Number(result.outputVersion??project.specVersion??q.targetVersion);if(requestedStatus==='completed'&&outputVersion!==Number(project.specVersion||1))return {completed:false,reason:'result_version_mismatch',outputVersion,currentVersion:Number(project.specVersion||1)};const r=recordReconciliationResult(project,q,actionIdValue,{...result,outputVersion});if(!r.ok)return {completed:false,reason:r.reason};if(q.status==='complete'){project.executionState={...(project.executionState||{}),reconciliationQueue:q,status:'reconciled'};project.impact={...(project.impact||{}),queueStatus:'complete',reconciledAt:q.completedAt};}return {completed:true,queueStatus:q.status,action:r.action};}
 export function retryFailedReconciliation(project={}){return resetFailedReconciliation(project);}
 
+export { getReconciliationQueue, getReadyReconciliationActions };
+
 function appendMutationAudit(project, entry) {
   const execution = project.executionState || {};
   const current = Array.isArray(execution.mutationAudit) ? execution.mutationAudit : [];
