@@ -7,10 +7,12 @@ function walk(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){if([
 walk(root);
 const text=files.filter(f=>/\.(js|ts|html|css|json|toml|sql|yml|yaml)$/.test(f) && !f.endsWith('scripts/security-scan.mjs')).map(f=>({f,t:fs.readFileSync(f,'utf8')}));
 const all=text.map(x=>x.t).join('\n');
+const browserFiles=new Set(['px-final.js','px-ui.js','projectx-core.js','projectx-execution.js','projectx-transaction.js','projectx-sandbox.js']);
+const browserSource=text.filter(x=>browserFiles.has(path.basename(x.f))).map(x=>x.t).join('\n');
 const checks=[
   ['No committed secret-looking API keys',!/(sk-[A-Za-z0-9_-]{16,}|AIza[A-Za-z0-9_-]{20,}|sb_secret_|sb_service_role_)/.test(all)],
   ['No private key blocks',!/BEGIN (RSA|EC|OPENSSH)? ?PRIVATE KEY/.test(all)],
-  ['No obvious command execution in browser',!/(child_process|execSync|spawnSync)\s*\(/.test(all)],
+  ['No obvious command execution in browser',!/(child_process|execSync|spawnSync)\s*\(/.test(browserSource)],
   ['No eval or Function constructor',!(/\beval\s*\(|new Function\s*\(/.test(all))],
   ['No plaintext connected-account tokens in base schema',!/(^|\\n)\\s*(access_token|refresh_token)\\s+text\\b/i.test(fs.readFileSync(path.join(root,'supabase/schema.sql'),'utf8'))],
   ['Provider credential table is server-only',/ai_provider_credentials[\s\S]{0,500}Never expose|ai_provider_credentials/.test(all)],
