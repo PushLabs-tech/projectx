@@ -1146,7 +1146,7 @@ async function subscribeProjectRealtime(projectId){
           state.active=projectId;persistLocal();renderProject(remote);notify('Project updated from another session.','info');
         }
       }catch{}
-    }).subscribe();
+    }).on('postgres_changes',{event:'INSERT',schema:'public',table:'project_execution_events',filter:'project_id=eq.'+projectId},()=>{const current=activeProject();if(current&&current.id===projectId&&current.uiNav==='runs')renderExecutionRuns(current);}).subscribe();
 }
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{} await subscribeProjectRealtime(id);}}
 function renderProject(project){
@@ -1167,6 +1167,107 @@ function renderProject(project){
     dockLog.scrollTop=dockLog.scrollHeight;
   }
 }
+
+let executionRunsTimer=null;
+
+function executionRunTime(value){
+  if(!value)return '—';
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return String(value);
+  return d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function executionRunDuration(run){
+  const start=run?.started_at?new Date(run.started_at).getTime():null;
+  const end=run?.completed_at?new Date(run.completed_at).getTime():Date.now();
+  if(!start||Number.isNaN(start)||Number.isNaN(end))return '—';
+  const ms=Math.max(0,end-start);
+  if(ms<1000)return '<1s';
+  if(ms<60000)return Math.round(ms/1000)+'s';
+  return Math.floor(ms/60000)+'m '+Math.round((ms%60000)/1000)+'s';
+}
+function executionStatusClass(status){
+  const s=String(status||'').toLowerCase();
+  if(['success','succeeded','passed','completed','ready','healthy'].includes(s))return 'ok';
+  if(['failed','failure','error','unhealthy','cancelled'].includes(s))return 'bad';
+  return 'warn';
+}
+function executionTimelineEvent(at,type,status,title,detail,meta=''){
+  const cls=executionStatusClass(status);
+  return '<div class="item px-run-event '+cls+'"><div class="px-run-event-dot"></div><div style="min-width:0;flex:1"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(title)+'</b><span class="sub">'+esc(type)+'</span><span class="sub">'+esc(status||'')+'</span></div><div class="sub" style="margin-top:4px">'+esc(detail||'')+'</div><div class="sub" style="margin-top:4px">'+esc(executionRunTime(at))+(meta?' · '+esc(meta):'')+'</div></div></div>';
+}
+async function loadExecutionObservability(project){
+  const client=ensureSupabase();
+  if(!client||!session?.access_token)return {auth:false,errors:[],runs:[],events:[],jobs:[],verifications:[],deployments:[],builds:[],localJournal:project.executionState?.executionJournal||[]};
+  const pid=project.sync?.remoteId||project.id;
+  const safe=async promise=>{
+    try{const {data,error}=await promise;return {data:Array.isArray(data)?data:[],error:error?.message||null};}
+    catch(error){return {data:[],error:String(error?.message||error)};}
+  };
+  const [runs,events,jobs,verifications,deployments,builds]=await Promise.all([
+    safe(client.from('engine_runs').select('*').eq('project_id',pid).order('created_at',{ascending:false}).limit(30)),
+    safe(client.from('project_execution_events').select('*').eq('project_id',pid).order('created_at',{ascending:false}).limit(120)),
+    safe(client.from('job_queue').select('*').eq('project_id',pid).order('created_at',{ascending:false}).limit(40)),
+    safe(client.from('verification_results').select('*').eq('project_id',pid).order('created_at',{ascending:false}).limit(40)),
+    safe(client.from('deployments').select('*').eq('project_id',pid).order('created_at',{ascending:false}).limit(20)),
+    safe(client.from('projectx_build_runs').select('*').eq('project_id',pid).order('requested_at',{ascending:false}).limit(20))
+  ]);
+  let engineEvents={data:[],error:null};
+  const runIds=runs.data.map(x=>x.id).filter(Boolean);
+  if(runIds.length){
+    engineEvents=await safe(client.from('engine_run_events').select('*').in('run_id',runIds).order('sequence_number',{ascending:true}).limit(200));
+  }
+  return {
+    auth:true,
+    errors:[...runs,events,jobs,verifications,deployments,builds,engineEvents].map(x=>x.error).filter(Boolean),
+    runs:runs.data,events:events.data,jobs:jobs.data,verifications:verifications.data,
+    deployments:deployments.data,builds:builds.data,engineEvents:engineEvents.data,
+    localJournal:Array.isArray(project.executionState?.executionJournal)?project.executionState.executionJournal.slice(-80):[]
+  };
+}
+async function renderExecutionRuns(project){
+  const root=$('#project-body');
+  if(!root)return;
+  if(executionRunsTimer)clearInterval(executionRunsTimer);
+  root.innerHTML='<div class="box"><div class="kicker">EXECUTION OBSERVABILITY</div><h2 style="margin:4px 0 6px">Runs & timeline</h2><div class="sub">One view across orchestration, queued jobs, execution events, verification, repairs, builds, and deployment health.</div><div id="px-runs-content" style="margin-top:16px"><div class="placeholder">Loading execution history…</div></div></div>';
+  const draw=async()=>{
+    const host=$('#px-runs-content');if(!host)return;
+    const data=await loadExecutionObservability(project);
+    if(!data.auth){
+      host.innerHTML='<div class="placeholder">Sign in to inspect the durable execution history. Local execution journal entries remain available in the project state.</div>';
+      return;
+    }
+    const allEvents=[];
+    data.runs.forEach(run=>{
+      allEvents.push({at:run.completed_at||run.started_at||run.created_at,type:'RUN',status:run.status,title:String(run.operation||'Engine run'),detail:run.error_message||'Execution run '+String(run.status||'created'),meta:'attempt '+String(run.attempt||1)+' · '+executionRunDuration(run)});
+    });
+    data.engineEvents.forEach(e=>allEvents.push({at:e.created_at,type:'ENGINE',status:e.event_type,title:e.message||e.event_type,detail:e.data?JSON.stringify(e.data).slice(0,280):'',meta:'run '+String(e.run_id||'').slice(0,8)+' · #'+String(e.sequence_number??'')}));
+    data.events.forEach(e=>allEvents.push({at:e.created_at,type:e.event,status:e.status,title:e.tool||e.event,detail:e.message||'',meta:(e.executor?'executor '+e.executor+' · ':'')+(e.action_id?'action '+e.action_id.slice(0,16):'')}));
+    data.jobs.forEach(j=>allEvents.push({at:j.updated_at||j.created_at,type:'QUEUE',status:j.status,title:'Job '+String(j.kind||'execution'),detail:j.error||((j.result&&typeof j.result==='object')?JSON.stringify(j.result).slice(0,240):'Queued execution job'),meta:'attempt '+String(j.attempts||0)+'/'+String(j.max_attempts||1)+(j.lease_expires_at?' · lease '+executionRunTime(j.lease_expires_at):'')}));
+    data.verifications.forEach(v=>allEvents.push({at:v.created_at,type:'VERIFY',status:v.status,title:String(v.check_type||'Verification'),detail:v.evidence?JSON.stringify(v.evidence).slice(0,280):'Verification result recorded',meta:String(v.verifier||'verifier')}));
+    data.deployments.forEach(d=>allEvents.push({at:d.updated_at||d.created_at,type:'DEPLOY',status:d.health_status||d.status,title:String(d.provider||'Deployment')+' deployment',detail:d.url||d.external_status||'Deployment record',meta:(d.health_status?'health '+d.health_status:'status '+d.status)+(d.source_hash?' · '+String(d.source_hash).slice(0,12):'')}));
+    data.builds.forEach(b=>allEvents.push({at:b.updated_at||b.requested_at,type:'BUILD',status:b.conclusion||b.status,title:'Isolated build',detail:b.error||b.repository_full_name||'Build runner',meta:b.commit_sha?String(b.commit_sha).slice(0,12):''}));
+    data.localJournal.forEach(j=>allEvents.push({at:j.at,type:'JOURNAL',status:j.status,title:j.event,detail:j.message,meta:j.executor||''}));
+    allEvents.sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
+    const recentRuns=data.runs.slice(0,8).map(run=>'<div class="row"><div><b>'+esc(run.operation||'Engine run')+'</b><div class="sub">'+esc(String(run.status||'unknown'))+' · '+esc(executionRunTime(run.created_at))+' · '+esc(executionRunDuration(run))+'</div></div><span class="result '+executionStatusClass(run.status)+'">'+esc(String(run.status||'unknown').toUpperCase())+'</span></div>').join('');
+    const counts=[
+      ['Runs',data.runs.length],
+      ['Queued jobs',data.jobs.length],
+      ['Events',data.events.length+data.engineEvents.length],
+      ['Verification',data.verifications.length],
+      ['Deployments',data.deployments.length]
+    ].map(([label,value])=>'<div class="box"><div class="kicker">'+label+'</div><div style="font-size:22px;font-weight:700;margin-top:4px">'+esc(value)+'</div></div>').join('');
+    const timeline=allEvents.slice(0,100).map(e=>executionTimelineEvent(e.at,e.type,e.status,e.title,e.detail,e.meta)).join('')||'<div class="placeholder">No durable events recorded yet. Start a build or execution to populate this timeline.</div>';
+    const errors=data.errors.length?'<div class="result bad"><b>Some sources were unavailable</b><div class="sub">'+esc([...new Set(data.errors)].slice(0,4).join(' · '))+'</div></div>':'';
+    host.innerHTML='<div class="grid" style="margin-bottom:14px">'+counts+'</div>'+
+      '<div class="actions" style="margin-bottom:12px"><button class="ghost" id="px-runs-refresh">Refresh</button><button class="ghost" id="px-runs-cancel" disabled>Cancel selected job</button></div>'+
+      errors+
+      '<div class="box" style="margin-bottom:14px"><div class="kicker">RECENT RUNS</div>'+(recentRuns||'<div class="sub">No engine runs recorded.</div>')+'</div>'+
+      '<div class="box"><div class="kicker">UNIFIED TIMELINE</div><div class="sub" style="margin-bottom:10px">Newest evidence first. This is operational history, not hidden model reasoning.</div><div class="conversation">'+timeline+'</div></div>';
+    $('#px-runs-refresh')?.addEventListener('click',draw);
+  };
+  await draw();
+  executionRunsTimer=setInterval(()=>{if(document.visibilityState==='visible'&&activeProject()?.id===project.id)draw();},8000);
+}
 async function renderProjectTool(project,tool){
   const body=$('#project-body');
   if(!body&&tool!=='settings'){
@@ -1175,7 +1276,7 @@ async function renderProjectTool(project,tool){
   }
   const map={
     brain:renderBrain,impact:renderImpact,architecture:renderArchitecture,simulation:renderSimulation,explain:renderExplain,improve:renderMakeGreat,optimize:renderOptimize,transform:renderTransform,versions:renderVersions,resources:renderResources,security:renderProjectSecurity,delivery:renderDelivery,
-    overview:renderOverview,assistant:()=>renderProjectChat(project),build:()=>renderOutput(project),design:()=>renderCanvas(project),files:()=>renderFiles(project),preview:()=>renderOutput(project),tasks:()=>renderTasks(project),artifacts:()=>renderArtifacts(project),database:()=>renderDatabase(project),research:()=>{const section=project.sections.find(s=>s.kind==='research')||{id:'research',name:'Research',purpose:'Source-backed evidence',kind:'research'};return renderResearchSection(project,section);},tests:()=>renderTests(project),storage:()=>renderStorage(project),integrations:()=>renderIntegrations(project),deploy:()=>renderDeploy(project),settings:()=>settingsPage('general'),git:()=>renderVersions(project),secrets:()=>renderSecrets(project),seo:()=>renderSeo(project),terminal:()=>renderTerminal(project),collab:()=>renderCollab(project)
+    overview:renderOverview,runs:()=>renderExecutionRuns(project),assistant:()=>renderProjectChat(project),build:()=>renderOutput(project),design:()=>renderCanvas(project),files:()=>renderFiles(project),preview:()=>renderOutput(project),tasks:()=>renderTasks(project),artifacts:()=>renderArtifacts(project),database:()=>renderDatabase(project),research:()=>{const section=project.sections.find(s=>s.kind==='research')||{id:'research',name:'Research',purpose:'Source-backed evidence',kind:'research'};return renderResearchSection(project,section);},tests:()=>renderTests(project),storage:()=>renderStorage(project),integrations:()=>renderIntegrations(project),deploy:()=>renderDeploy(project),settings:()=>settingsPage('general'),git:()=>renderVersions(project),secrets:()=>renderSecrets(project),seo:()=>renderSeo(project),terminal:()=>renderTerminal(project),collab:()=>renderCollab(project)
   };
   return (map[tool]||renderBrain)(project);
 }
