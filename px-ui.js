@@ -196,41 +196,48 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   const tools = project ? navForProject(project) : APP_TOOLS;
   const left = tools.map(([id, name]) => {
     const on = (nav || active) === id;
-    if (project) return `<button class="px-tool ${on ? 'active' : ''}" data-project-tool="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`;
+    if (project) return `<button class="px-tool ${on ? 'active' : ''}" data-project-tool="${esc(id)}" data-search="${esc(name)}"><span class="px-tool-dot" aria-hidden="true"></span><span>${esc(name)}</span></button>`;
     return `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`;
   }).join('');
-  const recent = recents.map(p => `<button data-open="${esc(p.id)}">${esc(p.title)}</button>`).join('') || '<div class="sub" style="padding:6px 10px">No projects yet</div>';
+  const recent = recents.map(p => `<button data-open="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.type)}</span></button>`).join('') || '<div class="sub" style="padding:8px 10px">No projects yet</div>';
   const title = project ? esc(project.title) : 'ProjectX';
-  const sync = project?.sync?.mode === 'cloud' ? 'Synced' : session ? 'Account' : 'Local';
-  const extra = project ? `<button class="ghost px-add-tool" data-cmd="more-tools">More tools</button>` : '';
-  return `<div class="px-shell no-right" id="px-shell">
+  const extra = project ? '<button class="ghost px-add-tool" data-cmd="more-tools">More tools</button>' : '';
+  const agentPane = project && right ? `<aside class="px-right replit-agent" id="px-right">
+      <div class="px-agent-bar">
+        <strong>Agent</strong>
+        <button class="ghost px-icon-btn" data-cmd="toggle-assistant" aria-label="Hide Agent panel">×</button>
+      </div>
+      <div class="px-agent-body">${right}</div>
+    </aside>` : '';
+  const recentPanel = project ? '' : `<div class="px-side-section"><div class="label">Recent</div><div class="recent">${recent}</div></div>`;
+  return `<div class="px-shell replit-shell" id="px-shell">
     <aside class="px-left side" id="px-left">
-      <button class="logo" data-nav="home" title="Home">ProjectX</button>
-      <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'Projects'} ▾</button>
+      <button class="logo px-brand" data-nav="home" title="Home"><span class="px-brand-mark">X</span><span>ProjectX</span></button>
+      <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'Projects'} <span aria-hidden="true">⌄</span></button>
       <div class="px-switch-list" id="px-switch-list" hidden>${recent}</div>
-      <button class="new" data-nav="home">New project</button>
-      <input class="input px-side-search" id="px-side-search" placeholder="Search" aria-label="Search project">
-      <nav class="nav" id="px-tool-nav">${left}${extra}</nav>
-      <div class="divider"></div>
-      <div class="label">Recent</div>
-      <div class="recent">${recent}</div>
-      <div class="acct">${email ? `Signed in as ${esc(email)}` : 'Guest workspace'}<div class="sub">${session ? 'Cloud vault available' : 'Local session'}</div></div>
+      <button class="new px-new-project" data-nav="home"><span>＋</span> New project</button>
+      <div class="px-side-caption">${project ? 'Workspace' : 'Workspace'}</div>
+      <nav class="nav px-project-nav" id="px-tool-nav">${left}</nav>
+      ${extra}
+      ${recentPanel}
+      <div class="px-side-grow"></div>
+      <div class="acct">${email ? esc(email) : 'Guest workspace'}<div class="sub">${session ? 'Cloud workspace' : 'Local workspace'}</div></div>
     </aside>
-    <header class="px-topbar top">
+    <header class="px-topbar top replit-topbar">
       <button class="ghost px-nav-toggle" id="px-nav-toggle" aria-label="Open navigation">Menu</button>
-      <strong style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${title}</strong>
-      ${project ? '<button class="ghost" data-project-tool="assistant">Agent</button><button class="ghost" data-project-tool="preview">Preview</button>' : ''}
+      <div class="px-breadcrumb"><span>ProjectX</span>${project ? '<span aria-hidden="true">/</span><strong>'+title+'</strong>' : ''}</div>
+      ${project ? '<div class="px-top-actions"><button class="ghost" data-project-tool="build">Build</button><button class="ghost" data-project-tool="preview">Preview</button><button class="ghost" data-project-tool="deploy">Publish</button></div>' : ''}
       <span style="flex:1"></span>
       <button class="ghost" data-cmd="palette" title="Command palette">⌘K</button>
-      ${project ? '<button class="ghost" data-cmd="share">Share</button>' : ''}
+      ${project ? '<button class="ghost" data-cmd="share">Share</button><button class="primary px-agent-toggle" data-cmd="toggle-assistant">Agent</button>' : ''}
       ${session ? '<button data-action="signout">Sign out</button>' : '<button data-action="signin">Sign in</button>'}
     </header>
     <main class="px-center main">${body}</main>
+    ${agentPane}
     <div class="px-bottom" id="px-bottom" hidden>
-      <div class="label">Queue</div>
+      <div class="label">Activity</div>
       <div id="px-bottom-log" class="conversation"></div>
     </div>
-    <footer class="px-statusbar" id="px-statusbar"><span>${status || 'Ready'}</span><span style="flex:1"></span><span class="sub">ProjectX</span></footer>
   </div>
   <div class="px-palette" id="px-palette" hidden>
     <div class="px-palette-box">
@@ -240,28 +247,32 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   </div>`;
 }
 export function launcherMarkup({esc, session, projects, guestReady}) {
-  const cards = projects.slice(0, 8).map(p => `<button class="box" data-open="${esc(p.id)}" style="text-align:left;cursor:pointer"><b>${esc(p.title)}</b><div class="sub">${esc(p.type)} · ${esc(p.status)}</div><div class="sub">${esc(String(p.intent || p.spec?.goal || '').slice(0,140))}</div></button>`).join('') || '<div class="px-empty">No projects yet. Describe an outcome to create one.</div>';
-  const recentFiles = projects.flatMap(p => Object.keys(p.files || {}).slice(0, 2).map(f => `${p.title} · ${f}`)).slice(0, 4);
-  return `<div class="panel">
-    <div class="kicker">WORKSPACE</div>
-    <h1 class="hero-title" style="font-size:36px">Continue the work.</h1>
-    <p class="sub">Describe a new outcome, or open a project that already has a brain.</p>
-    <div class="composer">
-      <textarea id="start-input" placeholder="Example: Build a landing page for my sneaker-cleaning business…"></textarea>
-      <div class="composer-foot">
-        <span class="sub">${session ? 'Signed in · AI connection available' : guestReady ? 'Free Gemini key ready' : 'AI connection needed to begin'}</span>
-        <button class="send" id="start-send" aria-label="Start project">→</button>
+  const cards = projects.slice(0, 8).map(p => `<button class="box px-recent-card" data-open="${esc(p.id)}" style="text-align:left;cursor:pointer"><b>${esc(p.title)}</b><span>${esc(p.type)} · ${esc(p.status)}</span><div class="sub">${esc(String(p.intent || p.spec?.goal || '').slice(0,120))}</div></button>`).join('');
+  return `<div class="px-launcher">
+    <div class="px-launcher-inner">
+      <div class="kicker">PROJECTX</div>
+      <h1>What are you building?</h1>
+      <p class="sub px-launcher-lead">Describe your idea. ProjectX turns it into a working project and keeps the context while you iterate.</p>
+      <div class="composer px-launcher-composer">
+        <textarea id="start-input" placeholder="Build a website for my sneaker-cleaning business…"></textarea>
+        <div class="composer-foot">
+          <div class="px-build-type-row">
+            <button class="px-type-chip" data-template="website">Website</button>
+            <button class="px-type-chip" data-template="app">Web app</button>
+            <button class="px-type-chip" data-template="game">Game</button>
+            <button class="px-type-chip" data-template="business">Business</button>
+            <button class="px-type-chip" data-template="research">Research</button>
+            <button class="px-type-chip" data-template="deck">Deck</button>
+          </div>
+          <button class="send" id="start-send" aria-label="Start project">→</button>
+        </div>
       </div>
+      <div class="px-launcher-meta"><span>${session ? 'Signed in · cloud workspace' : guestReady ? 'Guest AI ready' : 'Connect AI when you are ready'}</span><span>Start with one sentence</span></div>
     </div>
-    <div class="label">Templates</div>
-    <div class="grid" id="home-templates">${TEMPLATES.map(t=>`<button class="box" data-template="${t.id}" style="text-align:left;cursor:pointer"><b>${esc(t.title)}</b><div class="sub">${esc(t.intent)}</div></button>`).join('')}</div>
-    <div class="label">Projects</div>
-    <div class="grid" id="home-projects">${cards}</div>
-    <div class="grid" style="margin-top:12px">
-      <div class="box"><b>Recent artifacts</b><div class="sub">${projects.filter(p=>p.artifacts?.output).length ? projects.filter(p=>p.artifacts?.output).slice(0,3).map(p=>esc(p.title)).join(' · ') : 'None yet — build from a project.'}</div></div>
-      <div class="box"><b>Agent activity</b><div class="sub">${projects.reduce((n,p)=>n+(p.executionState?.tasks||[]).length,0)} tasks across projects</div></div>
-      <div class="box"><b>Files</b><div class="sub">${recentFiles.length ? esc(recentFiles.join(' · ')) : 'No generated files yet.'}</div></div>
-    </div>
+    <section class="px-launcher-section">
+      <div class="px-section-head"><div><div class="label">Recent projects</div><div class="sub">Pick up where you left off.</div></div></div>
+      <div class="px-recent-grid">${cards || '<div class="px-empty">No projects yet. Start with the box above.</div>'}</div>
+    </section>
   </div>`;
 }
 
@@ -298,18 +309,22 @@ export function projectHead({esc, project}) {
 export function assistantDock({esc, project, actions}) {
   const status = project?.pendingMutation ? 'Awaiting approval' : (project?.status || 'Ready');
   return `<div class="px-assist-head">
-    <div class="label">Assistant</div>
+    <div>
+      <div class="kicker">PROJECT AGENT</div>
+      <div class="px-agent-title">Build with me</div>
+    </div>
     <div class="sub" id="px-agent-status">${esc(status)} · ${esc(settingsSafe(project))}</div>
   </div>
+  <div class="px-agent-context">Ask for a new feature, a fix, a design change, or an explanation. ProjectX keeps the project context.</div>
   <div id="assistant-dock-log" class="conversation" role="log" aria-live="polite"></div>
   <div class="px-assist-actions">${(actions || CONTEXT_ACTIONS.default).map(a => `<button type="button" class="chip" data-assist-action="${esc(a)}">${esc(a)}</button>`).join('')}</div>
-  <form id="assistant-dock-form" class="form">
-    <textarea id="assistant-dock-input" placeholder="Ask about this project…"></textarea>
+  <form id="assistant-dock-form" class="form px-agent-form">
+    <textarea id="assistant-dock-input" placeholder="Ask Agent to build, change, or fix something…"></textarea>
     <button class="primary" id="assistant-dock-send" type="submit">Send</button>
   </form>
-  <form id="plan-dock-form" class="form" style="margin:0 8px 8px">
-    <textarea id="plan-dock-input" placeholder="Queue another task while work continues…"></textarea>
-    <button class="ghost" id="plan-dock-send" type="submit">Queue</button>
+  <form id="plan-dock-form" class="form px-agent-plan" style="margin:0">
+    <textarea id="plan-dock-input" placeholder="Queue another task while this runs…"></textarea>
+    <button class="ghost" id="plan-dock-send" type="submit">Queue task</button>
   </form>`;
 }
 
