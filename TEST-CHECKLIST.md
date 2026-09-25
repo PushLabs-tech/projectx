@@ -144,3 +144,16 @@ npm run build
 ```
 
 Do not mark the external configuration section complete until those real services and credentials have been configured and tested.
+
+
+## 9. Production execution control plane
+
+- [x] Renewable worker leases with explicit lease tokens.
+- [x] Lease heartbeat for long-running execution and proxied jobs.
+- [x] Automatic recovery of expired running jobs.
+- [x] Lease-aware job completion and cancellation.
+- [x] Server-side lease assertion immediately before execution commit.
+- [x] Committed job/action idempotency guard for execution transactions.
+- [x] Contract test coverage for the control-plane invariants.
+- [ ] Live production soak test with real Supabase Edge Function deployment.
+- [ ] Multi-worker concurrency test against a deployed database.
