@@ -122,7 +122,13 @@ test("authenticated autonomous loop can discover, reconcile, and verify a real p
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
 
-  await page.goto("/#workspace");
+  await page.goto("/#login");
+  await page.locator("#auth-email").fill(email!);
+  await page.locator("#auth-password").fill(password!);
+  await page.locator("#auth-submit").click();
+  await expect(page.locator("#px-app")).toBeVisible();
+  await expect(page.locator("#start-input")).toBeVisible({ timeout: 15_000 });
+
   await page.locator("#start-input").fill(
     "Build a tiny fictional bakery landing page with a hero, three menu items, opening hours, and a contact section."
   );
