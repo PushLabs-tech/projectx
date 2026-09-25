@@ -60,6 +60,19 @@ const TASK_FAMILIES: Record<string, string[]> = {
   ]
 };
 
+const AGENT_TASKS: Record<string, string> = {
+  interviewer: 'understand',
+  planner: 'plan',
+  builder: 'build',
+  tester: 'build',
+  researcher: 'research',
+  orchestrator: 'discuss'
+};
+
+export function routingTask(agent: string, fallback = 'discuss') {
+  const value = String(agent || '').trim().toLowerCase();
+  return AGENT_TASKS[value] || (TASK_FAMILIES[value] ? value : fallback);
+}
 
 /*
  * These modalities must never be selected for ordinary text/code
@@ -103,7 +116,7 @@ export function isCompatibleModel(model: any, agent: string) {
 
   const id = normalizedId(model);
   const task = normalizedTask(model);
-  const mode = String(agent || "discuss").trim().toLowerCase();
+  const mode = routingTask(agent);
 
   const isVisualAgent = mode === "visual";
 
@@ -160,7 +173,7 @@ function scoreModel(
 ) {
   const id = normalizedId(model);
   const task = normalizedTask(model);
-  const mode = String(agent || "discuss").trim().toLowerCase();
+  const mode = routingTask(agent);
 
   let score = Math.max(0, 400 - index);
 
@@ -262,4 +275,43 @@ export function deterministicCandidates(
   return manual
     ? [manual, ...rest]
     : rest;
+}
+
+
+function feedbackKey(model: any) {
+  return String(model?.provider || '') + ':' + String(model?.id || '');
+}
+
+export function scoreWithFeedback(model: any, agent: string, index: number, feedback: Record<string, any> = {}) {
+  let score = scoreModel(model, agent, index);
+  const item = feedback[feedbackKey(model)];
+  if (!item) return score;
+  const attempts = Math.max(0, Number(item.attempts ?? (Number(item.successes || 0) + Number(item.failures || 0))));
+  const failures = Math.max(0, Number(item.failures || 0));
+  const verificationFailures = Math.max(0, Number(item.verificationFailures || 0));
+  const successes = Math.max(0, Number(item.successes || 0));
+  const verificationPasses = Math.max(0, Number(item.verificationPasses || 0));
+  if (attempts) {
+    score -= Math.round((failures / attempts) * 180);
+    score -= Math.round((verificationFailures / Math.max(1, verificationFailures + verificationPasses)) * 260);
+    score += Math.min(60, successes * 8);
+    score += Math.min(90, verificationPasses * 15);
+  }
+  const latency = Number(item.avgLatencyMs || 0);
+  if (latency > 0) score -= Math.min(40, Math.round(latency / 1000));
+  if (item.lastOutcome === 'failure' || item.lastOutcome === 'verification_fail') score -= 80;
+  if (item.lastOutcome === 'verification_pass') score += 45;
+  return score;
+}
+
+export function routedCandidates(models: any[], agent: string, selected?: string, feedback: Record<string, any> = {}) {
+  const input = Array.isArray(models) ? models : [];
+  const available = input.filter(model => isCompatibleModel(model, agent));
+  const manual = selected && selected !== 'auto' ? available.find(model => String(model.id) === String(selected)) : null;
+  const ranked = available
+    .filter(model => !manual || model.id !== manual.id)
+    .map((model, index) => ({ model, score: scoreWithFeedback(model, agent, index, feedback), index }))
+    .sort((a, b) => b.score !== a.score ? b.score - a.score : a.index - b.index)
+    .map(item => item.model);
+  return manual ? [manual, ...ranked] : ranked;
 }

@@ -143,6 +143,8 @@ export function buildExecutionSettings(settings: any, action: any, result: any, 
           kind: String(result.kind || action.type || "execution"),
           ok: result.ok !== false,
           message: text(result.message, 800),
+          model: result.model ? text(result.model, 240) : null,
+          provider: result.provider ? text(result.provider, 80) : null,
           evidence: Array.isArray(result.evidence) ? result.evidence.slice(0, 20).map(clone) : [],
           outputVersion: Number(result.outputVersion ?? queue.targetVersion ?? 1),
           recordedAt: nowIso

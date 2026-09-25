@@ -1243,6 +1243,23 @@ async function executeTargetedFileUpdate(project,action){
   project.updatedAt=now();
   return {ok:true,message:'Updated '+path+'.',evidence:['Targeted AI reconciliation update applied to the existing file.'],outputVersion:project.specVersion};
 }
+async function recordVerificationModelFeedback(project,passed,evidence=[]){
+  if(!session?.access_token||!project?.id)return;
+  const queue=getReconciliationQueue(project);
+  const candidates=Array.isArray(queue?.actions)?queue.actions.filter(a=>a?.result?.model&&a?.result?.provider&&a.result.kind!=='verify'):[];
+  const latest=candidates.sort((a,b)=>Number(new Date(b.updatedAt||0))-Number(new Date(a.updatedAt||0))).at(-1)||candidates[candidates.length-1];
+  if(!latest?.result?.model||!latest?.result?.provider)return;
+  try{
+    await edge('recordModelFeedback',{
+      projectId:project.sync?.remoteId||project.id,
+      provider:latest.result.provider,
+      model:latest.result.model,
+      agent:'builder',
+      outcome:passed?'verification_pass':'verification_fail',
+      evidence:{verification:evidence.slice(0,12),actionId:latest.id,specVersion:project.specVersion}
+    });
+  }catch{}
+}
 async function executeLocalVerification(project){
   const results=await runTests(project);
   const security=projectSecurityChecks(project);
@@ -1255,7 +1272,9 @@ async function executeLocalVerification(project){
       .concat(security.map(x=>({name:x.name,checkType:'security',status:x.pass?'pass':(x.blockBuild?'fail':'warning'),severity:x.pass?'info':(x.blockBuild?'error':'warning'),evidence:{detail:x.detail||''},verifier:'projectx-reconciliation'})));
     try{await edge('runVerification',{projectId:project.id,artifactVersion:String(project.artifacts?.output?.specVersion||project.specVersion||1),checks});}catch(error){notify('Local verification finished, but its durable server record could not be saved: '+String(error.message||error),'error');}
   }
-  return {ok:passed,message:passed?'Current project output passed runtime and security verification.':'Verification found failures in the current project output.',evidence:[...results,...security].map(x=>({name:x.name,pass:Boolean(x.pass),detail:x.detail||''})),outputVersion:project.specVersion};
+  const evidence=[...results,...security].map(x=>({name:x.name,pass:Boolean(x.pass),detail:x.detail||''}));
+  await recordVerificationModelFeedback(project,passed,evidence);
+  return {ok:passed,message:passed?'Current project output passed runtime and security verification.':'Verification found failures in the current project output.',evidence,outputVersion:project.specVersion};
 }
 async function executeReconciliationQueue(project){
   const mode=String(settingsState.executionMode||'Mostly Automatic');
@@ -1359,8 +1378,8 @@ async function executeReconciliationQueue(project){
         if(liveAction?.remoteJobId===remoteJob.id)liveAction.remoteJobId=null;
         project.executionState={...(project.executionState||{}),reconciliationQueue:liveQueue};
         result=finishedJob.status==='succeeded'
-          ? {ok:true,message:String(finishedJob.result?.message||'Remote worker completed the action.'),evidence:Array.isArray(finishedJob.result?.evidence)?finishedJob.result.evidence:[],outputVersion:project.specVersion}
-          : {ok:false,error:String(finishedJob.error||'Remote worker failed the action.'),message:String(finishedJob.error||'Remote worker failed the action.'),outputVersion:project.specVersion};
+          ? {ok:true,message:String(finishedJob.result?.message||'Remote worker completed the action.'),model:finishedJob.result?.model?String(finishedJob.result.model):null,provider:finishedJob.result?.provider?String(finishedJob.result.provider):null,evidence:Array.isArray(finishedJob.result?.evidence)?finishedJob.result.evidence:[],outputVersion:project.specVersion}
+          : {ok:false,error:String(finishedJob.error||'Remote worker failed the action.'),message:String(finishedJob.error||'Remote worker failed the action.'),model:finishedJob.result?.model?String(finishedJob.result.model):null,provider:finishedJob.result?.provider?String(finishedJob.result.provider):null,outputVersion:project.specVersion};
         remoteHandled=Boolean(liveAction&&['completed','failed','blocked','skipped'].includes(liveAction.status));
         verificationPassed=verificationPassed||false;
       }else if(action.type==='rebuild'){
