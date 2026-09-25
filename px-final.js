@@ -1170,12 +1170,18 @@ async function subscribeProjectRealtime(projectId){
 }
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{} await subscribeProjectRealtime(id);}}
 function renderProject(project){
-  project.uiNav=project.uiNav||(Object.keys(project.files||{}).length?'files':'assistant');
+  if(!project.uiNav || project.uiNav==='assistant' || project.uiNav==='overview'){
+    project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
+  }
   const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default;
   const assistantDock=UI.assistantDock({esc,project,actions});
   shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
   $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
-  $$('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiNav=button.dataset.projectTool;saveProject(project);renderProjectTool(project,button.dataset.projectTool);});
+  $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{
+    project.uiNav=button.dataset.projectTool;
+    saveProject(project);
+    renderProject(project);
+  });
   if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav){
     renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
   } else {

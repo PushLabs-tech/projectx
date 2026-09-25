@@ -192,52 +192,99 @@ export function authMarkup({mode}) {
   </div>`;
 }
 
+function projectIcon(id){
+  const icons={
+    build:'<svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/></svg>',
+    preview:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 20h8M9 8l6 4-6 4V8Z"/></svg>',
+    files:'<svg viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-10Z"/></svg>',
+    settings:'<svg viewBox="0 0 24 24"><path d="M9.5 3h5l.8 2.3 2 .9 2.2-.9 2.1 3.6-1.8 1.6.1 2.2 1.7 1.6-2.1 3.6-2.1-.9-2 .9L14.5 21h-5l-.8-2.3-2-.9-2.2.9-2.1-3.6 1.8-1.6-.1-2.2-1.7-1.6 2.1-3.6 2.1.9 2-.9L9.5 3Z"/><circle cx="12" cy="12" r="3"/></svg>',
+    more:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+    home:'<svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20H4v-9.5Z"/><path d="M9 20v-5h6v5"/></svg>'
+  };
+  return icons[id] || icons.more;
+}
+
 export function chrome({esc, session, recents, active, body, project, nav, right, status, email, execNote}) {
-  const tools = project ? navForProject(project) : APP_TOOLS;
-  const left = tools.map(([id, name]) => {
-    const on = (nav || active) === id;
-    if (project) return `<button class="px-tool ${on ? 'active' : ''}" data-project-tool="${esc(id)}" data-search="${esc(name)}"><span class="px-tool-dot" aria-hidden="true"></span><span>${esc(name)}</span></button>`;
-    return `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`;
-  }).join('');
-  const recent = recents.map(p => `<button data-open="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.type)}</span></button>`).join('') || '<div class="sub" style="padding:8px 10px">No projects yet</div>';
   const title = project ? esc(project.title) : 'ProjectX';
-  const extra = project ? '<button class="ghost px-add-tool" data-cmd="more-tools">More tools</button>' : '';
-  const agentPane = project && right ? `<aside class="px-right replit-agent" id="px-right">
+  if(project){
+    const tools = navForProject(project);
+    const visible = tools.filter(([id])=>['build','preview','files','settings'].includes(id));
+    const rail = visible.map(([id,name])=>`<button class="px-rail-tool ${(nav||active)===id?'active':''}" data-project-tool="${esc(id)}" title="${esc(name)}" aria-label="${esc(name)}">${projectIcon(id)}<span class="px-rail-label">${esc(name)}</span></button>`).join('');
+    const recent = recents.map(p => `<button data-open="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.type)}</span></button>`).join('') || '<div class="sub" style="padding:8px 10px">No projects yet</div>';
+    const agentPane = right ? `<aside class="px-right replit-agent" id="px-right">
       <div class="px-agent-bar">
-        <strong>Agent</strong>
+        <div><div class="kicker">AGENT</div><strong>Build with ProjectX</strong></div>
         <button class="ghost px-icon-btn" data-cmd="toggle-assistant" aria-label="Hide Agent panel">×</button>
       </div>
       <div class="px-agent-body">${right}</div>
     </aside>` : '';
-  const recentPanel = project ? '' : `<div class="px-side-section"><div class="label">Recent</div><div class="recent">${recent}</div></div>`;
-  return `<div class="px-shell replit-shell" id="px-shell">
+    return `<div class="px-shell replit-shell actual-replit-shell" id="px-shell">
+      <aside class="px-left replit-rail" id="px-left">
+        <button class="px-brand-mini" data-nav="home" title="ProjectX home" aria-label="ProjectX home"><span class="px-brand-mark">X</span></button>
+        <button class="px-project-mini" id="px-project-switch" type="button" title="Switch project" aria-label="Switch project"><span>${projectIcon('home')}</span></button>
+        <div class="px-switch-list" id="px-switch-list" hidden>${recent}</div>
+        <button class="px-new-mini" data-nav="home" title="New project" aria-label="New project">+</button>
+        <div class="px-rail-divider"></div>
+        <nav class="px-rail-nav" id="px-tool-nav">${rail}</nav>
+        <button class="px-rail-tool px-more-tool" data-cmd="more-tools" title="More tools" aria-label="More tools">${projectIcon('more')}</button>
+        <div class="px-rail-spacer"></div>
+        <button class="px-rail-tool" data-cmd="palette" title="Command menu" aria-label="Command menu"><span class="px-rail-command">⌘</span></button>
+        <div class="px-account-dot" title="${email ? esc(email) : 'Guest workspace'}">${email ? esc(email.slice(0,1).toUpperCase()) : 'G'}</div>
+      </aside>
+      <header class="px-topbar actual-replit-topbar">
+        <button class="ghost px-nav-toggle" id="px-nav-toggle" aria-label="Open navigation">Menu</button>
+        <div class="px-project-titlebar">
+          <strong>${title}</strong>
+          <span class="px-project-status"><span class="px-live-dot"></span>${status ? esc(status) : 'Ready'}</span>
+        </div>
+        <div class="px-center-actions">
+          <button class="ghost ${(nav||active)==='build'?'active':''}" data-project-tool="build">Build</button>
+          <button class="ghost ${(nav||active)==='preview'?'active':''}" data-project-tool="preview">Preview</button>
+          <button class="ghost ${(nav||active)==='files'?'active':''}" data-project-tool="files">Code</button>
+        </div>
+        <span style="flex:1"></span>
+        <button class="ghost" data-cmd="palette" title="Command palette">⌘K</button>
+        <button class="ghost" data-cmd="share">Share</button>
+        <button class="primary px-agent-toggle" data-cmd="toggle-assistant">Agent</button>
+      </header>
+      <main class="px-center main actual-replit-center">${body}</main>
+      ${agentPane}
+      <div class="px-bottom" id="px-bottom" hidden>
+        <div class="label">Activity</div>
+        <div id="px-bottom-log" class="conversation"></div>
+      </div>
+    </div>
+    <div class="px-palette" id="px-palette" hidden>
+      <div class="px-palette-box">
+        <input id="px-palette-input" placeholder="Search…" aria-label="Command palette">
+        <div class="px-palette-list" id="px-palette-list"></div>
+      </div>
+    </div>`;
+  }
+
+  const tools = APP_TOOLS;
+  const left = tools.map(([id, name]) => `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`).join('');
+  const recent = recents.map(p => `<button data-open="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.type)}</span></button>`).join('') || '<div class="sub" style="padding:8px 10px">No projects yet</div>';
+  return `<div class="px-shell" id="px-shell">
     <aside class="px-left side" id="px-left">
-      <button class="logo px-brand" data-nav="home" title="Home"><span class="px-brand-mark">X</span><span>ProjectX</span></button>
-      <button class="ghost px-switcher" id="px-project-switch" type="button">${project ? esc(project.title) : 'Projects'} <span aria-hidden="true">⌄</span></button>
+      <button class="logo" data-nav="home" title="Home">ProjectX</button>
+      <button class="ghost px-switcher" id="px-project-switch" type="button">Projects ▾</button>
       <div class="px-switch-list" id="px-switch-list" hidden>${recent}</div>
-      <button class="new px-new-project" data-nav="home"><span>＋</span> New project</button>
-      <div class="px-side-caption">${project ? 'Workspace' : 'Workspace'}</div>
-      <nav class="nav px-project-nav" id="px-tool-nav">${left}</nav>
-      ${extra}
-      ${recentPanel}
-      <div class="px-side-grow"></div>
+      <button class="new" data-nav="home">New project</button>
+      <input class="input px-side-search" id="px-side-search" placeholder="Search" aria-label="Search workspace">
+      <nav class="nav" id="px-tool-nav">${left}</nav>
+      <div class="divider"></div>
+      <div class="label">Recent</div>
+      <div class="recent">${recent}</div>
       <div class="acct">${email ? esc(email) : 'Guest workspace'}<div class="sub">${session ? 'Cloud workspace' : 'Local workspace'}</div></div>
     </aside>
-    <header class="px-topbar top replit-topbar">
+    <header class="px-topbar top">
       <button class="ghost px-nav-toggle" id="px-nav-toggle" aria-label="Open navigation">Menu</button>
-      <div class="px-breadcrumb"><span>ProjectX</span>${project ? '<span aria-hidden="true">/</span><strong>'+title+'</strong>' : ''}</div>
-      ${project ? '<div class="px-top-actions"><button class="ghost" data-project-tool="build">Build</button><button class="ghost" data-project-tool="preview">Preview</button><button class="ghost" data-project-tool="deploy">Publish</button></div>' : ''}
-      <span style="flex:1"></span>
+      <strong>ProjectX</strong><span style="flex:1"></span>
       <button class="ghost" data-cmd="palette" title="Command palette">⌘K</button>
-      ${project ? '<button class="ghost" data-cmd="share">Share</button><button class="primary px-agent-toggle" data-cmd="toggle-assistant">Agent</button>' : ''}
       ${session ? '<button data-action="signout">Sign out</button>' : '<button data-action="signin">Sign in</button>'}
     </header>
     <main class="px-center main">${body}</main>
-    ${agentPane}
-    <div class="px-bottom" id="px-bottom" hidden>
-      <div class="label">Activity</div>
-      <div id="px-bottom-log" class="conversation"></div>
-    </div>
   </div>
   <div class="px-palette" id="px-palette" hidden>
     <div class="px-palette-box">
@@ -293,16 +340,22 @@ export function interviewMarkup() {
 }
 
 export function projectHead({esc, project}) {
-  const category = project.category || project.understanding?.category || project.type || 'PROJECT';
-  const summary = String(project.understanding?.summary || project.intent || '').trim();
-  return `<div class="project px-work">
-    <div class="px-work-head">
-      <div class="kicker">PROJECT</div>
-      <h1 class="project-title">${esc(project.title)}</h1>
-      <div class="project-context"><span>${esc(summary || 'Your project is ready to work on.')}</span></div>
+  const hasFiles=Object.keys(project.files||{}).length>0;
+  return `<div class="px-replit-project">
+    <div class="px-stage" id="px-project-stage">
+      <div class="px-stage-bar">
+        <div class="px-stage-left">
+          <span class="px-stage-title">${hasFiles ? 'Preview' : 'Build'}</span>
+          <span class="px-stage-sub">${hasFiles ? 'Live artifact' : 'Start from the Agent'}</span>
+        </div>
+        <div class="px-stage-tools">
+          <button class="ghost" data-project-tool="build">${hasFiles ? 'Edit' : 'Build'}</button>
+          <button class="ghost" data-project-tool="preview">Preview</button>
+          <button class="ghost" data-project-tool="files">Code</button>
+        </div>
+      </div>
+      <div id="project-body" class="body px-project-body"></div>
     </div>
-    <div class="sections">${project.sections.map(s => `<button class="tab ${project.selectedSection === s.id ? 'active' : ''}" data-section="${esc(s.id)}">${esc(s.name)}</button>`).join('')}</div>
-    <div id="project-body" class="body"></div>
   </div>`;
 }
 
