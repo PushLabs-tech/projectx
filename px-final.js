@@ -1257,7 +1257,9 @@ async function executeReconciliationQueue(project){
         result={ok:false,status:'blocked',kind:'human_review',message:'Human review is required before this reconciliation action can change canonical project state.',evidence:['Automatic execution stops at human decision boundaries.'],outputVersion:project.specVersion};
       }else if(action.type==='rebuild'){
         project.uiNav='build';renderProjectTool(project,'build');
+        const queueSnapshot=JSON.parse(JSON.stringify(getReconciliationQueue(project)||{}));
         const build=await buildArtifact(project);
+        if(queueSnapshot?.id){const live=getReconciliationQueue(project);if(!live||live.id!==queueSnapshot.id){project.executionState={...(project.executionState||{}),reconciliationQueue:queueSnapshot};}}
         result={ok:Boolean(build?.ok),message:build?.ok?'Artifact rebuilt successfully.':String(build?.error||'Artifact build failed.'),evidence:build?.evidence||[],outputVersion:project.specVersion};
       }else if(action.type==='update'){
         result=await executeTargetedFileUpdate(project,action);
