@@ -6,6 +6,7 @@ const worker=fs.readFileSync(new URL("../supabase/functions/projectx-worker/inde
 const tools=fs.readFileSync(new URL("../supabase/functions/projectx-worker/tools.ts",import.meta.url),"utf8");
 const ai=fs.readFileSync(new URL("../supabase/functions/ai/index.ts",import.meta.url),"utf8");
 const migration=fs.readFileSync(new URL("../supabase/migrations/20260925150000_projectx_remote_execution_worker.sql",import.meta.url),"utf8");
+const transactionMigration=fs.readFileSync(new URL("../supabase/migrations/20260925170000_projectx_execution_transactions.sql",import.meta.url),"utf8");
 const runtime=fs.readFileSync(new URL("../px-final.js",import.meta.url),"utf8");
 
 assert.match(worker,/projectx_worker_token_valid/);
@@ -45,12 +46,12 @@ assert.match(migration,/cancel_project_job/);
 assert.match(migration,/commit_project_execution/);
 assert.match(migration,/cancel_requested/);
 assert.match(migration,/timeout_seconds/);
-assert.match(migration,/project_execution_transactions/);
-assert.match(migration,/inverse_operations/);
-assert.match(migration,/rollback_project_execution/);
-assert.match(migration,/status','conflict/);
-assert.match(migration,/lastTransactionId/);
-assert.match(migration,/rollbackHistory/);
+assert.match(transactionMigration,/project_execution_transactions/);
+assert.match(transactionMigration,/inverse_operations/);
+assert.match(transactionMigration,/rollback_project_execution/);
+assert.match(transactionMigration,/status','conflict/);
+assert.match(transactionMigration,/lastTransactionId/);
+assert.match(transactionMigration,/rollbackHistory/);
 
 console.log("PASS: remote worker has a server-side authentication boundary");
 console.log("PASS: execution tools are explicitly registered and contract-scoped");
