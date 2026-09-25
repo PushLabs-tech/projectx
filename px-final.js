@@ -2032,9 +2032,9 @@ function browserRuntimeCheck(files){
     document.body.appendChild(frame);
     let settled=false;
     const finish=result=>{if(settled)return;settled=true;window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove();resolve(result);};
-    const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.'});};
+    const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.',affectedFiles:Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6)});};
     window.addEventListener('message',onMessage);
-    const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.'}),2200);
+    const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.',affectedFiles:Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6)}),2200);
     frame.srcdoc=assemblePreviewHtml(files);
   });
 }
