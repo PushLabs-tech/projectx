@@ -94,11 +94,11 @@ async function executeExecutionJob(token:string,job:any) {
       if (execution.operations.some((op:any)=>(artifact as any).filePaths.includes(op.path))) nextSettings.artifacts[key]={...(artifact as any),stale:true,staleFromVersion:project.specVersion};
     }
   }
-  const result={kind:action.type,ok:true,message:String(ai?.message || "Remote execution completed."),model:ai?.model?String(ai.model):null,provider:ai?.provider?String(ai.provider):null,evidence,outputVersion:project.specVersion};
+  const result={kind:action.type,ok:true,message:String(ai?.message || "Remote execution completed."),model:ai?.model?String(ai.model):null,provider:ai?.provider?String(ai.provider):null,diagnosis:ai?.diagnosis&&typeof ai.diagnosis==="object"?ai.diagnosis:null,repairPlan:ai?.repairPlan&&typeof ai.repairPlan==="object"?ai.repairPlan:null,evidence,outputVersion:project.specVersion};
   const finished=buildExecutionSettings(nextSettings,{...action,id:contract.actionId},result,"completed");
   const committed=await commitExecution(project,job.user_id,job,action,executor,"completed",finished,execution.operations,"action_finished",execution.operations.length?"write_file":null,result.message,evidence);
   if (committed?.status==="stale") throw new Error("Project changed while committing the worker result.");
-  const { error: finishError } = await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:{actionId:contract.actionId,executor,model:result.model,provider:result.provider,message:result.message,evidence:evidence.slice(0,20),filesChanged:execution.operations.map((op:any)=>op.path),outputVersion:project.specVersion},p_error:null,p_retry_seconds:60});
+  const { error: finishError } = await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:{actionId:contract.actionId,executor,model:result.model,provider:result.provider,diagnosis:result.diagnosis,repairPlan:result.repairPlan,message:result.message,evidence:evidence.slice(0,20),filesChanged:execution.operations.map((op:any)=>op.path),outputVersion:project.specVersion},p_error:null,p_retry_seconds:60});
   if (finishError) throw finishError;
   return {id:job.id,status:"succeeded",actionId:contract.actionId,executor,filesChanged:execution.operations.map((op:any)=>op.path)};
 }
