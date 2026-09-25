@@ -351,6 +351,65 @@ begin
   end loop;
 
   settings := coalesce(current_project.settings,'{}'::jsonb);
+  if jsonb_typeof(settings->'executionState'->'reconciliationQueue') = 'object' then
+    settings := jsonb_set(
+      settings,
+      '{executionState,reconciliationQueue,status}',
+      to_jsonb('pending'::text),
+      true
+    );
+    settings := jsonb_set(
+      settings,
+      '{executionState,reconciliationQueue,completedAt}',
+      'null'::jsonb,
+      true
+    );
+    settings := jsonb_set(
+      settings,
+      '{executionState,reconciliationQueue,execution,lastRollbackTransactionId}',
+      to_jsonb(tx.id::text),
+      true
+    );
+    settings := jsonb_set(
+      settings,
+      '{executionState,reconciliationQueue,actions}',
+      coalesce(
+        (
+          select jsonb_agg(
+            case
+              when elem->>'type' = 'verify' then
+                elem || jsonb_build_object(
+                  'status','pending',
+                  'result',null,
+                  'error',null,
+                  'completedAt',null,
+                  'updatedAt',now()
+                )
+              else elem
+            end
+            order by ord
+          )
+          from jsonb_array_elements(
+            coalesce(settings->'executionState'->'reconciliationQueue'->'actions','[]'::jsonb)
+          ) with ordinality as x(elem,ord)
+        ),
+        '[]'::jsonb
+      ),
+      true
+    );
+  end if;
+  settings := jsonb_set(
+    settings,
+    '{tests}',
+    jsonb_build_object(
+      'status','stale',
+      'specVersion',greatest(coalesce(current_project.spec_version,1),1),
+      'verifiedAgainstVersion',null,
+      'results','[]'::jsonb,
+      'updatedAt',null
+    ),
+    true
+  );
   settings := jsonb_set(
     settings,
     '{executionState,rollbackHistory}',
@@ -365,7 +424,7 @@ begin
     true
   );
   update public.projects
-  set settings=settings,updated_at=now()
+  set settings=settings,status='needs-build',updated_at=now()
   where id=p_project_id;
 
   update public.project_execution_transactions
