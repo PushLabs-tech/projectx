@@ -205,7 +205,7 @@ async function enqueueRemoteExecutionJob(project,action,contract){
   const result=await edge('enqueueJob',{
     projectId:project.sync?.remoteId||project.id,
     kind:'execution',
-    payload:{action,contract},
+    payload:{action,contract,explicitApproval:true},
     maxAttempts:Number(contract?.retryPolicy?.maxAttempts||2),
     timeoutSeconds:Math.max(30,Math.min(300,Number(contract?.limits?.timeoutSeconds||120)))
   });
