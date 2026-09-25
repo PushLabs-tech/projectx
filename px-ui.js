@@ -8,6 +8,7 @@ export const APP_TOOLS = [
 
 export const PROJECT_NAV = [
   ['overview', 'Overview'],
+  ['runs', 'Runs'],
   ['assistant', 'Assistant'],
   ['build', 'Build'],
   ['design', 'Design'],
@@ -32,7 +33,7 @@ export const PROJECT_NAV = [
   ['settings', 'Settings']
 ];
 
-export const CORE_NAV = ['overview', 'assistant', 'build', 'design', 'files', 'preview', 'tasks', 'artifacts', 'brain', 'impact', 'settings'];
+export const CORE_NAV = ['overview', 'runs', 'assistant', 'build', 'design', 'files', 'preview', 'tasks', 'artifacts', 'brain', 'impact', 'settings'];
 
 export const TEMPLATES = [
   {id:'website',title:'Website',intent:'Build a polished landing page for a local service business.',type:'Website',deliverables:['Working website']},
@@ -51,6 +52,7 @@ export const COMMANDS = [
   ['new', 'New project', 'home'],
   ['palette-files', 'Open files', 'files'],
   ['palette-preview', 'Open preview', 'preview'],
+  ['palette-runs', 'Open execution runs', 'runs'],
   ['palette-brain', 'Open Brain', 'brain'],
   ['palette-impact', 'Open Impact Engine', 'impact'],
   ['palette-tasks', 'Open tasks', 'tasks'],
