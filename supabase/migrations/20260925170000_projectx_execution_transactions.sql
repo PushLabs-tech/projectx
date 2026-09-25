@@ -191,8 +191,44 @@ begin
     where id=tx_id;
   end if;
 
+  current_settings := coalesce(p_settings,current_settings);
+  if tx_count > 0 then
+    current_settings := jsonb_set(current_settings,'{executionState,lastTransactionId}',to_jsonb(tx_id::text),true);
+    current_settings := jsonb_set(
+      current_settings,
+      '{executionState,transactionHistory}',
+      (
+        coalesce(current_settings->'executionState'->'transactionHistory','[]'::jsonb)
+        || jsonb_build_array(jsonb_build_object(
+          'transactionId',tx_id::text,
+          'actionId',p_action_id,
+          'changedPaths',changed_paths,
+          'summary',jsonb_build_object('filesChanged',tx_count,'writeBytes',total_write_bytes),
+          'at',now()
+        ))
+      ),
+      true
+    );
+    current_settings := jsonb_set(
+      current_settings,
+      '{executionState,transactionHistory}',
+      to_jsonb(
+        case
+          when jsonb_array_length(current_settings->'executionState'->'transactionHistory') > 20
+          then (
+            select jsonb_agg(value order by ord)
+            from jsonb_array_elements(current_settings->'executionState'->'transactionHistory') with ordinality as x(value,ord)
+            where ord > jsonb_array_length(current_settings->'executionState'->'transactionHistory') - 20
+          )
+          else current_settings->'executionState'->'transactionHistory'
+        end
+      ),
+      true
+    );
+  end if;
+
   update public.projects
-  set settings=coalesce(p_settings,current_settings),
+  set settings=current_settings,
       updated_at=now()
   where id=p_project_id;
 
