@@ -15,6 +15,12 @@ import {
   projectArtifactKind,
   normalizeProjectType,
   inputNodeIds,
+  createReconciliationRun,
+  getReconciliationQueue,
+  getReadyReconciliationActions,
+  beginReconciliationAction,
+  completeReconciliationAction,
+  retryFailedReconciliation,
 } from './projectx-core.js';
 import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
@@ -1184,6 +1190,106 @@ function projectSecurityChecks(project){
     {name:'Safe relative file paths',pass:Object.keys(files).every(p=>sanitizePath(p)===p),detail:'Generated file paths stay within the project file namespace.',blockBuild:true}
   ];
 }
+
+function reconciliationStatusLabel(queue){
+  return queue ? String(queue.status||'pending').replace(/_/g,' ') : 'not started';
+}
+async function executeTargetedFileUpdate(project,action){
+  const path=String(action?.targetId||'').replace(/^file:/,'');
+  if(!path||!Object.hasOwn(project.files||{},path))throw new Error('Target file is no longer present in the current project state.');
+  if(!session)throw new Error('Sign in and connect an AI provider before ProjectX can execute an AI file update.');
+  const data=await aiJson('discuss',{project,history:[],message:'Update only the existing project file "'+path+'" so it matches the current canonical project state. Preserve unrelated behavior. Return a complete replacement for this file only. No new dependencies, remote assets, placeholders, or unrelated changes.',system:'Return JSON only: {"fileOperations":[{"op":"write","path":string,"content":string}]}. Return exactly one operation for the requested existing file.'},7000);
+  const op=(Array.isArray(data?.fileOperations)?data.fileOperations:[]).find(x=>x&&x.op==='write'&&sanitizePath(x.path)===path&&typeof x.content==='string');
+  if(!op)throw new Error('The update executor returned no valid replacement for '+path+'.');
+  if(op.content.length>600000)throw new Error('The updated file exceeds the project file size limit.');
+  if(op.content===project.files[path])return {ok:true,message:path+' was already current.',evidence:['Target file content was unchanged.'],outputVersion:project.specVersion};
+  project.files[path]=op.content;
+  project.tests={status:'stale',specVersion:project.specVersion,verifiedAgainstVersion:null,results:[],updatedAt:null};
+  project.artifacts={...(project.artifacts||{}),output:{...(project.artifacts?.output||{}),stale:true,specVersion:project.specVersion}};
+  project.status='needs-build';
+  project.updatedAt=now();
+  return {ok:true,message:'Updated '+path+'.',evidence:['Targeted AI reconciliation update applied to the existing file.'],outputVersion:project.specVersion};
+}
+async function executeLocalVerification(project){
+  const results=await runTests(project);
+  const security=projectSecurityChecks(project);
+  const blocking=security.filter(x=>x.blockBuild&&!x.pass);
+  const passed=results.length>0&&results.every(x=>x.pass)&&blocking.length===0;
+  project.tests={status:passed?'passed':'failed',specVersion:project.specVersion,verifiedAgainstVersion:project.specVersion,results:[...results,...security],updatedAt:now()};
+  project.status=passed?'verified':'needs-fix';
+  if(session?.access_token){
+    const checks=results.map(x=>({name:x.name,checkType:'local',status:x.pass?'pass':'fail',severity:x.pass?'info':'error',evidence:{detail:x.detail||''},verifier:'projectx-reconciliation'}))
+      .concat(security.map(x=>({name:x.name,checkType:'security',status:x.pass?'pass':(x.blockBuild?'fail':'warning'),severity:x.pass?'info':(x.blockBuild?'error':'warning'),evidence:{detail:x.detail||''},verifier:'projectx-reconciliation'})));
+    try{await edge('runVerification',{projectId:project.id,artifactVersion:String(project.artifacts?.output?.specVersion||project.specVersion||1),checks});}catch(error){notify('Local verification finished, but its durable server record could not be saved: '+String(error.message||error),'error');}
+  }
+  return {ok:passed,message:passed?'Current project output passed runtime and security verification.':'Verification found failures in the current project output.',evidence:[...results,...security].map(x=>({name:x.name,pass:Boolean(x.pass),detail:x.detail||''})),outputVersion:project.specVersion};
+}
+async function executeReconciliationQueue(project){
+  let queue=getReconciliationQueue(project);
+  if(!queue||Number(queue.targetVersion)!==Number(project.specVersion||1)){
+    const created=createReconciliationRun(project);
+    if(!created.created&&created.reason!=='queue_exists')throw new Error(created.reason||'Could not create a reconciliation queue.');
+    queue=created.queue||getReconciliationQueue(project);
+  }
+  if(!queue)throw new Error('No reconciliation queue exists for this project.');
+  if(queue.status==='failed')retryFailedReconciliation(project);
+  queue=getReconciliationQueue(project);
+  queue.execution={...(queue.execution||{}),startedAt:now(),executor:'projectx-local-ai'};
+  project.executionState={...(project.executionState||{}),reconciliationQueue:queue,status:'reconciling'};
+  saveProject(project);
+  let executed=0;
+  while(true){
+    queue=getReconciliationQueue(project);
+    if(!queue)break;
+    if(Number(queue.targetVersion)!==Number(project.specVersion||1)){
+      queue.status='blocked';queue.error='project_version_changed';queue.updatedAt=now();
+      project.executionState={...(project.executionState||{}),reconciliationQueue:queue,status:'needs-reconciliation'};
+      saveProject(project);
+      throw new Error('The project changed while reconciliation was running. The queue was stopped so the new state can be reconciled safely.');
+    }
+    const ready=getReadyReconciliationActions(project);
+    if(!ready.length)break;
+    const action=ready[0],started=beginReconciliationAction(project,action.id);
+    if(!started.started)throw new Error(started.reason||'Could not start reconciliation action.');
+    let result;
+    try{
+      if(['review-decision','review-task','reevaluate-evidence','review','replan'].includes(action.type)){
+        result={ok:false,status:'blocked',kind:'human_review',message:'Human review is required before this reconciliation action can change canonical project state.',evidence:['Automatic execution stops at human decision boundaries.'],outputVersion:project.specVersion};
+      }else if(action.type==='rebuild'){
+        project.uiNav='build';renderProjectTool(project,'build');
+        const build=await buildArtifact(project);
+        result={ok:Boolean(build?.ok),message:build?.ok?'Artifact rebuilt successfully.':String(build?.error||'Artifact build failed.'),evidence:build?.evidence||[],outputVersion:project.specVersion};
+      }else if(action.type==='update'){
+        result=await executeTargetedFileUpdate(project,action);
+      }else if(action.type==='verify'){
+        result=await executeLocalVerification(project);
+      }else{
+        result={ok:false,status:'blocked',message:'No executor is registered for '+action.type+'.',outputVersion:project.specVersion};
+      }
+    }catch(error){
+      result={ok:false,message:String(error?.message||error),error:String(error?.message||error),outputVersion:project.specVersion};
+    }
+    const finished=completeReconciliationAction(project,action.id,result);
+    if(!finished.completed)throw new Error(finished.reason||'Could not record reconciliation result.');
+    executed++;
+    saveProject(project);
+    await syncRemoteProject(project);
+    if(finished.queueStatus==='blocked'||finished.queueStatus==='failed')break;
+  }
+  queue=getReconciliationQueue(project);
+  if(queue&&queue.status!=='failed'&&queue.status!=='blocked'){
+    const final=await executeLocalVerification(project);
+    queue=getReconciliationQueue(project);
+    if(final.ok&&queue&&queue.actions.every(a=>['completed','skipped'].includes(a.status))){
+      queue.status='complete';queue.completedAt=now();queue.updatedAt=now();
+      project.executionState={...(project.executionState||{}),reconciliationQueue:queue,status:'reconciled'};
+      project.impact={...(project.impact||{}),queueStatus:'complete',reconciledAt:queue.completedAt};
+    }
+  }
+  saveProject(project);await syncRemoteProject(project);
+  return {executed,queue:getReconciliationQueue(project)};
+}
+
 function renderImpact(project){
   const impact=project.impact||buildImpactGraph(project,project.spec||{},project.spec||{},{});
   const changedNodes=Array.isArray(impact.changedNodes)?impact.changedNodes:[];
@@ -1195,23 +1301,20 @@ function renderImpact(project){
   const verification=Array.isArray(impact.verification)?impact.verification:[];
   const nodes=Array.isArray(impact.nodes)?impact.nodes:[];
   const edges=Array.isArray(impact.edges)?impact.edges:[];
+  const queue=getReconciliationQueue(project);
   const pill=(label,value)=>'<div class="box"><div class="kicker">'+esc(label)+'</div><div style="font-size:24px;font-weight:700;margin-top:4px">'+esc(value)+'</div></div>';
-  const nodeRow=(item)=>{
-    const n=item.node||item;
-    const why=item.reason?' · '+item.reason:'';
-    return '<div class="item"><b>'+esc(n.label||n.id)+'</b><div class="sub">'+esc((n.kind||'node')+(item.depth!=null?' · depth '+item.depth:'')+(item.confidence?' · '+item.confidence:'')+why)+'</div></div>';
-  };
-  const actionRows=actions.map(a=>'<div class="item"><b>'+esc(a.label||a.type||'Reconciliation action')+'</b><div class="sub">'+esc(a.reason||'')+'</div></div>').join('')||'<div class="sub">No reconciliation action is required.</div>';
+  const nodeRow=item=>{const n=item.node||item;const why=item.reason?' · '+item.reason:'';return '<div class="item"><b>'+esc(n.label||n.id)+'</b><div class="sub">'+esc((n.kind||'node')+(item.depth!=null?' · depth '+item.depth:'')+(item.confidence?' · '+item.confidence:'')+why)+'</div></div>';};
+  const actionRows=actions.map(a=>{const qid='reconcile:'+String(a.id||'').replace(/^reconcile:/,'').replace(/[^a-z0-9-]/gi,'-');const qa=queue?.actions?.find(x=>x.id===qid);return '<div class="item"><b>'+esc(a.label||a.type||'Reconciliation action')+'</b><div class="sub">'+esc(qa?('Status: '+qa.status+' · attempts '+qa.attempts):a.reason||'Pending')+'</div></div>';}).join('')||'<div class="sub">No reconciliation action is required.</div>';
   const verifyRows=verification.map(v=>'<div class="item"><b>'+esc(v.label||v.type)+'</b><div class="sub">'+esc(v.reason||'')+'</div></div>').join('')||'<div class="sub">No verification step is queued.</div>';
-  const graphNodes=nodes.slice(0,100);
-  const nodeMap=new Map(graphNodes.map(n=>[n.id,n]));
-  const graphEdges=edges.filter(e=>nodeMap.has(e.from)&&nodeMap.has(e.to)).slice(0,160);
+  const graphNodes=nodes.slice(0,100),nodeMap=new Map(graphNodes.map(n=>[n.id,n])),graphEdges=edges.filter(e=>nodeMap.has(e.from)&&nodeMap.has(e.to)).slice(0,160);
   const graph=graphNodes.length?'<div class="px-impact-graph">'+graphNodes.map(n=>'<div class="px-impact-node '+esc(n.status||'active')+'"><span class="px-impact-kind">'+esc(n.kind)+'</span><b>'+esc(n.label)+'</b></div>').join('')+'</div>':'<div class="sub">Make a project change to build the dependency graph.</div>';
+  const queueSummary=queue?('Queue · '+reconciliationStatusLabel(queue)+' · '+queue.actions.filter(a=>['pending','running'].includes(a.status)).length+' remaining'):'No execution queue created yet.';
   const body=[
     '<div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px">',
     pill('Changed',changedNodes.length),pill('Affected',affectedNodes.length),pill('Stale',staleNodes.length),pill('Invalidated',invalidatedNodes.length),
     '</div>',
     '<div class="sub" style="margin-bottom:14px">'+esc(impact.summary||'No downstream impact detected.')+'</div>',
+    '<div class="box"><div class="kicker">EXECUTION</div><h3 style="margin:4px 0 10px">Reconcile this state</h3><div class="sub">'+esc(queueSummary)+'</div><div class="actions" style="margin-top:10px"><button class="primary" id="impact-run-reconcile">Run reconciliation</button>'+(queue?.status==='failed'?'<button class="ghost" id="impact-retry-reconcile">Retry failed</button>':'')+'</div><div id="impact-run-status" class="sub" style="margin-top:8px"></div></div>',
     '<div class="box"><div class="kicker">DEPENDENCY MAP</div><h3 style="margin:4px 0 10px">What this change touches</h3><div class="sub" style="margin-bottom:10px">'+esc(graphEdges.length+' dependency edges · '+reviewNodes.length+' objects need review')+'</div>'+graph+'</div>',
     '<div class="grid" style="margin-top:14px">',
     '<div class="box"><h3 style="margin-top:0">Changed state</h3>'+(changedNodes.map(nodeRow).join('')||'<div class="sub">No changed objects.</div>')+'</div>',
@@ -1220,18 +1323,13 @@ function renderImpact(project){
     '<div class="box"><h3 style="margin-top:0">Invalidated</h3>'+(invalidatedNodes.map(nodeRow).join('')||'<div class="sub">Nothing invalidated.</div>')+'</div>',
     '</div>',
     '<div class="grid" style="margin-top:14px"><div class="box"><h3 style="margin-top:0">Reconciliation actions</h3>'+actionRows+'</div><div class="box"><h3 style="margin-top:0">Verification queue</h3>'+verifyRows+'</div></div>',
-    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="primary" id="impact-chat">Reconcile in Assistant</button></div>',
-    '<div id="impact-status" class="sub" style="margin-top:10px"></div>'
+    '<div class="actions" style="margin-top:14px"><button class="ghost" id="impact-refresh">Recalculate</button><button class="ghost" id="impact-chat">Open in Assistant</button></div><div id="impact-status" class="sub" style="margin-top:10px"></div>'
   ].join('');
-  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces a state change through the dependency graph, marks stale work, and produces a concrete reconciliation queue.',body);
-  $('#impact-refresh').onclick=()=>{
-    const rebuilt=buildImpactGraph(project,project.spec||{},project.spec||{});
-    project.impact=rebuilt;saveProject(project);renderImpact(project);
-  };
-  $('#impact-chat').onclick=()=>{
-    const summary=(actions.slice(0,8).map(a=>a.label||a.type).join('; ')||'Review the current impact and reconcile affected work.');
-    project.uiNav='assistant';saveProject(project);renderProjectChat(project,'Reconcile this change. Review the affected decisions, stale artifacts, invalidated work, and verification queue before making any further changes. '+summary);
-  };
+  toolShell('IMPACT ENGINE','Change one thing. See what it changes.','ProjectX traces a state change through the dependency graph and can now execute eligible reconciliation actions against the current state.',body);
+  $('#impact-refresh').onclick=()=>{const rebuilt=buildImpactGraph(project,project.spec||{},project.spec||{});project.impact=rebuilt;saveProject(project);renderImpact(project);};
+  $('#impact-run-reconcile').onclick=async()=>{const button=$('#impact-run-reconcile'),status=$('#impact-run-status');if(button)button.disabled=true;if(status)status.textContent='Executing reconciliation actions and validating the resulting state…';try{const result=await executeReconciliationQueue(project);if(status)status.textContent='Reconciliation '+reconciliationStatusLabel(result.queue)+'. '+result.executed+' action(s) executed.';renderImpact(project);}catch(error){if(status)status.textContent='Reconciliation stopped: '+String(error.message||error);renderImpact(project);}finally{button?.removeAttribute('disabled');}};
+  $('#impact-retry-reconcile')?.addEventListener('click',async()=>{retryFailedReconciliation(project);saveProject(project);renderImpact(project);});
+  $('#impact-chat').onclick=()=>{const summary=(actions.slice(0,8).map(a=>a.label||a.type).join('; ')||'Review the current impact and reconcile affected work.');project.uiNav='assistant';saveProject(project);renderProjectChat(project,'Reconcile this change. Review affected decisions, stale artifacts, invalidated work, and verification before making further changes. '+summary);};
 }
 function renderProjectSecurity(project){
   const checks=projectSecurityChecks(project);
@@ -1437,9 +1535,9 @@ async function renderOutput(project){
   }else $('#output-area').innerHTML='<div class="placeholder">ProjectX will generate the deliverable from the current canonical specification.</div>';
 }
 async function buildArtifact(project,repairResults=[]){
-  if(!session)return aiRequiredModal('Sign in and connect an AI provider before ProjectX can build the real artifact.');
+  if(!session){aiRequiredModal('Sign in and connect an AI provider before ProjectX can build the real artifact.');return {ok:false,error:'Sign in and connect an AI provider before ProjectX can build the real artifact.'};}
   const button=$('#build-output'),area=$('#output-area'),software=projectArtifactKind(project.type)==='software';
-  if(!button||!area)return;
+  if(!button||!area)return {ok:false,error:'Build surface is unavailable.'};
   button.disabled=true;
   area.innerHTML='<div class="sub">ProjectX is generating and validating the real deliverable…</div>';
   try{
@@ -1516,8 +1614,10 @@ async function buildArtifact(project,repairResults=[]){
     renderOutput(project);
     if(software)mountArtifact(project);
     notify('Deliverable generated and validated from the current canonical project spec.','success');
+    return {ok:true,version:project.specVersion,evidence:[...(project.tests?.results||[])].map(x=>({name:x.name,detail:x.detail||'',pass:x.pass!==false}))};
   }catch(error){
     area.innerHTML=`<div class="placeholder">Generation failed: ${esc(error.message)}. Your previous deliverable was kept.</div>`;
+    return {ok:false,error:String(error?.message||error),evidence:project.tests?.results||[],version:project.specVersion};
   }finally{button.disabled=false;}
 }
 function mountArtifact(project){
