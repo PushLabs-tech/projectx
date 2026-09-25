@@ -1907,7 +1907,7 @@ async function renderOutput(project){
   $('#run-isolated-build')?.addEventListener('click',()=>requestIsolatedBuild(project));
   $('#visual-edit')?.addEventListener('click',()=>renderProjectChat(project,'Make a visual change: '));
   if(current){
-    if(software){mountArtifact(project);refreshIsolatedBuildPanel(project);
+    if(software){mountArtifact(project);refreshIsolatedBuildPanel(project);}
     else{
       const docPath=Object.keys(project.files||{}).find(p=>/\.(md|txt|csv|json)$/i.test(p))||Object.keys(project.files||{})[0];
       $('#output-area').innerHTML=`<div class="document-output"><pre class="document-text">${esc(docPath?project.files[docPath]:'No document content.')}</pre></div>`;
