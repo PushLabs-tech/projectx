@@ -1,9 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders, json } from "../_shared/cors.ts";
-import { decryptSecret, encryptSecret } from "../_shared/crypto.ts";
-import { chat as providerChat, listModels as providerListModels, detectProvider, type Credential, type ProviderId } from "../_shared/providers.ts";
-import { deterministicCandidates } from "../_shared/router.ts";
-import { applyBrainMutationToProject, snapshotForPersistence, validateBrainMutation } from "../_shared/brain.ts";
+import { corsHeaders, json } from "./_shared/cors.ts";
+import { decryptSecret, encryptSecret } from "./_shared/crypto.ts";
+import { chat as providerChat, listModels as providerListModels, detectProvider, type Credential, type ProviderId } from "./_shared/providers.ts";
+import { deterministicCandidates } from "./_shared/router.ts";
+import { applyBrainMutationToProject, snapshotForPersistence, validateBrainMutation } from "./_shared/brain.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
