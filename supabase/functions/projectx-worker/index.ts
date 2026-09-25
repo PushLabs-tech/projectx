@@ -63,6 +63,7 @@ async function executeExecutionJob(token:string,job:any) {
   const targetVersion=Number(contract.targetVersion ?? action.targetVersion ?? project.specVersion);
   if (targetVersion!==project.specVersion) throw new Error("Project version changed before execution.");
   if (!contract.actionId || contract.humanReviewRequired || !contract.executor) throw new Error("Execution contract is missing, unsafe, or requires human review.");
+  if (contract.autoExecute===false && payload.explicitApproval!==true) throw new Error("Execution contract requires explicit approval.");
   const maxAttempts=Math.max(1,Math.min(3,Number(contract.retryPolicy?.maxAttempts || 1)));
   if (Number(action.attempts || 0)>=maxAttempts) throw new Error("Execution attempt limit reached.");
   const executor=String(contract.executor);
