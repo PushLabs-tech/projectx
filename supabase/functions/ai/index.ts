@@ -855,11 +855,16 @@ async function runVerification(user:any, body:any) {
   }
   const verificationStatus=results.some((r:any)=>r.status==="fail")?"fail":results.some((r:any)=>r.status==="blocked")?"blocked":results.some((r:any)=>r.status==="human_review")?"human_review":results.length&&results.every((r:any)=>r.status==="pass")?"pass":"warning";
   if(["pass","fail"].includes(verificationStatus)){
-    const {data:latestJob}=await admin.from("job_queue").select("id,result,created_at").eq("project_id",projectId).eq("user_id",user.id).eq("kind","execution").eq("status","succeeded").order("created_at",{ascending:false}).limit(1).maybeSingle();
+    const sourceActionId=String(body?.sourceActionId||"").trim();
+    const {data:recentJobs}=await admin.from("job_queue").select("id,result,created_at").eq("project_id",projectId).eq("user_id",user.id).eq("kind","execution").eq("status","succeeded").order("created_at",{ascending:false}).limit(20);
+    const latestJob=(recentJobs||[]).find((job:any)=>{
+      const result=job?.result && typeof job.result==="object" ? job.result : {};
+      return (!sourceActionId || String(result?.actionId||"")===sourceActionId) && String(result?.model||"").trim() && String(result?.provider||"").trim();
+    });
     const model=String(latestJob?.result?.model||"").trim();
     const provider=String(latestJob?.result?.provider||"").trim();
     if(model&&provider){
-      await writeModelFeedback(user.id,provider,model,"build",verificationStatus==="pass"?"verification_pass":"verification_fail",0,{projectId,jobId:latestJob?.id||null,evidence:results.slice(-20)});
+      await writeModelFeedback(user.id,provider,model,"build",verificationStatus==="pass"?"verification_pass":"verification_fail",0,{projectId,jobId:latestJob?.id||null,evidence:results.slice(-20),sourceActionId:sourceActionId||null});
     }
   }
   return {ok:true,status:verificationStatus,results};
