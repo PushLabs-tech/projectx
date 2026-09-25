@@ -200,6 +200,28 @@ async function integrationEdge(functionName, action, payload = {}) {
   if (!response.ok || data.ok === false) throw new Error(data?.error || ('HTTP ' + response.status + ' from ' + functionName));
   return data;
 }
+async function enqueueRemoteExecutionJob(project,action,contract){
+  if(!session?.access_token||!project?.id) return null;
+  const result=await edge('enqueueJob',{
+    projectId:project.sync?.remoteId||project.id,
+    kind:'execution',
+    payload:{action,contract,explicitApproval:true},
+    maxAttempts:Number(contract?.retryPolicy?.maxAttempts||2),
+    timeoutSeconds:Math.max(30,Math.min(300,Number(contract?.limits?.timeoutSeconds||120)))
+  });
+  return result?.job||null;
+}
+async function waitForRemoteExecutionJob(jobId,timeoutMs=90000){
+async function cancelRemoteExecutionJob(jobId){if(!jobId)throw new Error('Remote execution job id is missing.');return edge('cancelJob',{jobId});}
+  const deadline=Date.now()+Math.max(15000,Math.min(180000,Number(timeoutMs)||90000));
+  while(Date.now()<deadline){
+    const result=await edge('getJob',{jobId});
+    const job=result?.job;
+    if(job&&['succeeded','failed','cancelled'].includes(String(job.status))) return job;
+    await sleep(2500);
+  }
+  throw new Error('The remote worker did not finish this action before the execution window expired.');
+}
 
 function integrationWorkspaceId() {
   try {
@@ -1311,9 +1333,37 @@ async function executeReconciliationQueue(project){
     const started=beginReconciliationAction(project,action.id);
     if(!started.started)throw new Error(started.reason||'Could not start reconciliation action.');
     appendExecutionJournal(project,{event:'action_started',actionId:action.id,status:'running',executor:contract.executor,message:'Executor started.',evidence:[{type:action.type,boundary:contract.boundary,risk:contract.risk,attempt:Number(started.action.attempts||1)}],outputVersion:project.specVersion});
-    let result;
+    let result,remoteHandled=false;
     try{
-      if(action.type==='rebuild'){
+      if(session?.access_token&&project?.sync?.remoteId&&['rebuild','update'].includes(action.type)){
+        const remoteJob=await enqueueRemoteExecutionJob(project,action,contract);
+        if(!remoteJob?.id)throw new Error('Remote execution job could not be queued.');
+        const remoteQueue=getReconciliationQueue(project);
+        const remoteAction=remoteQueue?.actions?.find(x=>x.id===action.id);
+        if(remoteQueue){
+          remoteQueue.execution={...(remoteQueue.execution||{}),activeJobId:remoteJob.id};
+          if(remoteAction)remoteAction.remoteJobId=remoteJob.id;
+          project.executionState={...(project.executionState||{}),reconciliationQueue:remoteQueue};
+        }
+        appendExecutionJournal(project,{event:'remote_job_queued',actionId:action.id,status:'queued',executor:contract.executor,message:'Queued action for the remote ProjectX worker.',evidence:[{jobId:remoteJob.id}],outputVersion:project.specVersion});
+        saveProject(project); await syncRemoteProject(project);
+        const cancelStatus=$('#impact-run-status');
+        if(cancelStatus)cancelStatus.innerHTML='Remote worker job '+esc(remoteJob.id.slice(0,8))+'… is running. <button class="ghost" id="impact-cancel-worker">Cancel</button>';
+        $('#impact-cancel-worker')?.addEventListener('click',async()=>{const b=$('#impact-cancel-worker');if(b)b.disabled=true;try{await cancelRemoteExecutionJob(remoteJob.id);if(cancelStatus)cancelStatus.textContent='Cancellation requested. Waiting for the worker to stop safely…';}catch(error){if(cancelStatus)cancelStatus.textContent='Could not cancel: '+String(error.message||error);if(b)b.disabled=false;}});
+        const finishedJob=await waitForRemoteExecutionJob(remoteJob.id);
+        const refreshed=await edge('getProject',{projectId:project.sync?.remoteId||project.id});
+        if(refreshed?.project)Object.assign(project,migrateProject(refreshed.project));
+        const liveQueue=getReconciliationQueue(project);
+        const liveAction=liveQueue?.actions?.find(x=>x.id===action.id);
+        if(liveQueue?.execution?.activeJobId===remoteJob.id)liveQueue.execution.activeJobId=null;
+        if(liveAction?.remoteJobId===remoteJob.id)liveAction.remoteJobId=null;
+        project.executionState={...(project.executionState||{}),reconciliationQueue:liveQueue};
+        result=finishedJob.status==='succeeded'
+          ? {ok:true,message:String(finishedJob.result?.message||'Remote worker completed the action.'),evidence:Array.isArray(finishedJob.result?.evidence)?finishedJob.result.evidence:[],outputVersion:project.specVersion}
+          : {ok:false,error:String(finishedJob.error||'Remote worker failed the action.'),message:String(finishedJob.error||'Remote worker failed the action.'),outputVersion:project.specVersion};
+        remoteHandled=Boolean(liveAction&&['completed','failed','blocked','skipped'].includes(liveAction.status));
+        verificationPassed=verificationPassed||false;
+      }else if(action.type==='rebuild'){
         project.uiNav='build';
         renderProjectTool(project,'build');
         const queueSnapshot=JSON.parse(JSON.stringify(getReconciliationQueue(project)||{}));
@@ -1350,8 +1400,10 @@ async function executeReconciliationQueue(project){
       result={ok:false,error:String(error?.message||error),message:String(error?.message||error),outputVersion:project.specVersion};
     }
 
-    const finished=completeReconciliationAction(project,action.id,result);
-    if(!finished.completed)throw new Error(finished.reason||'Could not record reconciliation result.');
+    if(!remoteHandled){
+      const finished=completeReconciliationAction(project,action.id,result);
+      if(!finished.completed)throw new Error(finished.reason||'Could not record reconciliation result.');
+    }
     executed++;
     appendExecutionJournal(project,{
       event:'action_finished',
