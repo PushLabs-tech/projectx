@@ -2081,15 +2081,43 @@ async function runTests(project){
 function browserRuntimeCheck(files){
   return new Promise(resolve=>{
     const frame=document.createElement('iframe');
-    frame.setAttribute('sandbox','allow-scripts');
     frame.style.cssText='position:fixed;left:-99999px;width:800px;height:600px;opacity:0';
     document.body.appendChild(frame);
-    let settled=false;
-    const finish=result=>{if(settled)return;settled=true;window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove();resolve(result);};
-    const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.',affectedFiles:Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6)});};
-    window.addEventListener('message',onMessage);
-    const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.',affectedFiles:Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6)}),2200);
-    frame.srcdoc=assemblePreviewHtml(files);
+    const sandbox=createRuntimeSandbox(files,{timeoutMs:5000});
+    frame.setAttribute('sandbox',sandbox.iframeAttributes.sandbox);
+    frame.setAttribute('referrerpolicy',sandbox.iframeAttributes.referrerPolicy);
+    const affectedFiles=Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6);
+    const events=[];
+    let finished=false;
+    const cleanupMonitor=createRuntimeMonitor(sandbox.channelId,frame.contentWindow,{
+      onEvent:event=>events.push(event),
+      onError:event=>{
+        if(finished)return;
+        finished=true;
+        cleanup();
+        resolve({name:'Browser runtime',pass:false,detail:event.message||'Runtime error reported by output.',affectedFiles});
+      },
+      onTimeout:()=>{
+        if(finished)return;
+        finished=true;
+        cleanup();
+        resolve({name:'Browser runtime',pass:false,detail:'Sandbox runtime timed out before completing.',affectedFiles});
+      },
+      onComplete:()=>{
+        if(finished)return;
+        finished=true;
+        cleanup();
+        const blocked=events.filter(e=>e.type==='PROJECTX_RUNTIME_BLOCKED_NETWORK').length;
+        resolve({
+          name:'Browser runtime',
+          pass:true,
+          detail:blocked?('Sandbox runtime completed without errors. '+blocked+' network request(s) were blocked by the isolated policy.'): 'Sandbox runtime completed without errors inside the isolated policy.',
+          affectedFiles
+        });
+      }
+    },{timeoutMs:sandbox.timeoutMs});
+    const cleanup=()=>{cleanupMonitor();frame.remove();};
+    frame.srcdoc=sandbox.srcdoc;
   });
 }
 function renderDelivery(project){
