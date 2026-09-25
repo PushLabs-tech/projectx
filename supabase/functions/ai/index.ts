@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, json } from "./_shared/cors.ts";
 import { decryptSecret, encryptSecret } from "./_shared/crypto.ts";
 import { chat as providerChat, listModels as providerListModels, detectProvider, type Credential, type ProviderId } from "./_shared/providers.ts";
-import { deterministicCandidates } from "./_shared/router.ts";
+import { deterministicCandidates, routedCandidates, routingTask } from "./_shared/router.ts";
 import { applyBrainMutationToProject, snapshotForPersistence, validateBrainMutation } from "./_shared/brain.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -10,7 +10,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUB
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
-const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary", "enqueueJob", "getJob", "cancelJob"]);
+const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "getUsageSummary", "enqueueJob", "getJob", "cancelJob", "recordModelFeedback"]);
 const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
@@ -191,6 +191,52 @@ async function credentialsFor(uid: string): Promise<Credential[]> {
     };
   }));
 }
+async function modelFeedbackForUser(uid: string, task: string) {
+  const { data, error } = await admin.from("ai_model_feedback").select("provider,model,task,attempts,successes,failures,verification_passes,verification_failures,total_latency_ms,last_latency_ms,last_outcome,last_error,last_used_at").eq("user_id", uid).eq("task", task).limit(300);
+  if (error) throw error;
+  const out: Record<string, any> = {};
+  for (const row of data || []) {
+    out[`${row.provider}:${row.model}`] = {
+      attempts: Number(row.attempts || 0),
+      successes: Number(row.successes || 0),
+      failures: Number(row.failures || 0),
+      verificationPasses: Number(row.verification_passes || 0),
+      verificationFailures: Number(row.verification_failures || 0),
+      totalLatencyMs: Number(row.total_latency_ms || 0),
+      lastLatencyMs: Number(row.last_latency_ms || 0),
+      avgLatencyMs: Number(row.attempts || 0) ? Number(row.total_latency_ms || 0) / Number(row.attempts || 1) : 0,
+      lastOutcome: row.last_outcome,
+      lastError: row.last_error,
+      lastUsedAt: row.last_used_at
+    };
+  }
+  return out;
+}
+
+async function recordModelFeedback(user: any, body: any) {
+  const projectId = String(body?.projectId || "").trim();
+  if (projectId) await authorizeProject(user, projectId, false);
+  const provider = String(body?.provider || "").trim();
+  const model = String(body?.model || "").trim();
+  const task = routingTask(String(body?.agent || body?.task || "discuss"));
+  const outcome = String(body?.outcome || "").trim();
+  if (!provider || !model || !task || !["success","failure","verification_pass","verification_fail"].includes(outcome)) throw new Error("Invalid model feedback.");
+  const latencyMs = Math.max(0, Math.min(300000, Number(body?.latencyMs || 0)));
+  const { data, error } = await admin.rpc("record_ai_model_feedback", {
+    p_user_id: user.id,
+    p_provider: provider,
+    p_model: model,
+    p_task: task,
+    p_outcome: outcome,
+    p_latency_ms: latencyMs,
+    p_error: body?.error ? String(body.error).slice(0,1000) : null,
+    p_evidence: body?.evidence && typeof body.evidence === "object" ? body.evidence : {}
+  });
+  if (error) throw error;
+  return { ok: true, feedback: data };
+}
+
+
 function safeCredential(r: any) {
   return { provider: r.provider, label: r.label, keyHint: r.key_hint || "••••", baseUrl: r.base_url || null, updatedAt: r.updated_at };
 }
