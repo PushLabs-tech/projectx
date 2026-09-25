@@ -1342,7 +1342,7 @@ async function executeReconciliationQueue(project){
     const started=beginReconciliationAction(project,action.id);
     if(!started.started)throw new Error(started.reason||'Could not start reconciliation action.');
     appendExecutionJournal(project,{event:'action_started',actionId:action.id,status:'running',executor:contract.executor,message:'Executor started.',evidence:[{type:action.type,boundary:contract.boundary,risk:contract.risk,attempt:Number(started.action.attempts||1)}],outputVersion:project.specVersion});
-    let result,remoteHandled=false;
+    let result,remoteHandled=false,finished={action:null,queueStatus:null};
     try{
       if(session?.access_token&&project?.sync?.remoteId&&['rebuild','update','repair'].includes(action.type)){
         const remoteJob=await enqueueRemoteExecutionJob(project,action,contract);
@@ -1371,6 +1371,7 @@ async function executeReconciliationQueue(project){
           ? {ok:true,message:String(finishedJob.result?.message||'Remote worker completed the action.'),model:finishedJob.result?.model?String(finishedJob.result.model):null,provider:finishedJob.result?.provider?String(finishedJob.result.provider):null,evidence:Array.isArray(finishedJob.result?.evidence)?finishedJob.result.evidence:[],outputVersion:project.specVersion}
           : {ok:false,error:String(finishedJob.error||'Remote worker failed the action.'),message:String(finishedJob.error||'Remote worker failed the action.'),model:finishedJob.result?.model?String(finishedJob.result.model):null,provider:finishedJob.result?.provider?String(finishedJob.result.provider):null,outputVersion:project.specVersion};
         remoteHandled=Boolean(liveAction&&['completed','failed','blocked','skipped'].includes(liveAction.status));
+        if(remoteHandled)finished={action:liveAction,queueStatus:liveQueue?.status};
         verificationPassed=verificationPassed||false;
       }else if(action.type==='rebuild'){
         project.uiNav='build';
