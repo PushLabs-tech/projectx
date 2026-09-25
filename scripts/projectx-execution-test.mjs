@@ -54,6 +54,7 @@ assert.equal(rebuild.retryPolicy.maxAttempts,2);
 
 assert.deepEqual(canExecuteAction(rebuild,{projectVersion:7,actionStatus:'pending'}),{allowed:true});
 assert.equal(canExecuteAction(rebuild,{projectVersion:8,actionStatus:'pending'}).reason,'project_version_changed');
+assert.equal(canExecuteAction(rebuild,{projectVersion:7,actionStatus:'pending',actionAttempts:2}).reason,'attempt_limit_reached');
 assert.equal(canExecuteAction(review,{projectVersion:7,actionStatus:'pending'}).reason,'human_review_required');
 assert.equal(shouldRepairAfterFailure({type:'verify',repairCycles:0},verify,'Autonomous'),true);
 assert.equal(shouldRepairAfterFailure({type:'verify',repairCycles:2},verify,'Autonomous'),false);
