@@ -146,12 +146,15 @@ async function execution(user:any, body:any) {
       const result=await providerChat(m.credential,m.id,messages,{providerKey:m.credential.providerKey,maxTokens:Math.min(9000,Number(body?.maxTokens||7000))});
       await admin.from("ai_usage").insert({user_id:user.id,project_id:project.id,action:"execution",provider:m.provider,model:m.id,units:1});
       let parsed:any=null;try{parsed=JSON.parse(result.text);}catch{parsed=parseDiscoveryJson(result.text);}
-      if(!parsed || !Array.isArray(parsed.toolCalls)){
-        await writeModelFeedback(user.id,m.provider,m.id,routeTask,"failure",Date.now()-startedAt,"invalid execution tool-call JSON",{execution:true,schema:true});
-        throw new Error("Execution model returned invalid tool-call JSON.");
+      const writeCalls=Array.isArray(parsed?.toolCalls)?parsed.toolCalls.filter((x:any)=>String(x?.tool||"")==="write_file"):[]; 
+      if(!parsed || !Array.isArray(parsed.toolCalls) || (action?.type==='repair' && !writeCalls.length)){
+        await writeModelFeedback(user.id,m.provider,m.id,routeTask,"failure",Date.now()-startedAt,action?.type==='repair'?"repair plan returned no write_file operation":"invalid execution tool-call JSON",{execution:true,schema:true,actionType:action?.type});
+        throw new Error(action?.type==='repair'?"Repair planner returned no patch.":"Execution model returned invalid tool-call JSON.");
       }
-      await writeModelFeedback(user.id,m.provider,m.id,routeTask,"success",Date.now()-startedAt,null,{execution:true,actionType:action?.type});
-      return {ok:true,message:String(parsed.message||"Execution plan prepared."),diagnosis:parsed.diagnosis&&typeof parsed.diagnosis==="object"?parsed.diagnosis:{},repairPlan:parsed.repairPlan&&typeof parsed.repairPlan==="object"?parsed.repairPlan:null,toolCalls:parsed.toolCalls.slice(0,24),evidence:Array.isArray(parsed.evidence)?parsed.evidence.slice(0,12):[],model:m.id,provider:m.provider,attempted};
+      const diagnosis=parsed.diagnosis&&typeof parsed.diagnosis==="object"?parsed.diagnosis:{};
+      const repairPlan=parsed.repairPlan&&typeof parsed.repairPlan==="object"?parsed.repairPlan:null;
+      await writeModelFeedback(user.id,m.provider,m.id,routeTask,"success",Date.now()-startedAt,null,{execution:true,actionType:action?.type,diagnosis:Boolean(Object.keys(diagnosis).length)});
+      return {ok:true,message:String(parsed.message||"Execution plan prepared."),diagnosis,repairPlan,toolCalls:parsed.toolCalls.slice(0,24),evidence:Array.isArray(parsed.evidence)?parsed.evidence.slice(0,12):[],model:m.id,provider:m.provider,attempted};
     }catch(e){
       last=e;
       await writeModelFeedback(user.id,m.provider,m.id,routeTask,"failure",Date.now()-startedAt,e instanceof Error?e.message:String(e),{execution:true,providerError:true,actionType:action?.type});
