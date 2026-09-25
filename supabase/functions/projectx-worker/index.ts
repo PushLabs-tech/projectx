@@ -28,6 +28,32 @@ async function isCancelled(jobId: string) {
   if (error) throw error;
   return data?.status === "cancelled" || Boolean(data?.cancel_requested);
 }
+async function renewLease(job:any) {
+  if (!job?.id || !job?.lease_token) return;
+  const { error } = await db.rpc("renew_project_job_lease", {
+    p_id: job.id,
+    p_lease_token: job.lease_token,
+    p_extension_seconds: Math.max(30, Math.min(300, Number(job.timeout_seconds || DEFAULT_TIMEOUT_SECONDS)))
+  });
+  if (error) throw error;
+}
+async function startLeaseHeartbeat(job:any) {
+  if (!job?.id || !job?.lease_token) return () => {};
+  const intervalMs=Math.max(10000,Math.min(60000,Math.floor(Number(job.timeout_seconds || DEFAULT_TIMEOUT_SECONDS)*1000/3)));
+  let stopped=false;
+  let chain=Promise.resolve();
+  const timer=setInterval(() => {
+    if (stopped) return;
+    chain=chain.then(() => renewLease(job)).catch(() => {});
+  }, intervalMs);
+  return () => { stopped=true; clearInterval(timer); };
+}
+async function assertLease(job:any) {
+  if (!job?.lease_token) return;
+  const { data, error } = await db.rpc("assert_project_job_lease", { p_id:job.id, p_lease_token:job.lease_token });
+  if (error) throw error;
+  if (data !== true) throw new Error("Execution lease expired before commit.");
+}
 async function loadProject(projectId: string) {
   const { data, error } = await db.from("projects").select("id,spec_version,project_type,settings,status").eq("id", projectId).maybeSingle();
   if (error) throw error;
@@ -37,6 +63,7 @@ async function loadProject(projectId: string) {
   return { ...data, specVersion:Number(data.spec_version || 1), type:String(data.project_type || "Other"), files:Object.fromEntries((files || []).map((f:any)=>[String(f.path),String(f.content ?? "")])), settings:data.settings && typeof data.settings==="object" ? data.settings : {} };
 }
 async function commitExecution(project:any,userId:string,job:any,action:any,executor:string,status:string,settings:any,ops:any[],event:string,tool:string|null,message:string,evidence:any[]) {
+  await assertLease(job);
   const { data, error } = await db.rpc("commit_project_execution", { p_project_id:project.id,p_user_id:userId,p_base_version:Number(project.specVersion||1),p_job_id:job.id,p_action_id:String(action?.id||""),p_executor:executor,p_status:status,p_settings:settings,p_file_operations:ops,p_event:event,p_tool:tool,p_message:message,p_evidence:evidence.slice(0,20) });
   if (error) throw error;
   return data;
@@ -55,7 +82,9 @@ async function invokeAI(token:string,job:any,project:any,contract:any) {
 }
 async function executeExecutionJob(token:string,job:any) {
   if (!job.project_id) throw new Error("Execution jobs require a project.");
-  if (await isCancelled(job.id)) { await db.rpc("finish_project_job",{p_id:job.id,p_status:"cancelled",p_result:{reason:"cancel_requested"},p_error:null,p_retry_seconds:60}); return {id:job.id,status:"cancelled"}; }
+  const stopHeartbeat=await startLeaseHeartbeat(job);
+  try {
+  if (await isCancelled(job.id)) { await db.rpc("finish_project_job",{p_id:job.id,p_status:"cancelled",p_result:{reason:"cancel_requested"},p_error:null,p_retry_seconds:60,p_lease_token:job.lease_token}); return {id:job.id,status:"cancelled"}; }
   const project=await loadProject(String(job.project_id));
   const payload=job.payload && typeof job.payload==="object" ? job.payload : {};
   const contract=payload.contract && typeof payload.contract==="object" ? payload.contract : {};
@@ -103,9 +132,12 @@ async function executeExecutionJob(token:string,job:any) {
   const committed=await commitExecution(project,job.user_id,job,action,executor,"completed",finished,execution.operations,"action_finished",execution.operations.length?"write_file":null,result.message,evidence);
   if (committed?.status==="stale") throw new Error("Project changed while committing the worker result.");
   const transactionId=committed?.transactionId ? String(committed.transactionId) : null;
-  const { error: finishError } = await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:{actionId:contract.actionId,executor,model:result.model,provider:result.provider,diagnosis:result.diagnosis,repairPlan:result.repairPlan,message:result.message,evidence:evidence.slice(0,20),filesChanged:execution.operations.map((op:any)=>op.path),outputVersion:project.specVersion,transactionId},p_error:null,p_retry_seconds:60});
+  const { error: finishError } = await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:{actionId:contract.actionId,executor,model:result.model,provider:result.provider,diagnosis:result.diagnosis,repairPlan:result.repairPlan,message:result.message,evidence:evidence.slice(0,20),filesChanged:execution.operations.map((op:any)=>op.path),outputVersion:project.specVersion,transactionId},p_error:null,p_retry_seconds:60,p_lease_token:job.lease_token});
   if (finishError) throw finishError;
   return {id:job.id,status:"succeeded",actionId:contract.actionId,executor,filesChanged:execution.operations.map((op:any)=>op.path),transactionId};
+  } finally {
+    stopHeartbeat();
+  }
 }
 async function proxyQueuedJob(token:string,job:any) {
   const controller=new AbortController();
@@ -115,7 +147,7 @@ async function proxyQueuedJob(token:string,job:any) {
     const response=await fetch(SUPABASE_URL + "/functions/v1/ai",{method:"POST",headers:{"Content-Type":"application/json","X-ProjectX-Worker-Token":token},body:JSON.stringify({action:"runQueuedJob",userId:job.user_id,kind:job.kind,payload:job.payload}),signal:controller.signal});
     const raw=await response.text(); let payload:any={}; try{payload=raw?JSON.parse(raw):{};}catch{payload={raw:raw.slice(0,2000)};}
     if(!response.ok || payload?.ok===false)throw new Error(String(payload?.error || "Queued job failed"));
-    const {error}=await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:payload?.result ?? payload,p_error:null,p_retry_seconds:60}); if(error)throw error;
+    const {error}=await db.rpc("finish_project_job",{p_id:job.id,p_status:"succeeded",p_result:payload?.result ?? payload,p_error:null,p_retry_seconds:60,p_lease_token:job.lease_token}); if(error)throw error;
     return {id:job.id,status:"succeeded"};
   } finally { clearTimeout(timer); }
 }
@@ -129,7 +161,7 @@ async function run(limit:number,token:string) {
       const message=error instanceof Error?error.message:String(error);
       const cancelled=await isCancelled(job.id).catch(()=>false);
       const status=cancelled?"cancelled":"failed";
-      const {error:finishError}=await db.rpc("finish_project_job",{p_id:job.id,p_status:status,p_result:{},p_error:message,p_retry_seconds:Math.min(900,30*Math.max(1,Number(job.attempts||1)))});
+      const {error:finishError}=await db.rpc("finish_project_job",{p_id:job.id,p_status:status,p_result:{},p_error:message,p_retry_seconds:Math.min(900,30*Math.max(1,Number(job.attempts||1))),p_lease_token:job.lease_token});
       results.push({id:job.id,status:finishError?"finish_error":status,error:message});
     }
   }
