@@ -102,7 +102,7 @@ async function executeExecutionJob(token:string,job:any) {
   if (await isCancelled(job.id)) {
     const blocked=buildExecutionSettings(runningSettings,{...action,id:contract.actionId},{kind:action.type,ok:false,error:"cancel_requested",message:"Execution cancelled.",evidence:[{reason:"cancel_requested"}],outputVersion:project.specVersion},"blocked");
     await commitExecution(project,job.user_id,job,action,executor,"blocked",blocked,[],"action_cancelled",null,"Execution cancelled before tool execution.",[{reason:"cancel_requested"}]);
-    await db.rpc("finish_project_job",{p_id:job.id,p_status:"cancelled",p_result:{reason:"cancel_requested"},p_error:null,p_retry_seconds:60});
+    await db.rpc("finish_project_job",{p_id:job.id,p_status:"cancelled",p_result:{reason:"cancel_requested"},p_error:null,p_retry_seconds:60,p_lease_token:job.lease_token});
     return {id:job.id,status:"cancelled"};
   }
   const ai=await invokeAI(token,job,project,contract);
