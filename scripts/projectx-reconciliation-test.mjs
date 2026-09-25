@@ -170,7 +170,8 @@ console.log('PROJECTX RECONCILIATION CONTRACT PASSED');
 
 
 const queueRun=createReconciliationRun(project);
-assert.equal(queueRun.created,true);
+assert.ok(queueRun.queue,'a durable queue should exist after mutation');
+assert.ok(queueRun.created||queueRun.reason==='queue_exists');
 assert.ok(queueRun.queue.actions.length>0);
 const firstReady=project.executionState.reconciliationQueue.actions.find(a=>a.status==='pending');
 assert.ok(firstReady);
@@ -187,3 +188,14 @@ assert.equal(duplicate.created,false);
 console.log('PASS: reconciliation queue is durable and deduplicated');
 console.log('PASS: action lifecycle supports execution results');
 console.log('PASS: failed reconciliation actions can be retried');
+
+
+const queueTarget=Number(project.executionState.reconciliationQueue.targetVersion);
+const savedVersion=project.specVersion;
+project.specVersion=savedVersion+1;
+const staleStart=beginReconciliationAction(project,project.executionState.reconciliationQueue.actions.find(a=>a.status==='pending')?.id||'missing');
+assert.equal(staleStart.started,false);
+assert.equal(staleStart.reason,'queue_stale');
+project.specVersion=savedVersion;
+assert.equal(Number(project.executionState.reconciliationQueue.targetVersion),queueTarget);
+console.log('PASS: stale queues cannot execute against a newer project version');
