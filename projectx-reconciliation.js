@@ -48,7 +48,8 @@ function explicitRefs(value) {
     ...(Array.isArray(value.relatedTo)?value.relatedTo:[]),
     ...(Array.isArray(value.affectedFiles)?value.affectedFiles:[]),
     ...(Array.isArray(value.affectedArtifacts)?value.affectedArtifacts:[]),
-    ...(Array.isArray(value.nodeIds)?value.nodeIds:[])
+    ...(Array.isArray(value.nodeIds)?value.nodeIds:[]),
+    ...(Array.isArray(value.dependencyNodeIds)?value.dependencyNodeIds:[])
   ];
   return raw.map(v=>text(typeof v==='object'?(v.id||v.key||v.name||v.title):v)).filter(Boolean);
 }
@@ -179,7 +180,9 @@ function buildStateGraph(project={}) {
   for (const task of idsByKind('task')) {
     const value=task.value||{};
     for (const ref of explicitRefs(value)) {
-      if (ref.startsWith('task:')) addEdge(edges,task.id,ref,'depends_on','Task declares a dependency.');
+      if (nodes.has(ref) && /^input:|^spec:|^goal:|^user:|^requirement:|^constraint:|^feature:|^decision:|^dependency:|^resource:|^asset:|^deliverable:|^acceptance:|^success:|^question:|^platform:|^technology:|^visual:|^state:/.test(ref)) {
+        addEdge(edges,ref,task.id,'requires','Task explicitly depends on this project input.');
+      } else if (ref.startsWith('task:')) addEdge(edges,task.id,ref,'depends_on','Task declares a dependency.');
       else if (ref.startsWith('artifact:')) addEdge(edges,task.id,ref,'implements','Task declares an affected artifact.');
       else if (ref.startsWith('file:')) addEdge(edges,task.id,ref,'implements','Task declares an affected file.');
       else {
@@ -207,6 +210,11 @@ function buildStateGraph(project={}) {
     for (const dep of Array.isArray(item.dependencyNodeIds)?item.dependencyNodeIds:[]) {
       if(nodes.has(dep)) addEdge(edges,dep,artifact.id,'supports','Artifact declares its dependency.');
     }
+  }
+
+  for (const test of idsByKind('test')) {
+    const refs=Array.isArray(test.value?.dependencyNodeIds)?test.value.dependencyNodeIds:[];
+    for(const ref of refs) if(nodes.has(ref)) addEdge(edges,ref,test.id,'verifies','Verification explicitly covers this project node.');
   }
 
   // Explicit dependency references in decisions/requirements/etc are honored.
