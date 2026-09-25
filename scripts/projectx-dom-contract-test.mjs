@@ -56,7 +56,7 @@ assert.match(appCss, /\.project\.px-work/);
 assert.match(runtime, /function validDiscoveryPollLocal/);
 assert.match(runtime, /Describe in your own words/);
 assert.match(runtime, /options\.length!==4/);
-assert.match(runtime, /renderedOptions=\[\.\.\.options,'Describe in your own words'\]/);
+assert.match(runtime, /renderedOptions=\[\.\.\.options,'Something else'\]/);
 
 assert.match(ui, /export function authMarkup/);
 assert.match(ui, /id="auth-email"/);
