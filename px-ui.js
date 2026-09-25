@@ -148,7 +148,7 @@ export function publicMarkup() {
     <div class="kicker">FAQ</div>
     <details open><summary>What happens after I describe an outcome?</summary><p>ProjectX opens discovery: one contextual decision at a time, four AI options plus “Describe in your own words.” A project brain is written only after valid discovery.</p></details>
     <details><summary>Do I need an AI key?</summary><p>No, to open the workspace. Discovery and Agent work need a connected provider, a guest Gemini key in this browser, or a signed-in vault. Without AI you can still create a local draft project and inspect files.</p></details>
-    <details><summary>Does ProjectX run my app on a cloud VM?</summary><p>Browser-safe previews run in a sandboxed iframe. Isolated workers are not claimed. Export is available until a host is connected.</p></details>
+    <details><summary>Does ProjectX run my app on a cloud VM?</summary><p>Browser-safe previews run in a sandboxed iframe. Connected GitHub repositories can also run an exact snapshot in an ephemeral isolated build runner. Export remains available until a host is connected.</p></details>
   </section>
   <section class="px-how">
     <div class="kicker">FREE STACK</div>
