@@ -1,0 +1,192 @@
+name: ProjectX Isolated Build
+
+on:
+  repository_dispatch:
+    types: [projectx_build]
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Commit SHA to verify
+        required: true
+        type: string
+      projectx_run_id:
+        description: ProjectX build-run identifier
+        required: false
+        type: string
+      ref:
+        description: Git ref containing the commit
+        required: false
+        type: string
+        default: main
+
+run-name: ProjectX build \${{ github.event.client_payload.projectx_run_id || inputs.projectx_run_id || github.run_id }}
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: projectx-build-\${{ github.repository }}-\${{ github.event.client_payload.commit_sha || inputs.commit_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact ProjectX snapshot
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.client_payload.commit_sha || inputs.commit_sha || github.event.client_payload.ref || inputs.ref || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run isolated build and tests
+        id: verify
+        shell: bash
+        env:
+          GITHUB_TOKEN: ""
+          GH_TOKEN: ""
+          PROJECTX_BUILD_RUN_ID: \${{ github.event.client_payload.projectx_run_id || inputs.projectx_run_id || github.run_id }}
+          PROJECTX_COMMIT_SHA: \${{ github.event.client_payload.commit_sha || inputs.commit_sha || github.sha }}
+        run: |
+          set +e
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { spawnSync } from 'node:child_process';
+
+          const startedAt = new Date().toISOString();
+          const evidence = {
+            version: 1,
+            runner: 'projectx-github-actions',
+            runId: process.env.PROJECTX_BUILD_RUN_ID || '',
+            commitSha: process.env.PROJECTX_COMMIT_SHA || '',
+            node: process.version,
+            platform: process.platform,
+            startedAt,
+            packageManager: null,
+            steps: [],
+            failures: []
+          };
+
+          const root = process.cwd();
+          const packagePath = path.join(root, 'package.json');
+          const pkg = fs.existsSync(packagePath)
+            ? JSON.parse(fs.readFileSync(packagePath, 'utf8'))
+            : null;
+          const scripts = pkg?.scripts && typeof pkg.scripts === 'object' ? pkg.scripts : {};
+          const has = name => Object.prototype.hasOwnProperty.call(scripts, name);
+
+          function run(label, command, args, timeout = 240000) {
+            const start = Date.now();
+            const result = spawnSync(command, args, {
+              cwd: root,
+              stdio: 'inherit',
+              shell: process.platform === 'win32',
+              timeout,
+              env: {
+                ...process.env,
+                GITHUB_TOKEN: '',
+                GH_TOKEN: '',
+                NODE_AUTH_TOKEN: ''
+              }
+            });
+            const timedOut = result.error?.code === 'ETIMEDOUT';
+            const code = timedOut ? 124 : (typeof result.status === 'number' ? result.status : 1);
+            const row = {
+              label,
+              command: [command, ...args].join(' '),
+              exitCode: code,
+              timedOut,
+              durationMs: Date.now() - start
+            };
+            evidence.steps.push(row);
+            if (code !== 0) evidence.failures.push(row);
+            return code;
+          }
+
+          try {
+            if (pkg) {
+              if (fs.existsSync(path.join(root, 'pnpm-lock.yaml'))) {
+                evidence.packageManager = 'pnpm';
+                run('Enable Corepack', 'corepack', ['enable'], 60000);
+                if (has('install')) run('Install dependencies', 'corepack', ['pnpm', 'install', '--frozen-lockfile'], 300000);
+                else run('Install dependencies', 'corepack', ['pnpm', 'install', '--frozen-lockfile'], 300000);
+              } else if (fs.existsSync(path.join(root, 'yarn.lock'))) {
+                evidence.packageManager = 'yarn';
+                run('Enable Corepack', 'corepack', ['enable'], 60000);
+                run('Install dependencies', 'corepack', ['yarn', 'install', '--immutable'], 300000);
+              } else {
+                evidence.packageManager = 'npm';
+                const installer = fs.existsSync(path.join(root, 'package-lock.json')) ? ['ci'] : ['install'];
+                run('Install dependencies', 'npm', installer, 300000);
+              }
+
+              if (has('build')) run('Build', 'npm', ['run', 'build'], 300000);
+              if (has('test')) run('Test', 'npm', ['test'], 300000);
+              else if (has('check')) run('Check', 'npm', ['run', 'check'], 300000);
+              const deps = {
+                ...((pkg && pkg.dependencies) || {}),
+                ...((pkg && pkg.devDependencies) || {})
+              };
+              const usesPlaywright = Boolean(deps['@playwright/test'] || deps.playwright);
+              if (has('e2e') && usesPlaywright) run('Install Chromium', 'npx', ['playwright', 'install', '--with-deps', 'chromium'], 300000);
+              if (has('e2e')) run('Browser E2E', 'npm', ['run', 'e2e'], 300000);
+            } else {
+              evidence.packageManager = 'none';
+              const indexPath = fs.existsSync(path.join(root, 'index.html'))
+                ? path.join(root, 'index.html')
+                : null;
+              if (!indexPath) {
+                const row = { label: 'Static entry', exitCode: 1, detail: 'No package.json or index.html found.' };
+                evidence.steps.push(row);
+                evidence.failures.push(row);
+              } else {
+                const html = fs.readFileSync(indexPath, 'utf8');
+                const row = {
+                  label: 'Static entry',
+                  exitCode: /<html[\\s>]/i.test(html) && /<body[\\s>]/i.test(html) ? 0 : 1,
+                  detail: 'index.html structural check'
+                };
+                evidence.steps.push(row);
+                if (row.exitCode !== 0) evidence.failures.push(row);
+              }
+            }
+          } catch (error) {
+            evidence.failures.push({ label: 'Runner', exitCode: 1, detail: String(error?.message || error) });
+          }
+
+          evidence.finishedAt = new Date().toISOString();
+          evidence.passed = evidence.failures.length === 0;
+          fs.writeFileSync(path.join(root, 'projectx-build-evidence.json'), JSON.stringify(evidence, null, 2));
+          process.stdout.write(JSON.stringify(evidence, null, 2));
+          NODE
+
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: projectx-build-evidence
+          path: projectx-build-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce verification result
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const evidence = JSON.parse(fs.readFileSync('projectx-build-evidence.json', 'utf8'));
+          if (!evidence.passed) {
+            console.error('ProjectX isolated verification failed.');
+            process.exit(1);
+          }
+          console.log('ProjectX isolated verification passed.');
+          NODE
