@@ -1285,7 +1285,7 @@ async function executeReconciliationQueue(project){
 
     const action=ready[0];
     const contract=plan.contracts.find(x=>x.actionId===action.id)||createActionContract(project,action,{mode,targetVersion:queue.targetVersion});
-    const gate=canExecuteAction(contract,{projectVersion:project.specVersion,actionStatus:'pending',humanApproval:false});
+    const gate=canExecuteAction(contract,{projectVersion:project.specVersion,actionStatus:'pending',actionAttempts:Number(action.attempts||0),humanApproval:false});
     if(!gate.allowed){
       const started=beginReconciliationAction(project,action.id);
       if(!started.started)throw new Error(started.reason||'Could not start reconciliation action.');
