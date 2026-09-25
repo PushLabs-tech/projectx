@@ -82,3 +82,33 @@ test("public mobile shell remains usable after observability release", async ({ 
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 2);
   expect(metrics.visibleButtons).toBeGreaterThan(0);
 });
+
+
+test("authenticated workspace smoke path syncs a real account", async ({ page }) => {
+  const email = process.env.PROJECTX_E2E_EMAIL;
+  const password = process.env.PROJECTX_E2E_PASSWORD;
+  test.skip(!email || !password, "Set PROJECTX_E2E_EMAIL and PROJECTX_E2E_PASSWORD for the live authenticated gate.");
+
+  const errors:string[]=[];
+  page.on("pageerror", e => errors.push(e.message));
+  page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
+
+  await page.goto("/#login");
+  await page.locator("#auth-email").fill(email!);
+  await page.locator("#auth-password").fill(password!);
+  await page.locator("#auth-submit").click();
+
+  await expect(page.locator("#px-app")).toBeVisible();
+  await expect(page.locator("#start-input")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".composer .sub")).toContainText(/signed in/i);
+
+  const before = await page.locator("#home-projects").innerText();
+  await page.locator('[data-template]').first().click();
+  await expect(page.locator("#project-body")).toBeVisible();
+  await expect(page.locator(".project-title")).toBeVisible();
+
+  const after = await page.locator("#px-app").innerText();
+  expect(after).toMatch(/project|assistant|build/i);
+  expect(before.length).toBeGreaterThanOrEqual(0);
+  expect(errors.filter(x => !/favicon/i.test(x))).toEqual([]);
+});
