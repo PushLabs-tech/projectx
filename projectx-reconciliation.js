@@ -1,0 +1,339 @@
+const INPUT_DEFS = [
+  ['goal','Goal','goal'],['users','Users','user'],['requirements','Requirements','requirement'],['constraints','Constraints','constraint'],
+  ['features','Features','feature'],['decisions','Decisions','decision'],['dependencies','Dependencies','dependency'],['resources','Resources','resource'],
+  ['assets','Assets','asset'],['deliverables','Deliverables','deliverable'],['acceptanceCriteria','Acceptance criteria','acceptance'],
+  ['successCriteria','Success criteria','success'],['openQuestions','Open questions','question'],['platform','Platform','platform'],
+  ['technology','Technology','technology'],['visualDirection','Visual direction','visual'],['currentState','Current state','state']
+];
+const SCALAR_FIELDS = new Set(['goal','platform','visualDirection','currentState']);
+const ARRAY_FIELDS = new Set(INPUT_DEFS.filter(([field])=>!SCALAR_FIELDS.has(field)).map(([field])=>field));
+const KIND_TO_LABEL = Object.fromEntries(INPUT_DEFS.map(([,label,kind])=>[kind,label]));
+const slug = value => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,96) || 'item';
+const digest = value => {
+  const s = typeof value === 'string' ? value : JSON.stringify(value ?? null);
+  let h = 2166136261;
+  for (let i=0;i<s.length;i++) { h ^= s.charCodeAt(i); h = Math.imul(h,16777619); }
+  return s.length+':'+(h>>>0).toString(16);
+};
+const clone = value => JSON.parse(JSON.stringify(value ?? null));
+const arr = value => Array.isArray(value) ? value : [];
+const text = value => String(value ?? '').trim();
+const meaningful = value => Array.isArray(value) ? value.length > 0 : text(value).length > 0;
+
+function stableItemId(kind, value, index) {
+  const raw = value && typeof value === 'object'
+    ? (value.id || value.key || value.name || value.title || value.url || value.finding || value.content)
+    : value;
+  return kind+':'+slug(raw || index);
+}
+
+function addNode(map, node) {
+  if (!node?.id) return;
+  const existing = map.get(node.id);
+  if (!existing) map.set(node.id,node);
+}
+
+function addEdge(map, from, to, relation, reason, confidence='structural') {
+  if (!from || !to || from===to) return;
+  const key = from+'|'+to+'|'+relation;
+  if (!map.has(key)) map.set(key,{from,to,relation,reason:reason||'Project dependency',confidence});
+}
+
+function explicitRefs(value) {
+  if (!value || typeof value !== 'object') return [];
+  const raw = [
+    ...(Array.isArray(value.dependsOn)?value.dependsOn:[]),
+    ...(Array.isArray(value.dependencies)?value.dependencies:[]),
+    ...(Array.isArray(value.requires)?value.requires:[]),
+    ...(Array.isArray(value.relatedTo)?value.relatedTo:[]),
+    ...(Array.isArray(value.affectedFiles)?value.affectedFiles:[]),
+    ...(Array.isArray(value.affectedArtifacts)?value.affectedArtifacts:[]),
+    ...(Array.isArray(value.nodeIds)?value.nodeIds:[])
+  ];
+  return raw.map(v=>text(typeof v==='object'?(v.id||v.key||v.name||v.title):v)).filter(Boolean);
+}
+
+function buildStateGraph(project={}) {
+  const nodes = new Map();
+  const edges = new Map();
+  const spec = project.spec || {};
+  const addCollection = (field,label,kind) => {
+    for (const [index,value] of arr(spec[field]).entries()) {
+      const id = stableItemId(kind,value,index);
+      addNode(nodes,{id,kind,label:typeof value==='string'?value:text(value.name||value.title||value.url||value.finding||value.content||id),source:'spec.'+field,signature:digest(value),value:clone(value),version:Number(project.specVersion||1)});
+    }
+  };
+
+  for (const [field,label,kind] of INPUT_DEFS) {
+    if (SCALAR_FIELDS.has(field)) {
+      if (meaningful(spec[field])) addNode(nodes,{id:'spec:'+field,kind,label: text(spec[field]).slice(0,180),source:'spec.'+field,signature:digest(spec[field]),value:spec[field],version:Number(project.specVersion||1)});
+    } else addCollection(field,label,kind);
+  }
+  if (text(project.title)) addNode(nodes,{id:'project:title',kind:'projectType',label:'Title: '+text(project.title),source:'project.title',signature:digest(project.title),version:Number(project.specVersion||1)});
+  if (text(project.type)) addNode(nodes,{id:'project:type',kind:'projectType',label:'Type: '+text(project.type),source:'project.type',signature:digest(project.type),version:Number(project.specVersion||1)});
+
+  for (const [index,item] of arr(project.plan).entries()) {
+    const id='plan:'+(text(item?.id||item?.key)||slug(item?.title||item?.name)||index);
+    addNode(nodes,{id,kind:'plan',label:text(item?.title||item?.name||item)||('Plan '+(index+1)),source:'plan',signature:digest(item),value:clone(item),version:Number(project.specVersion||1)});
+  }
+
+  for (const [index,item] of arr(project.executionState?.tasks).entries()) {
+    const id='task:'+(text(item?.id||item?.key)||slug(item?.title||item?.name)||index);
+    addNode(nodes,{id,kind:'task',label:text(item?.title||item?.name||item)||('Task '+(index+1)),source:'executionState.tasks',signature:digest({
+      title:item?.title,description:item?.description,dependencies:item?.dependencies,affectedFiles:item?.affectedFiles,affectedArtifacts:item?.affectedArtifacts
+    }),value:clone(item),version:Number(project.specVersion||1)});
+  }
+
+  const artifacts = project.artifacts || {};
+  for (const [key,item] of Object.entries(artifacts)) {
+    const id='artifact:'+slug(key);
+    addNode(nodes,{id,kind:'artifact',label:text(item?.summary||item?.name||key),source:'artifacts.'+key,signature:digest({
+      kind:item?.kind,summary:item?.summary,deliverables:item?.deliverables,filePaths:item?.filePaths,entry:item?.entry,dependencyNodeIds:item?.dependencyNodeIds
+    }),value:clone(item),version:Number(item?.specVersion||project.specVersion||1)});
+  }
+  const outputs = project.outputs || {};
+  for (const [key,item] of Object.entries(outputs)) {
+    const id='output:'+slug(key);
+    addNode(nodes,{id,kind:'output',label:text(item?.summary||item?.name||key),source:'outputs.'+key,signature:digest({
+      kind:item?.kind,summary:item?.summary,filePaths:item?.filePaths,dependencyNodeIds:item?.dependencyNodeIds
+    }),value:clone(item),version:Number(item?.specVersion||project.specVersion||1)});
+  }
+  for (const path of Object.keys(project.files || {})) {
+    addNode(nodes,{id:'file:'+path,kind:'file',label:path,source:'files.'+path,signature:digest(String(project.files[path]??'')),value:String(project.files[path]??''),version:Number(project.specVersion||1)});
+  }
+  for (const [index,item] of arr(project.tests?.results).entries()) {
+    const id='test:'+slug(item?.id||item?.name||index);
+    addNode(nodes,{id,kind:'test',label:text(item?.name)||('Verification '+(index+1)),source:'tests.results',signature:digest({
+      name:item?.name,detail:item?.detail,evidence:item?.evidence,requiredHumanReview:item?.requiredHumanReview,checkType:item?.checkType
+    }),value:clone(item),version:Number(project.tests?.specVersion||project.specVersion||1)});
+  }
+  for (const [index,item] of arr(project.research?.findings).entries()) {
+    const id='evidence:'+slug(item?.id||item?.sourceUrl||item?.url||item?.finding||index);
+    addNode(nodes,{id,kind:'evidence',label:text(item?.finding||item?.title||item?.sourceUrl||item?.url)||('Evidence '+(index+1)),source:'research.findings',signature:digest(item),value:clone(item),version:Number(project.specVersion||1)});
+  }
+  for (const [index,item] of arr(project.executionState?.uncertainties).entries()) {
+    const id='uncertainty:'+slug(item?.id||item?.path||index);
+    addNode(nodes,{id,kind:'uncertainty',label:text(item?.reason||item?.path)||('Uncertainty '+(index+1)),source:'executionState.uncertainties',signature:digest(item),value:clone(item),version:Number(project.specVersion||1)});
+  }
+
+  const idsByKind = kind => [...nodes.values()].filter(n=>n.kind===kind);
+  const bySource = source => [...nodes.values()].filter(n=>n.source===source);
+  const linkAll = (fromKind,toKind,relation,reason) => {
+    for (const from of idsByKind(fromKind)) for (const to of idsByKind(toKind)) addEdge(edges,from.id,to.id,relation,reason);
+  };
+
+  // Mission inputs constrain or inform downstream decisions.
+  for (const k of ['goal','user','constraint','requirement','feature','dependency','resource','asset','platform','technology','visual','state']) {
+    const from = k==='goal' ? nodes.get('spec:goal') : null;
+    if (from) {
+      for (const to of [...idsByKind('decision'),...idsByKind('requirement'),...idsByKind('constraint'),...idsByKind('deliverable')]) {
+        addEdge(edges,from.id,to.id,'influences','Goal shapes project decisions and outputs.');
+      }
+    }
+  }
+  linkAll('constraint','decision','constrains','Constraints bound project decisions.');
+  linkAll('requirement','decision','requires','Requirements must be satisfied by decisions or work.');
+  linkAll('feature','decision','influences','Features influence implementation decisions.');
+  linkAll('decision','task','produces','Decisions create or change executable work.');
+  linkAll('decision','artifact','implements','Decisions are reflected in project artifacts.');
+  linkAll('decision','output','implements','Decisions are reflected in project outputs.');
+  linkAll('deliverable','artifact','produces','Deliverables are represented by artifacts.');
+  linkAll('deliverable','output','produces','Deliverables are represented by outputs.');
+  linkAll('acceptance','test','verifies','Acceptance criteria define verification checks.');
+  linkAll('success','test','verifies','Success criteria define verification checks.');
+  linkAll('requirement','task','requires','Requirements create necessary work.');
+  linkAll('constraint','task','constrains','Constraints bound executable work.');
+  linkAll('platform','file','requires','Platform choices constrain implementation files.');
+  linkAll('technology','file','requires','Technology choices constrain implementation files.');
+  linkAll('visual','file','influences','Visual direction influences implementation files.');
+  linkAll('artifact','test','verifies','Artifacts should be verified before delivery.');
+  linkAll('output','test','verifies','Outputs should be verified before delivery.');
+  linkAll('file','test','verifies','Files are covered by runtime or content checks.');
+  linkAll('evidence','decision','supports','Evidence can support project decisions.');
+  linkAll('uncertainty','decision','uncertainty_affects','Uncertainties should be resolved before dependent decisions.');
+
+  // Plan-to-task and explicit task/artifact/file links.
+  for (const task of idsByKind('task')) {
+    const value=task.value||{};
+    for (const ref of explicitRefs(value)) {
+      if (ref.startsWith('task:')) addEdge(edges,task.id,ref,'depends_on','Task declares a dependency.');
+      else if (ref.startsWith('artifact:')) addEdge(edges,task.id,ref,'implements','Task declares an affected artifact.');
+      else if (ref.startsWith('file:')) addEdge(edges,task.id,ref,'implements','Task declares an affected file.');
+      else {
+        const match=idsByKind('task').find(n=>slug(n.id)===slug(ref)||slug(n.label)===slug(ref));
+        if(match) addEdge(edges,task.id,match.id,'depends_on','Task declares a dependency.');
+        const file=idsByKind('file').find(n=>n.id==='file:'+ref||n.label===ref);
+        if(file) addEdge(edges,task.id,file.id,'implements','Task declares an affected file.');
+      }
+    }
+  }
+  for (const plan of idsByKind('plan')) {
+    const match=idsByKind('task').filter(task=>{
+      const p=slug(plan.label), t=slug(task.label);
+      return p && t && (p.includes(t)||t.includes(p));
+    });
+    for (const task of match.slice(0,6)) addEdge(edges,plan.id,task.id,'requires','Plan item maps to executable task.');
+  }
+  for (const artifact of [...idsByKind('artifact'),...idsByKind('output')]) {
+    const item=artifact.value||{};
+    const paths=Array.isArray(item.filePaths)?item.filePaths:[item.entry];
+    for (const path of paths.filter(Boolean)) {
+      const file=nodes.get('file:'+String(path));
+      if(file) addEdge(edges,artifact.id,file.id,'produces','Artifact declares its file output.');
+    }
+    for (const dep of Array.isArray(item.dependencyNodeIds)?item.dependencyNodeIds:[]) {
+      if(nodes.has(dep)) addEdge(edges,dep,artifact.id,'supports','Artifact declares its dependency.');
+    }
+  }
+
+  // Explicit dependency references in decisions/requirements/etc are honored.
+  for (const kind of ['decision','requirement','constraint','feature','deliverable']) {
+    for (const node of idsByKind(kind)) {
+      for (const ref of explicitRefs(node.value)) {
+        const target=nodes.get(ref)||[...nodes.values()].find(n=>slug(n.id)===slug(ref)||slug(n.label)===slug(ref));
+        if(target) addEdge(edges,target.id,node.id,'depends_on','Explicit project dependency.');
+      }
+    }
+  }
+
+  return {
+    version:Number(project.specVersion||1),
+    nodes:[...nodes.values()].slice(0,320),
+    edges:[...edges.values()].slice(0,640)
+  };
+}
+
+function nodeMap(graph) { return new Map((graph?.nodes||[]).map(n=>[n.id,n])); }
+function edgeList(graph) { return Array.isArray(graph?.edges)?graph.edges:[]; }
+
+export function reconcileChange(beforeProject={}, afterProject={}, options={}) {
+  const before=buildStateGraph(beforeProject), after=buildStateGraph(afterProject);
+  const bm=nodeMap(before), am=nodeMap(after);
+  const allIds=new Set([...bm.keys(),...am.keys()]);
+  const changedNodes=[];
+  for (const id of allIds) {
+    const b=bm.get(id), a=am.get(id);
+    if (!b || !a || b.signature!==a.signature) changedNodes.push(id);
+  }
+  const adjacency=new Map();
+  const unionEdges=new Map();
+  for (const e of [...edgeList(before),...edgeList(after)]) unionEdges.set(e.from+'|'+e.to+'|'+e.relation,e);
+  for (const e of unionEdges.values()) {
+    if (!adjacency.has(e.from)) adjacency.set(e.from,[]);
+    adjacency.get(e.from).push(e);
+  }
+  const affectedNodes=[];
+  const seen=new Set(changedNodes);
+  const queue=changedNodes.map(id=>({id,depth:0,via:null}));
+  while(queue.length){
+    const current=queue.shift();
+    for(const e of adjacency.get(current.id)||[]){
+      if(seen.has(e.to)) continue;
+      seen.add(e.to);
+      const n=am.get(e.to)||bm.get(e.to);
+      if(n) affectedNodes.push({id:e.to,depth:current.depth+1,relation:e.relation,reason:e.reason,confidence:e.confidence,node:n});
+      queue.push({id:e.to,depth:current.depth+1,via:e});
+    }
+  }
+
+  const changedSet=new Set(changedNodes);
+  const affectedSet=new Set(affectedNodes.map(x=>x.id));
+  const staleNodes=affectedNodes.filter(x=>am.has(x.id)&&['artifact','output','file','test','plan'].includes(am.get(x.id).kind));
+  const reviewNodes=affectedNodes.filter(x=>am.has(x.id)&&['decision','task','evidence','uncertainty'].includes(am.get(x.id).kind));
+  const invalidatedNodes=affectedNodes.filter(x=>am.has(x.id)&&(['task','decision'].includes(am.get(x.id).kind)) && changedNodes.some(id=>!am.has(id)));
+  const labelsFor = ids => [...new Set(ids.map(id=>am.get(id)||bm.get(id)).filter(Boolean).map(n=>n.label))].slice(0,80);
+  const areas = [...new Set(affectedNodes.map(x=>x.node.kind).filter(Boolean))].slice(0,40);
+
+  const actions=[];
+  for(const item of [...staleNodes,...reviewNodes]){
+    const n=item.node;
+    const type=n.kind==='artifact'||n.kind==='output'?'rebuild':n.kind==='file'?'update':n.kind==='test'?'verify':n.kind==='plan'?'replan':n.kind==='decision'?'review-decision':n.kind==='task'?'review-task':n.kind==='evidence'?'reevaluate-evidence':'review';
+    const label= type==='rebuild' ? 'Rebuild '+n.label : type==='verify' ? 'Rerun verification: '+n.label : type==='replan' ? 'Regenerate plan item: '+n.label : type==='review-decision' ? 'Review decision: '+n.label : type==='review-task' ? 'Review task: '+n.label : type==='reevaluate-evidence' ? 'Re-evaluate evidence: '+n.label : 'Update '+n.label;
+    if(!actions.some(a=>a.id===n.id)) actions.push({id:n.id,type,label,reason:item.reason,confidence:item.confidence});
+  }
+
+  const verification=[];
+  for(const n of staleNodes){
+    if(n.node.kind==='test') verification.push({type:'rerun-test',targetId:n.id,label:'Rerun '+n.node.label,reason:'Upstream project state changed.',required:true});
+    if(n.node.kind==='artifact'||n.node.kind==='output') verification.push({type:'rebuild-artifact',targetId:n.id,label:'Rebuild '+n.node.label,reason:'Artifact depends on changed project state.',required:true});
+    if(n.node.kind==='file') verification.push({type:'recheck-file',targetId:n.id,label:'Recheck '+n.node.label,reason:'File depends on changed implementation inputs.',required:true});
+  }
+  const targetVersion=Number(afterProject.specVersion||1);
+  const baseVersion=Number(beforeProject.specVersion||Math.max(1,targetVersion-1));
+  const changedLabels=labelsFor(changedNodes);
+  const affectedLabels=labelsFor(affectedNodes.map(x=>x.id));
+  const staleLabels=labelsFor(staleNodes.map(x=>x.id));
+  const invalidatedLabels=labelsFor(invalidatedNodes.map(x=>x.id));
+  const changedInputs=[...changedNodes].map(id=>am.get(id)||bm.get(id)).filter(n=>n && (n.source?.startsWith('spec.')||n.kind==='projectType'));
+  const summary=changedNodes.length
+    ? changedInputs.length
+      ? changedInputs.map(n=>n.label).slice(0,5).join(', ')+' changed; '+affectedNodes.length+' downstream nodes require review or reconciliation.'
+      : changedNodes.length+' project objects changed; '+affectedNodes.length+' downstream nodes require review or reconciliation.'
+    : 'No dependent project state changed.';
+
+  const statusNodes=[...after.nodes].map(n=>{
+    const status=changedSet.has(n.id)?'changed':staleNodes.some(x=>x.id===n.id)?'stale':reviewNodes.some(x=>x.id===n.id)?'review':'active';
+    return {...n,status};
+  });
+
+  return {
+    baseVersion,targetVersion,
+    changed:changedLabels,
+    changedNodes:changedNodes.map(id=>am.get(id)||bm.get(id)).filter(Boolean),
+    affected:affectedLabels,
+    affectedNodes,
+    stale:staleLabels,
+    staleNodes,
+    invalidated:invalidatedLabels,
+    invalidatedNodes,
+    reviewNodes,
+    suggestedActions:actions.map(a=>a.label),
+    actions,
+    verification,
+    areas,
+    nodes:statusNodes,
+    edges:after.edges,
+    summary,
+    generatedAt:new Date().toISOString(),
+    version:targetVersion
+  };
+}
+
+export function markReconciliationState(project={}, reconciliation={}) {
+  const staleIds=new Set((reconciliation.staleNodes||[]).map(x=>x.id));
+  const reviewIds=new Set((reconciliation.reviewNodes||[]).map(x=>x.id));
+  const invalidateById=(collection,prefix)=>{
+    if(!collection || typeof collection!=='object') return;
+    for(const [key,value] of Object.entries(collection)){
+      if(!value || typeof value!=='object') continue;
+      const id=prefix+slug(key);
+      if(staleIds.has(id)){ value.stale=true; value.staleFromVersion=Number(project.specVersion||1); value.derivedFromVersion=Number(value.specVersion||project.specVersion||1); }
+      else if(reviewIds.has(id)) value.needsReview=true;
+    }
+  };
+  invalidateById(project.artifacts,'artifact:');
+  invalidateById(project.outputs,'output:');
+  if(Array.isArray(project.executionState?.tasks)){
+    for(const task of project.executionState.tasks){
+      const id='task:'+(text(task?.id||task?.key)||slug(task?.title||task?.name)||'0');
+      if(staleIds.has(id)){task.reconciliationStatus='stale';task.reconciliationVersion=Number(project.specVersion||1);}
+      else if(reviewIds.has(id)){task.reconciliationStatus='needs_review';task.reconciliationVersion=Number(project.specVersion||1);}
+    }
+  }
+  project.executionState={
+    ...(project.executionState||{}),
+    reconciliation:{
+      baseVersion:reconciliation.baseVersion,targetVersion:reconciliation.targetVersion,
+      changedNodeIds:(reconciliation.changedNodes||[]).map(x=>x.id),
+      affectedNodeIds:(reconciliation.affectedNodes||[]).map(x=>x.id),
+      staleNodeIds:(reconciliation.staleNodes||[]).map(x=>x.id),
+      invalidatedNodeIds:(reconciliation.invalidatedNodes||[]).map(x=>x.id),
+      generatedAt:reconciliation.generatedAt
+    }
+  };
+  return project;
+}
+
+export function inputNodeIds(project={}) {
+  return buildStateGraph(project).nodes.filter(n => n.source?.startsWith('spec.') || n.kind==='projectType').map(n=>n.id);
+}
