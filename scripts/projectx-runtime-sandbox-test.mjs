@@ -14,6 +14,7 @@ assert.match(raw,/connect-src 'none'/);
 assert.match(raw,/PROJECTX_RUNTIME_READY/);
 assert.match(raw,/PROJECTX_RUNTIME_DONE/);
 assert.match(raw,/PROJECTX_RUNTIME_BLOCKED_NETWORK/);
+assert.match(raw,/PROJECTX_RUNTIME_ERROR/);
 assert.match(raw,/channel-test/);
 
 const sandbox=createRuntimeSandbox(files,{channelId:'channel-test',timeoutMs:4500});
@@ -22,6 +23,8 @@ assert.equal(sandbox.timeoutMs,4500);
 assert.equal(sandbox.iframeAttributes.sandbox,'allow-scripts');
 assert.equal(sandbox.iframeAttributes.referrerPolicy,'no-referrer');
 assert.match(sandbox.srcdoc,/connect-src 'none'/);
+assert.match(sandbox.srcdoc,/PROJECTX_RUNTIME_ERROR/);
+assert.match(sandbox.srcdoc,/PROJECTX_RUNTIME_DONE/);
 
 const source={};
 assert.equal(isRuntimeSandboxMessage({source,data:{type:'PROJECTX_RUNTIME_READY',channelId:'channel-test'}},'channel-test',source),true);
