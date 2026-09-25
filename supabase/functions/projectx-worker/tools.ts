@@ -56,10 +56,11 @@ export function validateExecutionOperations(project: any, contract: any, operati
     }
   }
   const changed = normalized.filter((item) => item.changed);
+  const changedOperations = changed.map(({ changed: _changed, ...item }) => item);
   return {
     ok: true,
     noop: changed.length === 0,
-    operations: normalized,
+    operations: changedOperations,
     changedPaths: changed.map((item) => item.path),
     summary: {
       filesChanged: changed.length,
