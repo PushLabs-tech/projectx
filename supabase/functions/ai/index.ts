@@ -91,6 +91,7 @@ async function runQueuedJob(req: Request, body: any) {
   const payload = body?.payload && typeof body.payload === "object" ? body.payload : {};
   if (kind === "research") return { ok: true, kind, result: await research(user, payload) };
   if (kind === "verification") return { ok: true, kind, result: await runVerification(user, payload) };
+  if (kind === "execution") return { ok: true, kind, result: await execution(user, payload) };
   throw new Error("Unsupported queued job kind");
 }
 
