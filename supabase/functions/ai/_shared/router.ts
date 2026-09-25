@@ -37,6 +37,21 @@ const TASK_FAMILIES: Record<string, string[]> = {
     "gemini",
     "nemotron"
   ],
+  repair: [
+    "debug",
+    "fix",
+    "repair",
+    "code",
+    "coder",
+    "reason",
+    "reasoning",
+    "sonnet",
+    "opus",
+    "gpt",
+    "qwen",
+    "deepseek",
+    "gemini"
+  ],
 
   visual: [
     "vision",
@@ -65,6 +80,7 @@ const AGENT_TASKS: Record<string, string> = {
   planner: 'plan',
   builder: 'build',
   tester: 'build',
+  repairer: 'repair',
   researcher: 'research',
   orchestrator: 'discuss'
 };
