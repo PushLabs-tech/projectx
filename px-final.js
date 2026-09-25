@@ -31,6 +31,7 @@ import {
   diagnoseFailures,
   createRepairActionContract,
   scheduleRepairCycle,
+  summarizeSandboxEvents,
 } from './projectx-core.js';
 import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
@@ -1860,11 +1861,24 @@ async function buildArtifact(project,repairResults=[]){
 }
 function mountArtifact(project){
   const area=$('#output-area');if(!area)return;
-  area.innerHTML='<div class="preview-toolbar"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" title="Project output"></iframe></div>';
+  area.innerHTML='<div class="preview-toolbar"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Project output"></iframe></div>';
   const frame=$('#project-frame');frame.srcdoc=assemblePreviewHtml(project.files||{});runtimeTestCleanup?.();
-  const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR'){const msg=String(e.data.message||'Runtime error');notify('Preview failed to load. '+msg+'. Open Assistant to diagnose.','error');setAgentStatus('Failed');const dock=$('#assistant-dock-input');if(dock)dock.value='Fix preview runtime error: '+msg;}};
+  const onMessage=e=>{
+    if(e.source!==frame.contentWindow)return;
+    if(e.data?.type==='PROJECTX_SANDBOX_EVENT'){
+      const event=e.data?.event||{};
+      if(event.kind==='runtime_error'||event.kind==='unhandled_rejection'){
+        const msg=String(event.message||'Runtime error');
+        notify('Preview failed to run. '+msg+'. Open Assistant to diagnose.','error');
+        setAgentStatus('Failed');
+        const dock=$('#assistant-dock-input');if(dock)dock.value='Fix preview runtime error: '+msg;
+      }else if(event.kind==='resource_error'){
+        notify('Preview reported a resource error. Open Assistant to diagnose.','error');
+      }
+    }
+  };
   window.addEventListener('message',onMessage);runtimeTestCleanup=()=>window.removeEventListener('message',onMessage);
-  $$('[data-viewport]').forEach(btn=>btn.onclick=()=>{const value=btn.dataset.viewport;$$('[data-viewport]').forEach(x=>x.classList.toggle('active',x===btn));const artifact=$('.artifact');artifact.className='artifact preview-'+value;});
+  $('[data-viewport]').forEach(btn=>btn.onclick=()=>{const value=btn.dataset.viewport;$('[data-viewport]').forEach(x=>x.classList.toggle('active',x===btn));const artifact=$('.artifact');artifact.className='artifact preview-'+value;});
 }
 function fileTreeNodes(paths){
   const root={};
@@ -2050,14 +2064,55 @@ function browserRuntimeCheck(files){
   return new Promise(resolve=>{
     const frame=document.createElement('iframe');
     frame.setAttribute('sandbox','allow-scripts');
-    frame.style.cssText='position:fixed;left:-99999px;width:800px;height:600px;opacity:0';
+    frame.setAttribute('referrerpolicy','no-referrer');
+    frame.setAttribute('aria-hidden','true');
+    frame.style.cssText='position:fixed;left:-99999px;width:1024px;height:768px;opacity:0;pointer-events:none';
     document.body.appendChild(frame);
+
+    const events=[];
+    let ready=false;
     let settled=false;
-    const finish=result=>{if(settled)return;settled=true;window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove();resolve(result);};
-    const onMessage=e=>{if(e.source===frame.contentWindow&&e.data?.type==='PROJECTX_RUNTIME_ERROR')finish({name:'Browser runtime',pass:false,detail:e.data.message||'Runtime error reported by output.',affectedFiles:Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6)});};
+    const finish=result=>{
+      if(settled)return;
+      settled=true;
+      window.removeEventListener('message',onMessage);
+      clearTimeout(timer);
+      frame.remove();
+      resolve(result);
+    };
+    const onMessage=e=>{
+      if(e.source!==frame.contentWindow)return;
+      if(e.data?.type!=='PROJECTX_SANDBOX_EVENT')return;
+      const event=e.data?.event&&typeof e.data.event==='object'?e.data.event:null;
+      if(!event)return;
+      events.push(event);
+      if(event.kind==='ready')ready=true;
+      if(event.kind==='runtime_error'||event.kind==='unhandled_rejection'){
+        // Keep the sandbox alive briefly so the report contains secondary failures too.
+      }
+    };
     window.addEventListener('message',onMessage);
-    const timer=setTimeout(()=>finish({name:'Browser runtime',pass:true,detail:'No runtime error was reported during the validation window.',affectedFiles:Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,6)}),2200);
-    frame.srcdoc=assemblePreviewHtml(files);
+
+    const finishReport=phase=>{
+      const summary=summarizeSandboxEvents(events);
+      const htmlPaths=Object.keys(files).filter(p=>/\.html?$/i.test(p)).slice(0,12);
+      finish({
+        name:'Sandboxed browser runtime',
+        pass:Boolean(ready&&summary.passed),
+        detail:ready
+          ? (summary.passed
+            ? 'Sandbox runtime completed without runtime or resource errors.'
+            : 'Sandbox runtime reported execution errors; diagnostics captured.')
+          : 'Sandbox runtime did not reach a ready state before the verification deadline.',
+        affectedFiles:htmlPaths,
+        evidence:summary,
+        phase
+      });
+    };
+
+    const timer=setTimeout(()=>finishReport('timeout'),5000);
+    frame.onload=()=>setTimeout(()=>finishReport('post-load'),1300);
+    frame.srcdoc=assemblePreviewHtml(files,{runtimeVerification:true});
   });
 }
 function renderDelivery(project){
