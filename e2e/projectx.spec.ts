@@ -112,3 +112,61 @@ test("authenticated workspace smoke path syncs a real account", async ({ page })
   expect(before.length).toBeGreaterThanOrEqual(0);
   expect(errors.filter(x => !/favicon/i.test(x))).toEqual([]);
 });
+
+test("authenticated autonomous loop can discover, reconcile, and verify a real project", async ({ page }) => {
+  const email = process.env.PROJECTX_E2E_EMAIL;
+  const password = process.env.PROJECTX_E2E_PASSWORD;
+  test.skip(!email || !password, "Set PROJECTX_E2E_EMAIL and PROJECTX_E2E_PASSWORD for the live autonomous gate.");
+
+  const errors:string[]=[];
+  page.on("pageerror", e => errors.push(e.message));
+  page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
+
+  await page.goto("/#login");
+  await page.locator("#auth-email").fill(email!);
+  await page.locator("#auth-password").fill(password!);
+  await page.locator("#auth-submit").click();
+  await expect(page.locator("#px-app")).toBeVisible();
+  await expect(page.locator("#start-input")).toBeVisible({ timeout: 15_000 });
+
+  await page.locator("#start-input").fill(
+    "Build a tiny fictional bakery landing page with a hero, three menu items, opening hours, and a contact section."
+  );
+  await page.locator("#start-send").click();
+
+  // Discovery is intentionally allowed to ask contextual questions. Keep the
+  // test deterministic by selecting the first concrete option when a poll is shown.
+  for (let i=0; i<6; i++) {
+    const poll = page.locator("#interview-poll");
+    if (await poll.count() && await poll.isVisible().catch(()=>false)) {
+      const option = poll.locator(".poll-option").first();
+      if (await option.count()) {
+        await option.click();
+        await page.waitForTimeout(700);
+        continue;
+      }
+    }
+    if (await page.locator("#project-body").count()) break;
+    await page.waitForTimeout(1500);
+  }
+
+  await expect(page.locator("#project-body")).toBeVisible({ timeout: 45_000 });
+
+  // The project is created through the authenticated createProjectFromIntent path,
+  // so reconciliation below exercises the real remote-worker boundary.
+  await page.locator('[data-section="impact"]').click();
+  await expect(page.locator("#impact-run-reconcile")).toBeVisible({ timeout: 15_000 });
+  await page.locator("#impact-run-reconcile").click();
+
+  const status = page.locator("#impact-run-status");
+  await expect(status).toContainText(/Reconciliation (complete|reconciled)|action\(s\) executed/i, { timeout: 180_000 });
+
+  const finalText = await status.innerText();
+  expect(finalText).not.toMatch(/stopped|failed|blocked/i);
+
+  // The final verification gate must be represented in the rendered execution
+  // state rather than inferred from the presence of a button or project shell.
+  const bodyText = await page.locator("#project-body").innerText();
+  expect(bodyText).toMatch(/complete|passed|verified/i);
+  expect(errors.filter(x => !/favicon/i.test(x))).toEqual([]);
+});
