@@ -5,6 +5,7 @@ const URL=Deno.env.get("SUPABASE_URL")!;
 const ANON=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
 const SERVICE=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||Deno.env.get("SUPABASE_SECRET_KEY")!;
 const admin=createClient(URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});
+async function deploymentSourceHash(fs:any[]){const normalized=fs.slice().sort((a,b)=>String(a.path).localeCompare(String(b.path))).map(f=>String(f.path)+"\n"+String(f.content??"")).join("\n\u0000");const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(normalized));return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");}
 async function deploymentUrlHealthCheck(url:string){
   const target=String(url||"").trim();
   if(!/^https:\/\//i.test(target)) return {status:"skipped",detail:"Deployment URL is not HTTPS.",url:target||null};
@@ -50,7 +51,8 @@ async function syncDeployment(row:any,token:string){
     if(health.status==="failed")status="unhealthy";
   }
   const metadata={...(row.metadata||{}),providerState:providerState.raw,externalStatus:providerState.providerState,health,externalId};
-  const update={status,url,metadata,updated_at:new Date().toISOString()};
+  const healthStatus=health?.status==="passed"?"passed":health?.status==="failed"?"failed":health?.status==="skipped"?"skipped":"pending";
+  const update={status,url,external_status:providerState.providerState||null,health_status:healthStatus,health_checked_at:health&&healthStatus!=="pending"?new Date().toISOString():null,health_evidence:health||{},metadata,updated_at:new Date().toISOString()};
   const {data,error}=await admin.from("deployments").update(update).eq("id",row.id).select().single();
   if(error)throw error;
   return data;
@@ -62,9 +64,21 @@ async function previousSuccessfulDeployment(projectId:string,currentId:string){
 }
 
 async function auth(req:Request){const h=req.headers.get("Authorization");if(!h)throw new Error("SIGN_IN_REQUIRED");const c=createClient(URL,ANON,{global:{headers:{Authorization:h}}});const {data,error}=await c.auth.getUser();if(error||!data.user)throw new Error("INVALID_SESSION");return data.user;}
-async function resolveWorkspace(userId:string,workspaceId:string,projectId:string){if(workspaceId)return workspaceId;if(projectId){const {data,error}=await admin.from("projects").select("workspace_id").eq("id",projectId).maybeSingle();if(error)throw error;if(data?.workspace_id){const {data:m}=await admin.from("workspace_members").select("role").eq("workspace_id",data.workspace_id).eq("user_id",userId).maybeSingle();if(m)return data.workspace_id;}}throw new Error("WORKSPACE_REQUIRED");}
+async function resolveWorkspace(userId:string,workspaceId:string,projectId:string){
+  let ws=String(workspaceId||"").trim();
+  if(!ws&&projectId){
+    const {data,error}=await admin.from("projects").select("workspace_id").eq("id",projectId).maybeSingle();
+    if(error)throw error;
+    ws=String(data?.workspace_id||"");
+  }
+  if(!ws)throw new Error("WORKSPACE_REQUIRED");
+  const {data:m,error}=await admin.from("workspace_members").select("role").eq("workspace_id",ws).eq("user_id",userId).maybeSingle();
+  if(error)throw error;
+  if(!m||!["owner","admin","editor"].includes(m.role))throw new Error("FORBIDDEN");
+  return ws;
+}
 async function targetStatus(userId:string,workspaceId:string,projectId:string){const ws=await resolveWorkspace(userId,workspaceId,projectId);const {data,error}=await admin.from("deployment_targets").select("provider,label,updated_at").eq("workspace_id",ws);if(error)throw error;const targets:any={vercel:{connected:false},netlify:{connected:false}};for(const row of data||[])if(row.provider in targets)targets[row.provider]={connected:true,label:row.label,updatedAt:row.updated_at};return {workspaceId:ws,targets};}
-async function target(userId:string,workspaceId:string,provider:string,label?:string){const {data,error}=await admin.from("deployment_targets").select("*").eq("workspace_id",workspaceId).eq("provider",provider).eq("label",label||"default").maybeSingle();if(error||!data)throw new Error("DEPLOYMENT_TARGET_NOT_CONFIGURED");return {...data,credential:await decryptSecret(data.credential_ciphertext)};}
+async function target(userId:string,workspaceId:string,provider:string,label?:string){const {data,error}=await admin.from("deployment_targets").select("*").eq("workspace_id",workspaceId).eq("provider",provider).eq("label",label||"default").eq("enabled",true).maybeSingle();if(error||!data)throw new Error("DEPLOYMENT_TARGET_NOT_CONFIGURED");return {...data,credential:await decryptSecret(data.credential_ciphertext)};}
 async function projectAccess(userId:string,projectId:string){const {data,error}=await admin.from("projects").select("id,workspace_id,title").eq("id",projectId).maybeSingle();if(error||!data)throw new Error("PROJECT_NOT_FOUND");const {data:m}=await admin.from("workspace_members").select("role").eq("workspace_id",data.workspace_id).eq("user_id",userId).maybeSingle();if(!m||!["owner","admin","editor"].includes(m.role))throw new Error("FORBIDDEN");return data;}
 async function files(projectId:string){const {data,error}=await admin.from("project_files").select("path,content,mime_type,size_bytes").eq("project_id",projectId).limit(2000);if(error)throw error;if(!data?.length)throw new Error("PROJECT_HAS_NO_FILES");return data.map(f=>({path:String(f.path).replace(/^\/+/, ""),content:String(f.content??"")}));}
 async function vercelDeploy(token:string,name:string,fs:any[],existingProject?:string){let project=existingProject;if(!project){const pr=await fetch("https://api.vercel.com/v9/projects",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({name})});const pj=await pr.json();if(!pr.ok)throw new Error(pj?.error?.message||"Vercel project creation failed");project=pj.id||pj.name;}const r=await fetch("https://api.vercel.com/v13/deployments",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({name,project,files:fs.map(f=>({file:f.path,data:f.content})),target:"production"})});const j=await r.json();if(!r.ok)throw new Error(j?.error?.message||"Vercel deployment failed");return {providerProject:project,url:j.url?(`https://${j.url}`):null,externalId:j.id,status:j.readyState||"QUEUED",metadata:j};}
@@ -77,15 +91,18 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   const fs=await files(p.id);
   if(!fs.length)throw new Error("PROJECT_HAS_NO_FILES");
   const previous=await previousSuccessfulDeployment(p.id,"00000000-0000-0000-0000-000000000000");
+  const sourceHash=await deploymentSourceHash(fs);
   const name=p.title.replace(/[^a-z0-9-]+/gi,"-").toLowerCase().slice(0,50)||"projectx-app";
   const result=provider==="vercel"?await vercelDeploy(t.credential,name,fs,t.metadata?.projectId):await netlifyDeploy(t.credential,name,fs,t.metadata?.siteId);
   const metadata={
     externalId:result.externalId,
     ...(result.metadata||{}),
-    deploymentPipeline:{phase:"deployed",health:"pending",sourceSpecVersion:p.spec_version||null,previousDeploymentId:previous?.id||null}
+    deploymentPipeline:{phase:"deployed",health:"pending",sourceSpecVersion:p.spec_version||null,sourceHash,previousDeploymentId:previous?.id||null}
   };
   const {data:d,error}=await admin.from("deployments").insert({
-    project_id:p.id,provider,status:result.status,url:result.url,provider_project:result.providerProject,metadata
+    project_id:p.id,provider,status:"pending",url:result.url,provider_project:result.providerProject,
+    source_spec_version:p.spec_version||null,source_hash:sourceHash,previous_deployment_id:previous?.id||null,
+    external_status:result.status||"pending",health_status:"pending",metadata
   }).select().single();
   if(error)throw error;
   return json({ok:true,deployment:d});
