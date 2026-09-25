@@ -340,25 +340,16 @@ export function interviewMarkup() {
 }
 
 export function projectHead({esc, project}) {
-  const title = esc(project.title);
-  const summary = String(project.understanding?.summary || project.intent || '').trim();
+  const hasFiles=Object.keys(project.files||{}).length>0;
   return `<div class="px-replit-project">
-    <div class="px-project-context">
-      <div class="px-context-main">
-        <div class="kicker">WORKSPACE</div>
-        <div class="px-context-title">${title}</div>
-        <div class="px-context-summary">${esc(summary || 'Your Agent workspace is ready.')}</div>
-      </div>
-      <div class="px-context-actions">
-        <button class="ghost" data-project-tool="build">Build</button>
-        <button class="ghost" data-project-tool="preview">Preview</button>
-        <button class="ghost" data-project-tool="files">Code</button>
-      </div>
-    </div>
     <div class="px-stage" id="px-project-stage">
       <div class="px-stage-bar">
-        <div class="px-stage-mode"><span class="px-live-dot"></span><span>Live workspace</span></div>
+        <div class="px-stage-left">
+          <span class="px-stage-title">${hasFiles ? 'Preview' : 'Build'}</span>
+          <span class="px-stage-sub">${hasFiles ? 'Live artifact' : 'Start from the Agent'}</span>
+        </div>
         <div class="px-stage-tools">
+          <button class="ghost" data-project-tool="build">${hasFiles ? 'Edit' : 'Build'}</button>
           <button class="ghost" data-project-tool="preview">Preview</button>
           <button class="ghost" data-project-tool="files">Code</button>
         </div>
