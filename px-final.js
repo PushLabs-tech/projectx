@@ -21,6 +21,13 @@ import {
   beginReconciliationAction,
   completeReconciliationAction,
   retryFailedReconciliation,
+  getExecutionPolicy,
+  createActionContract,
+  createExecutionPlan,
+  appendExecutionJournal,
+  canExecuteAction,
+  shouldRepairAfterFailure,
+  prepareReconciliationRepair,
 } from './projectx-core.js';
 import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
@@ -64,9 +71,9 @@ const DEFAULT_SETTINGS = {
   splitFiles: false
 };
 const ExecutionProvider = {
-  kind: 'sequential-local',
+  kind: 'orchestrated-local',
   isolatedWorkers: false,
-  note: 'No isolated cloud workers are connected. Independent tasks can be queued; execution is sequential through the Assistant.'
+  note: 'Execution uses explicit action contracts and bounded local adapters. Browser verification runs in a sandboxed iframe; remote workers are not connected.'
 };
 const DeploymentProvider = {
   kind: 'github-pages-export',
@@ -1229,6 +1236,8 @@ async function executeLocalVerification(project){
   return {ok:passed,message:passed?'Current project output passed runtime and security verification.':'Verification found failures in the current project output.',evidence:[...results,...security].map(x=>({name:x.name,pass:Boolean(x.pass),detail:x.detail||''})),outputVersion:project.specVersion};
 }
 async function executeReconciliationQueue(project){
+  const mode=String(settingsState.executionMode||'Mostly Automatic');
+  const policy=getExecutionPolicy(mode);
   let queue=getReconciliationQueue(project);
   if(!queue||Number(queue.targetVersion)!==Number(project.specVersion||1)){
     const created=createReconciliationRun(project);
@@ -1238,72 +1247,196 @@ async function executeReconciliationQueue(project){
   if(!queue)throw new Error('No reconciliation queue exists for this project.');
   if(queue.status==='failed')retryFailedReconciliation(project);
   queue=getReconciliationQueue(project);
-  queue.execution={...(queue.execution||{}),startedAt:now(),executor:'projectx-local-ai'};
+  if(!queue)throw new Error('No reconciliation queue exists for this project.');
+
+  const plan=createExecutionPlan(project,queue,{mode});
+  queue.execution={
+    ...(queue.execution||{}),
+    startedAt:now(),
+    executor:'projectx-orchestrator',
+    provider:ExecutionProvider.kind,
+    policy:{
+      mode:policy.mode,
+      maxActions:policy.maxActions,
+      maxRepairCycles:policy.maxRepairCycles,
+      maxAttemptsPerAction:policy.maxAttemptsPerAction
+    },
+    plan,
+    repairCycles:Number(queue.execution?.repairCycles||0)
+  };
   project.executionState={...(project.executionState||{}),reconciliationQueue:queue,status:'reconciling'};
+  appendExecutionJournal(project,{event:'orchestration_started',status:'in_progress',executor:'projectx-orchestrator',message:'Execution plan compiled for the current reconciliation queue.',evidence:[{queueId:queue.id,mode:policy.mode,contractCount:plan.contracts.length}],outputVersion:project.specVersion});
   saveProject(project);
-  let executed=0;
-  while(true){
+
+  let executed=0,verificationPassed=false,halted=false;
+  while(executed<policy.maxActions){
     queue=getReconciliationQueue(project);
     if(!queue)break;
     if(Number(queue.targetVersion)!==Number(project.specVersion||1)){
       queue.status='blocked';queue.error='project_version_changed';queue.updatedAt=now();
       project.executionState={...(project.executionState||{}),reconciliationQueue:queue,status:'needs-reconciliation'};
+      appendExecutionJournal(project,{event:'orchestration_blocked',status:'blocked',executor:'projectx-orchestrator',message:'The project changed while execution was in progress; the queue was stopped at the old version.',evidence:[{queueTargetVersion:queue.targetVersion,currentVersion:project.specVersion}],outputVersion:project.specVersion});
       saveProject(project);
-      throw new Error('The project changed while reconciliation was running. The queue was stopped so the new state can be reconciled safely.');
+      halted=true;
+      break;
     }
     const ready=getReadyReconciliationActions(project);
     if(!ready.length)break;
-    const action=ready[0],started=beginReconciliationAction(project,action.id);
+
+    const action=ready[0];
+    const contract=plan.contracts.find(x=>x.actionId===action.id)||createActionContract(project,action,{mode,targetVersion:queue.targetVersion});
+    const gate=canExecuteAction(contract,{projectVersion:project.specVersion,actionStatus:'pending',humanApproval:false});
+    if(!gate.allowed){
+      const started=beginReconciliationAction(project,action.id);
+      if(!started.started)throw new Error(started.reason||'Could not start reconciliation action.');
+      const result={
+        ok:false,
+        status:contract.humanReviewRequired?'blocked':'failed',
+        kind:contract.humanReviewRequired?'human_review':'executor',
+        message:contract.humanReviewRequired
+          ? 'Human review is required before this action can change canonical project state.'
+          : 'The selected executor is not available for this action.',
+        evidence:[{reason:gate.reason,executor:contract.executor,actionType:action.type}],
+        outputVersion:project.specVersion
+      };
+      const finished=completeReconciliationAction(project,action.id,result);
+      if(!finished.completed)throw new Error(finished.reason||'Could not record reconciliation result.');
+      appendExecutionJournal(project,{event:'action_gated',actionId:action.id,status:result.status,executor:contract.executor,message:result.message,evidence:result.evidence,outputVersion:project.specVersion});
+      saveProject(project);
+      await syncRemoteProject(project);
+      halted=true;
+      break;
+    }
+
+    const started=beginReconciliationAction(project,action.id);
     if(!started.started)throw new Error(started.reason||'Could not start reconciliation action.');
+    appendExecutionJournal(project,{event:'action_started',actionId:action.id,status:'running',executor:contract.executor,message:'Executor started.',evidence:[{type:action.type,boundary:contract.boundary,risk:contract.risk,attempt:Number(started.action.attempts||1)}],outputVersion:project.specVersion});
     let result;
     try{
-      if(['review-decision','review-task','reevaluate-evidence','review','replan'].includes(action.type)){
-        result={ok:false,status:'blocked',kind:'human_review',message:'Human review is required before this reconciliation action can change canonical project state.',evidence:['Automatic execution stops at human decision boundaries.'],outputVersion:project.specVersion};
-      }else if(action.type==='rebuild'){
-        project.uiNav='build';renderProjectTool(project,'build');
+      if(action.type==='rebuild'){
+        project.uiNav='build';
+        renderProjectTool(project,'build');
         const queueSnapshot=JSON.parse(JSON.stringify(getReconciliationQueue(project)||{}));
-        const build=await buildArtifact(project);
-        if(queueSnapshot?.id){const live=getReconciliationQueue(project);if(!live||live.id!==queueSnapshot.id){project.executionState={...(project.executionState||{}),reconciliationQueue:queueSnapshot};}}
-        result={ok:Boolean(build?.ok),message:build?.ok?'Artifact rebuilt successfully.':String(build?.error||'Artifact build failed.'),evidence:build?.evidence||[],outputVersion:project.specVersion};
+        const failures=Array.isArray(project.tests?.results)?project.tests.results.filter(x=>x&&!x.pass):[];
+        const build=await buildArtifact(project,failures);
+        if(queueSnapshot?.id){
+          const live=getReconciliationQueue(project);
+          if(!live||live.id!==queueSnapshot.id){
+            project.executionState={...(project.executionState||{}),reconciliationQueue:queueSnapshot};
+          }
+        }
+        result={
+          ok:Boolean(build?.ok),
+          message:build?.ok?'Artifact rebuilt successfully.':String(build?.error||'Artifact build failed.'),
+          evidence:build?.evidence||[],
+          outputVersion:project.specVersion
+        };
       }else if(action.type==='update'){
         result=await executeTargetedFileUpdate(project,action);
       }else if(action.type==='verify'){
         result=await executeLocalVerification(project);
+        verificationPassed=Boolean(result?.ok);
       }else{
-        result={ok:false,status:'blocked',message:'No executor is registered for '+action.type+'.',outputVersion:project.specVersion};
+        result={
+          ok:false,
+          status:'blocked',
+          kind:'human_review',
+          message:'This action is intentionally held at a human decision boundary.',
+          evidence:[{actionType:action.type,boundary:contract.boundary}],
+          outputVersion:project.specVersion
+        };
       }
     }catch(error){
-      result={ok:false,message:String(error?.message||error),error:String(error?.message||error),outputVersion:project.specVersion};
+      result={ok:false,error:String(error?.message||error),message:String(error?.message||error),outputVersion:project.specVersion};
     }
+
     const finished=completeReconciliationAction(project,action.id,result);
     if(!finished.completed)throw new Error(finished.reason||'Could not record reconciliation result.');
     executed++;
+    appendExecutionJournal(project,{
+      event:'action_finished',
+      actionId:action.id,
+      status:finished.action?.status||result.status||(result.ok?'completed':'failed'),
+      executor:contract.executor,
+      message:String(result.message||'').slice(0,800),
+      evidence:result.evidence||[],
+      outputVersion:project.specVersion
+    });
     saveProject(project);
     await syncRemoteProject(project);
-    if(finished.queueStatus==='blocked'||finished.queueStatus==='failed')break;
+
+    if(result.ok===false){
+      if(action.type==='verify'&&shouldRepairAfterFailure(action,contract,policy)){
+        const repair=prepareReconciliationRepair(project,action.id,{mode});
+        if(repair.reset){
+          plan=createExecutionPlan(project,getReconciliationQueue(project),{mode});
+          const liveQueue=getReconciliationQueue(project);
+          if(liveQueue){
+            liveQueue.execution={...(liveQueue.execution||{}),plan,repairCycles:repair.cycle};
+            project.executionState={...(project.executionState||{}),reconciliationQueue:liveQueue,status:'reconciling'};
+          }
+          appendExecutionJournal(project,{event:'repair_cycle_started',actionId:action.id,status:'pending',executor:'projectx-orchestrator',message:'Verification failed, so the bounded repair loop reopened an eligible apply action.',evidence:[{cycle:repair.cycle,repairActionId:repair.repairAction?.id}],outputVersion:project.specVersion});
+          saveProject(project);
+          await syncRemoteProject(project);
+          verificationPassed=false;
+          continue;
+        }
+      }
+      halted=true;
+      break;
+    }
+    if(finished.queueStatus==='blocked') { halted=true; break; }
   }
+
   queue=getReconciliationQueue(project);
-  if(queue&&queue.status!=='failed'&&queue.status!=='blocked'){
-    const final=await executeLocalVerification(project);
+  if(!halted&&queue&&queue.status!=='failed'&&queue.status!=='blocked'){
+    const hasVerifyAction=queue.actions.some(a=>a.type==='verify');
+    if(!hasVerifyAction&&!verificationPassed){
+      const final=await executeLocalVerification(project);
+      verificationPassed=Boolean(final.ok);
+      if(!final.ok){
+        queue=getReconciliationQueue(project);
+        if(queue)queue.status='failed';
+      }
+    }
     queue=getReconciliationQueue(project);
-    if(final.ok){
+    if(verificationPassed&&queue&&queue.actions.every(a=>['completed','skipped'].includes(a.status))){
       for(const [key,artifact] of Object.entries(project.artifacts||{})){
         if(!artifact||!artifact.stale)continue;
         const paths=Array.isArray(artifact.filePaths)?artifact.filePaths:[];
         if(!paths.length||paths.some(path=>Object.hasOwn(project.files||{},path))){
-          project.artifacts[key]={...artifact,stale:false,specVersion:project.specVersion,derivedFromVersion:project.specVersion,verification:{status:'passed',verifiedAgainstVersion:project.specVersion,verifiedAt:now()}};
+          project.artifacts[key]={
+            ...artifact,
+            stale:false,
+            specVersion:project.specVersion,
+            derivedFromVersion:project.specVersion,
+            verification:{
+              status:'passed',
+              verifiedAgainstVersion:project.specVersion,
+              verifiedAt:now()
+            }
+          };
         }
       }
-    }
-    queue=getReconciliationQueue(project);
-    if(final.ok&&queue&&queue.actions.every(a=>['completed','skipped'].includes(a.status))){
-      queue.status='complete';queue.completedAt=now();queue.updatedAt=now();
+      queue.status='complete';
+      queue.completedAt=now();
+      queue.updatedAt=now();
+      queue.execution={...(queue.execution||{}),finishedAt:now(),finalVerification:'passed'};
       project.executionState={...(project.executionState||{}),reconciliationQueue:queue,status:'reconciled'};
       project.impact={...(project.impact||{}),queueStatus:'complete',reconciledAt:queue.completedAt};
+      appendExecutionJournal(project,{event:'orchestration_completed',status:'complete',executor:'projectx-orchestrator',message:'All eligible actions completed and the current state passed verification.',evidence:[{executed,repairCycles:Number(queue.execution?.repairCycles||0)}],outputVersion:project.specVersion});
+    }else if(queue){
+      queue.execution={...(queue.execution||{}),finishedAt:now(),finalVerification:verificationPassed?'passed':'not_converged'};
+      project.executionState={...(project.executionState||{}),reconciliationQueue:queue,status:queue.status==='failed'?'needs-fix':'needs-reconciliation'};
+      appendExecutionJournal(project,{event:'orchestration_stopped',status:queue.status,executor:'projectx-orchestrator',message:'Execution stopped before the project reached a verified converged state.',evidence:[{executed,remaining:queue.actions.filter(a=>!['completed','skipped'].includes(a.status)).map(a=>a.id)}],outputVersion:project.specVersion});
     }
+  }else if(queue){
+    queue.execution={...(queue.execution||{}),finishedAt:now(),finalVerification:verificationPassed?'passed':'failed'};
+    project.executionState={...(project.executionState||{}),reconciliationQueue:queue,status:queue.status==='blocked'?'needs-reconciliation':'needs-fix'};
   }
-  saveProject(project);await syncRemoteProject(project);
-  return {executed,queue:getReconciliationQueue(project)};
+  saveProject(project);
+  await syncRemoteProject(project);
+  return {executed,queue:getReconciliationQueue(project),policy,provider:ExecutionProvider};
 }
 
 function renderImpact(project){
