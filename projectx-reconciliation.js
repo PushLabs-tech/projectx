@@ -139,8 +139,14 @@ function buildStateGraph(project={}) {
   linkAll('requirement','decision','requires','Requirements must be satisfied by decisions or work.');
   linkAll('feature','decision','influences','Features influence implementation decisions.');
   linkAll('decision','task','produces','Decisions create or change executable work.');
-  linkAll('decision','artifact','implements','Decisions are reflected in project artifacts.');
-  linkAll('decision','output','implements','Decisions are reflected in project outputs.');
+  // Explicit artifact dependency scopes are authoritative. Only artifacts without an explicit
+  // dependency list receive the broader structural decision -> artifact relationship.
+  for (const decision of idsByKind('decision')) {
+    for (const artifact of [...idsByKind('artifact'),...idsByKind('output')]) {
+      const deps=Array.isArray(artifact.value?.dependencyNodeIds)?artifact.value.dependencyNodeIds:[];
+      if (!deps.length) addEdge(edges,decision.id,artifact.id,'implements','Decision is reflected in an artifact without an explicit dependency scope.');
+    }
+  }
   linkAll('deliverable','artifact','produces','Deliverables are represented by artifacts.');
   linkAll('deliverable','output','produces','Deliverables are represented by outputs.');
   linkAll('acceptance','test','verifies','Acceptance criteria define verification checks.');
