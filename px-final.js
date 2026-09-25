@@ -31,8 +31,8 @@ import {
   diagnoseFailures,
   createRepairActionContract,
   scheduleRepairCycle,
-  summarizeSandboxEvents,
 } from './projectx-core.js';
+import { summarizeSandboxEvents } from './projectx-sandbox.js';
 import * as UI from './px-ui.js';
 const appStylesheet = new URL('./px-app.css', import.meta.url).href;
 
