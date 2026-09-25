@@ -131,6 +131,12 @@ jobs:
               if (has('build')) run('Build', 'npm', ['run', 'build'], 300000);
               if (has('test')) run('Test', 'npm', ['test'], 300000);
               else if (has('check')) run('Check', 'npm', ['run', 'check'], 300000);
+              const deps = {
+                ...((pkg && pkg.dependencies) || {}),
+                ...((pkg && pkg.devDependencies) || {})
+              };
+              const usesPlaywright = Boolean(deps['@playwright/test'] || deps.playwright);
+              if (has('e2e') && usesPlaywright) run('Install Chromium', 'npx', ['playwright', 'install', '--with-deps', 'chromium'], 300000);
               if (has('e2e')) run('Browser E2E', 'npm', ['run', 'e2e'], 300000);
             } else {
               evidence.packageManager = 'none';
