@@ -404,6 +404,7 @@ export function restoreProjectSnapshot(project, snapshot = {}) {
     staleFromVersion:project.specVersion,
     reconciliation:{...(project.executionState?.reconciliation||{}),baseVersion:reconciliation.baseVersion,targetVersion:project.specVersion}
   };
+  project.executionState.reconciliationQueue=createReconciliationQueue(reconciliation,{baseVersion:reconciliation.baseVersion,targetVersion:project.specVersion});
   return {changed:true,impact:reconciliation};
 }
 
