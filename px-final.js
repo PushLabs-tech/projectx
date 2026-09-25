@@ -1177,7 +1177,11 @@ function renderProject(project){
   const assistantDock=UI.assistantDock({esc,project,actions});
   shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
   $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
-  $$('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiNav=button.dataset.projectTool;saveProject(project);renderProjectTool(project,button.dataset.projectTool);});
+  $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{
+    project.uiNav=button.dataset.projectTool;
+    saveProject(project);
+    renderProject(project);
+  });
   if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav){
     renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
   } else {
