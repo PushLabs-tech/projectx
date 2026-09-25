@@ -222,6 +222,7 @@ export function canExecuteAction(contract={},context={}){
   if(!contract?.actionId)return {allowed:false,reason:'missing_action'};
   if(context?.projectVersion!=null&&Number(context.projectVersion)!==Number(contract.targetVersion))return {allowed:false,reason:'project_version_changed'};
   if(context?.actionStatus&&context.actionStatus!=='pending')return {allowed:false,reason:'action_not_pending'};
+  if(context?.actionAttempts!=null&&Number(context.actionAttempts)>=Number(contract.retryPolicy?.maxAttempts||1))return {allowed:false,reason:'attempt_limit_reached'};
   if(contract.humanReviewRequired&&!context?.humanApproval)return {allowed:false,reason:'human_review_required'};
   if(contract.executor==null)return {allowed:false,reason:'executor_unavailable'};
   return {allowed:true};
@@ -245,6 +246,7 @@ export function prepareReconciliationRepair(project={},actionId='',options={}){
   if(cycle>policy.maxRepairCycles)return {reset:false,reason:'repair_limit_reached'};
   const repairCandidates=queue.actions
     .filter(a=>a.status==='completed'&&['rebuild','update'].includes(a.type))
+    .filter(a=>Number(a.attempts||0)<Math.min(policy.maxAttemptsPerAction,Number(getExecutorDefinition(a.type)?.maxAttempts||1)))
     .sort((a,b)=>Number(b.completedAt?new Date(b.completedAt).getTime():0)-Number(a.completedAt?new Date(a.completedAt).getTime():0));
   const repair=repairCandidates.find(a=>a.type==='rebuild')||repairCandidates[0];
   if(!repair)return {reset:false,reason:'no_repair_executor'};
