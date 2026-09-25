@@ -1900,11 +1900,14 @@ async function renderOutput(project){
   const current=output?.specVersion===project.specVersion&&Object.keys(project.files||{}).length>0;
   const title=software?(project.type==='Game'?'Playtest':project.type==='Presentation'?'Presentation':'Output'):'Deliverable';
   const description=current?'Current output generated from the project brain.':software?'No current artifact exists yet.':'No document deliverable exists yet.';
-  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><div class="actions"><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button>${software?'<button id="visual-edit" class="ghost">Visual edit</button>':''}</div></div><div id="output-area" style="margin-top:14px"></div></div>`;
+  const isolated=project.executionState?.isolatedBuild;
+  const runLabel=isolated?.polling?'Build running…':'Run isolated build';
+  body.innerHTML=`<div class="box"><div style="display:flex;justify-content:space-between;gap:10px"><div><h2 style="margin:0">${title}</h2><div class="sub">${esc(description)}</div></div><div class="actions"><button id="build-output" class="primary">${current?'Rebuild with AI':software?'Build with AI':'Generate deliverable'}</button>${software?'<button id="visual-edit" class="ghost">Visual edit</button>':''}${software&&current?'<button id="run-isolated-build" class="ghost" '+(isolated?.polling?'disabled':'')+'>'+runLabel+'</button>':''}</div></div><div id="output-area" style="margin-top:14px"></div>${software&&current?isolatedBuildPanelHtml(project):''}</div>`;
   $('#build-output').onclick=()=>buildArtifact(project);
+  $('#run-isolated-build')?.addEventListener('click',()=>requestIsolatedBuild(project));
   $('#visual-edit')?.addEventListener('click',()=>renderProjectChat(project,'Make a visual change: '));
   if(current){
-    if(software)mountArtifact(project);
+    if(software){mountArtifact(project);refreshIsolatedBuildPanel(project);
     else{
       const docPath=Object.keys(project.files||{}).find(p=>/\.(md|txt|csv|json)$/i.test(p))||Object.keys(project.files||{})[0];
       $('#output-area').innerHTML=`<div class="document-output"><pre class="document-text">${esc(docPath?project.files[docPath]:'No document content.')}</pre></div>`;
@@ -2633,7 +2636,11 @@ function renderSeo(project){
   toolShell('SEO','Document metadata','Reads the current artifact only. Search rankings are not invented.','<div class="box"><div class="row"><b>Title</b><span class="sub">'+(title?esc(title):'Not found in index.html')+'</span></div><div class="row"><b>Description</b><span class="sub">'+(desc?esc(desc):'Not found')+'</span></div><div class="row"><b>Canonical HTML</b><span class="sub">'+(html?'Present':'No index.html')+'</span></div></div>');
 }
 function renderTerminal(){
-  toolShell('OUTPUT','Execution provider',ExecutionProvider.note,'<div class="placeholder">Remote terminal is unavailable. '+esc(ExecutionProvider.kind)+' — ProjectX will not pretend a shell command succeeded.</div>');
+  const p=activeProject();
+  const body='<div class="placeholder">'+esc(ExecutionProvider.note)+'</div>'+(p?.executionState?.isolatedBuild?isolatedBuildPanelHtml(p):'')+'<div class="actions" style="margin-top:10px">'+(p&&projectArtifactKind(p.type)==='software'&&Object.keys(p.files||{}).length?'<button class="primary" id="terminal-run-isolated">Run isolated build</button>':'')+'</div>';
+  toolShell('OUTPUT','Execution provider',ExecutionProvider.note,body);
+  $('#terminal-run-isolated')?.addEventListener('click',()=>requestIsolatedBuild(p));
+  if(p)refreshIsolatedBuildPanel(p);
 }
 function renderCollab(){
   toolShell('MEMBERS','Collaboration','Presence uses Supabase Realtime when signed in. Additional members appear only after they exist on the project.','<div class="box"><div class="row"><b>'+(session?.user?.email||'Guest')+'</b><span class="sub">Owner</span></div></div>'+(session?'<div class="sub" style="margin-top:8px">Realtime channel is attached while this project is open.</div>':'<div class="placeholder">Sign in to sync collaboration events.</div>'));
@@ -2691,6 +2698,6 @@ window.addEventListener('hashchange',()=>{
 });
 async function boot(){installCss();installOptionalAnalytics();window.addEventListener('online',()=>{flushSyncOutbox().catch(()=>{});});await refreshSession();if(!state.projects.length){const legacy=read('px_adaptive_v1',null)||read('builder_universal_v14',null);if(legacy?.projects?.length){state.projects=legacy.projects.map(migrateProject);persistLocal();}}await syncRemoteProjects();home();}
 window.ProjectX={state:()=>state,settings:()=>settingsState,openProject,refresh:boot,
-  integrations:{startGitHubConnection,githubListRepositories,githubCreateRepository,githubPushFiles,deployProject,deploymentStatus,saveDeploymentTarget,
+  integrations:{startGitHubConnection,githubListRepositories,githubCreateRepository,githubPushFiles,startIsolatedBuild,isolatedBuildStatus,isolatedBuildRuns,cancelIsolatedBuild,deployProject,deploymentStatus,saveDeploymentTarget,
     inviteWorkspaceMember,acceptWorkspaceInvite,listWorkspaceMembers,ingestProjectResource,billingStatus,cancelBillingSubscription,collaborationChannel}};
 boot();
