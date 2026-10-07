@@ -265,7 +265,7 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   const tools = APP_TOOLS;
   const left = tools.map(([id, name]) => `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`).join('');
   const recent = recents.map(p => `<button data-open="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.type)}</span></button>`).join('') || '<div class="sub" style="padding:8px 10px">No projects yet</div>';
-  return `<div class="px-shell" id="px-shell">
+  return `<div class="px-shell no-right" id="px-shell">
     <aside class="px-left side" id="px-left">
       <button class="logo" data-nav="home" title="Home">ProjectX</button>
       <button class="ghost px-switcher" id="px-project-switch" type="button">Projects ▾</button>
@@ -298,43 +298,50 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
   return `<div class="px-home-builder">
     <div class="px-home-builder-inner">
       <div class="px-home-eyebrow">PROJECTX / NEW PROJECT</div>
-      <h1>What are you building?<br><span>Give it a visual direction.</span></h1>
-      <p>Describe what you want to make. Before ProjectX builds, give it enough taste to avoid the generic AI look.</p>
-      <div class="px-home-composer composer">
-        <textarea id="start-input" placeholder="Build a website for my sneaker-cleaning business…"></textarea>
-        <div class="px-home-composer-foot">
-          <div class="px-home-shortcuts">
-            <button class="px-shortcut" data-template="website">Website</button>
-            <button class="px-shortcut" data-template="app">Web app</button>
-            <button class="px-shortcut" data-template="game">Game</button>
-            <button class="px-shortcut" data-template="business">Business</button>
-            <button class="px-shortcut" data-template="research">Research</button>
-            <button class="px-shortcut" data-template="deck">Deck</button>
+      <h1>What are you building?</h1>
+      <p class="px-home-lead">Start with the outcome. Then give ProjectX enough visual direction to avoid the generic AI look.</p>
+
+      <div class="px-home-grid">
+        <div class="px-home-primary">
+          <div class="px-home-composer composer">
+            <textarea id="start-input" placeholder="Build a website for my sneaker-cleaning business…"></textarea>
+            <div class="px-home-composer-foot">
+              <div class="px-home-shortcuts">
+                <button class="px-shortcut" data-template="website">Website</button>
+                <button class="px-shortcut" data-template="app">Web app</button>
+                <button class="px-shortcut" data-template="game">Game</button>
+                <button class="px-shortcut" data-template="business">Business</button>
+                <button class="px-shortcut" data-template="research">Research</button>
+                <button class="px-shortcut" data-template="deck">Deck</button>
+              </div>
+              <button class="send px-home-send" id="start-send" aria-label="Start project">→</button>
+            </div>
           </div>
-          <button class="send px-home-send" id="start-send" aria-label="Start project">→</button>
+          <div class="px-home-hint"><span>${session ? 'Cloud workspace connected' : guestReady ? 'Guest AI ready' : 'Connect AI when you need it'}</span><span>⌘ Enter to start</span></div>
         </div>
+
+        <section class="px-design-panel">
+          <div class="px-design-panel-head">
+            <div><b>Design direction</b><span>Optional, but recommended</span></div>
+            <span class="px-design-badge">VISUAL CONTRACT</span>
+          </div>
+          <div class="px-design-grid">
+            <label><span>Visual character</span><select id="design-character">
+              <option value="">Let ProjectX decide</option>
+              <option>Editorial / typographic</option><option>Minimal / product-led</option><option>Technical / precise</option>
+              <option>Playful / expressive</option><option>Luxury / restrained</option><option>Brutalist / raw</option><option>Dark / cinematic</option>
+            </select></label>
+            <label><span>Reference sites</span><input id="design-references" placeholder="Linear, Apple, labs.google…"></label>
+            <label><span>Typography</span><input id="design-type" placeholder="Grotesk + mono, serif editorial…"></label>
+            <label><span>Color direction</span><input id="design-colors" placeholder="Bone + ink + electric blue…"></label>
+            <label class="px-design-wide"><span>Avoid</span><input id="design-banned" placeholder="Purple gradients, glassmorphism, excessive cards…"></label>
+            <label class="px-design-wide"><span>Distinctive idea</span><textarea id="design-distinctive" rows="2" placeholder="What should people remember about the interface?"></textarea></label>
+          </div>
+          <div class="px-design-note"><strong>ProjectX rule</strong><span>References become tokens, layout rules, component decisions, and constraints before generation.</span></div>
+        </section>
       </div>
-      <details class="px-design-direction">
-        <summary>
-          <span><b>Design direction</b><small>Optional, but strongly recommended</small></span>
-          <span class="px-design-summary">Set the taste before the build</span>
-        </summary>
-        <div class="px-design-grid">
-          <label><span>Visual character</span><select id="design-character">
-            <option value="">Let ProjectX decide</option>
-            <option>Editorial / typographic</option><option>Minimal / product-led</option><option>Technical / precise</option>
-            <option>Playful / expressive</option><option>Luxury / restrained</option><option>Brutalist / raw</option><option>Dark / cinematic</option>
-          </select></label>
-          <label><span>Reference sites or products</span><input id="design-references" placeholder="e.g. Linear, Apple, labs.google, a site you like"></label>
-          <label><span>Typography / type preference</span><input id="design-type" placeholder="e.g. grotesk + mono, serif editorial, system sans"></label>
-          <label><span>Color direction</span><input id="design-colors" placeholder="e.g. bone + ink + one electric blue accent"></label>
-          <label class="px-design-wide"><span>Things to avoid</span><input id="design-banned" placeholder="e.g. purple gradients, glassmorphism, huge centered hero, excessive cards"></label>
-          <label class="px-design-wide"><span>What should feel distinctive?</span><textarea id="design-distinctive" rows="2" placeholder="Describe the one visual idea you want people to remember."></textarea></label>
-        </div>
-        <div class="px-design-note"><strong>Design rule</strong><span>References are inspiration, not a copy target. ProjectX turns them into reusable tokens, layout rules and component decisions.</span></div>
-      </details>
-      <div class="px-home-hint"><span>${session ? 'Cloud workspace connected' : guestReady ? 'Guest AI ready' : 'Connect AI when you need it'}</span><span>⌘ Enter to start</span></div>
     </div>
+
     <section class="px-home-recent">
       <div class="px-section-head"><div><strong>Recent projects</strong><div class="sub">Jump back into something you've been building.</div></div></div>
       <div class="px-recent-grid">${cards||'<div class="px-empty">No projects yet.</div>'}</div>
