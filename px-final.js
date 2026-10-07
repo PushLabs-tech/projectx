@@ -928,7 +928,7 @@ function conversationHtml(project){
     const assistant=m.role!=='user';
     const feedback=m.feedback||'';
     const actions=assistant?`<div class="px-ai-actions" role="group" aria-label="AI response actions">
-      <button type="button" class="px-ai-action ${feedback==='up'?'selected':''}" data-ai-action="retry" data-message-index="${idx}" title="Retry response" aria-label="Retry response">${aiActionIcon('retry')}</button>
+      <button type="button" class="px-ai-action" data-ai-action="retry" data-message-index="${idx}" title="Retry response" aria-label="Retry response">${aiActionIcon('retry')}</button>
       <button type="button" class="px-ai-action ${feedback==='up'?'selected':''}" data-ai-action="like" data-message-index="${idx}" title="Helpful" aria-label="Helpful">${aiActionIcon('like')}</button>
       <button type="button" class="px-ai-action ${feedback==='down'?'selected':''}" data-ai-action="dislike" data-message-index="${idx}" title="Not helpful" aria-label="Not helpful">${aiActionIcon('dislike')}</button>
       <button type="button" class="px-ai-action" data-ai-action="copy" data-message-index="${idx}" title="Copy" aria-label="Copy response">${aiActionIcon('copy')}</button>
@@ -993,7 +993,18 @@ function bindAIResponseActions(project){
     };
   });
 }
-function drawConversation(history,selector){const el=$(selector);if(!el)return;const project=activeProject();const draft={conversation:Array.isArray(history)?history:[]};el.innerHTML=conversationHtml(project&&project.conversation?.length===draft.conversation.length?project:draft);el.scrollTop=el.scrollHeight;bindAIResponseActions(project||draft);}
+function drawConversation(history,selector){
+  const el=$(selector);if(!el)return;
+  const project=activeProject();
+  const source=Array.isArray(history)?history:[];
+  if(project&&Array.isArray(project.conversation)&&project.conversation.length===source.length){
+    el.innerHTML=conversationHtml(project);
+    bindAIResponseActions(project);
+  }else{
+    el.innerHTML=source.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');
+  }
+  el.scrollTop=el.scrollHeight;
+}
 function mergeDiscoveryProject(previous={},next={}){
   const out={...(previous||{})};
   const scalar=['title','goal','type','platform','visualDirection','currentState'];
