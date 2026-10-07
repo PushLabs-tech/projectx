@@ -909,7 +909,102 @@ async function beginCreation(text){
 function renderInterview(history,meta){
   shell(UI.interviewMarkup(),'home');
   meta.initialIntent=String(history?.[0]?.text||'').trim();
-}function drawConversation(history,selector){const el=$(selector);if(!el)return;el.innerHTML=history.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');el.scrollTop=el.scrollHeight;}
+}function aiActionIcon(name){
+  const paths={
+    retry:'<path d="M20 11a8 8 0 0 0-14.9-4L3 9"/><path d="M3 4v5h5"/><path d="M4 13a8 8 0 0 0 14.9 4L21 15"/><path d="M21 20v-5h-5"/>',
+    like:'<path d="M7 10v10H4a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2h3Z"/><path d="M7 10l4-7c.8 1.1 1.2 2.4.9 3.8L11.5 10H18a2 2 0 0 1 2 2l-1.1 6a2 2 0 0 1-2 1H7"/>',
+    dislike:'<path d="M17 14V4h3a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-3Z"/><path d="M17 14l-4 7c-.8-1.1-1.2-2.4-.9-3.8l.4-3.2H6a2 2 0 0 1-2-2l1.1-6a2 2 0 0 1 2-1H17"/>',
+    copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>',
+    share:'<circle cx="18" cy="5" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="18" cy="19" r="2"/><path d="m8 11 8-5M8 13l8 5"/>'
+  };
+  return '<svg viewBox="0 0 24 24" aria-hidden="true">'+(paths[name]||paths.copy)+'</svg>';
+}
+function conversationHtml(project){
+  const all=Array.isArray(project?.conversation)?project.conversation:[];
+  const messages=all.slice(-MAX_HISTORY);
+  const offset=Math.max(0,all.length-messages.length);
+  return messages.map((m,i)=>{
+    const idx=offset+i;
+    const assistant=m.role!=='user';
+    const feedback=m.feedback||'';
+    const actions=assistant?`<div class="px-ai-actions" role="group" aria-label="AI response actions">
+      <button type="button" class="px-ai-action" data-ai-action="retry" data-message-index="${idx}" title="Retry response" aria-label="Retry response">${aiActionIcon('retry')}</button>
+      <button type="button" class="px-ai-action ${feedback==='up'?'selected':''}" data-ai-action="like" data-message-index="${idx}" title="Helpful" aria-label="Helpful">${aiActionIcon('like')}</button>
+      <button type="button" class="px-ai-action ${feedback==='down'?'selected':''}" data-ai-action="dislike" data-message-index="${idx}" title="Not helpful" aria-label="Not helpful">${aiActionIcon('dislike')}</button>
+      <button type="button" class="px-ai-action" data-ai-action="copy" data-message-index="${idx}" title="Copy" aria-label="Copy response">${aiActionIcon('copy')}</button>
+      <button type="button" class="px-ai-action" data-ai-action="share" data-message-index="${idx}" title="Share" aria-label="Share response">${aiActionIcon('share')}</button>
+    </div>`:'';
+    return `<div class="msg-row ${m.role==='user'?'user':'ai'}" data-message-index="${idx}">
+      <div class="px-msg-avatar" aria-hidden="true">${assistant?'X':'You'}</div>
+      <div class="px-msg-stack">
+        <div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>
+        ${actions}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function copyAIResponse(text){
+  const value=String(text||'');
+  if(!value)return;
+  try{
+    if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(value);}
+    else{
+      const area=document.createElement('textarea');
+      area.value=value;area.style.position='fixed';area.style.opacity='0';
+      document.body.appendChild(area);area.select();document.execCommand('copy');area.remove();
+    }
+    notify('Response copied.','info');
+  }catch{notify('Could not copy the response.','warn');}
+}
+async function runAIAction(project,action,index){
+  const messages=Array.isArray(project?.conversation)?project.conversation:[];
+  const message=messages[index];
+  if(!message||message.role==='user')return;
+  if(action==='copy'){await copyAIResponse(message.text);return;}
+  if(action==='share'){
+    try{
+      if(navigator.share){await navigator.share({title:'ProjectX AI response',text:String(message.text||'')});}
+      else await copyAIResponse(message.text);
+    }catch(error){if(error?.name!=='AbortError')notify('Could not share the response.','warn');}
+    return;
+  }
+  if(action==='like'||action==='dislike'){
+    message.feedback=action==='like'?'up':'down';
+    project.conversation=messages.slice(-MAX_HISTORY);
+    saveProject(project);refreshConversationViews(project);notify(action==='like'?'Marked helpful.':'Marked not helpful.','info');return;
+  }
+  if(action==='retry'){
+    const previous=messages.slice(0,index).reverse().find(x=>x.role==='user');
+    if(!previous?.text){notify('There is no user request to retry yet.','warn');return;}
+    await sendProjectMessage(project,previous.text);
+  }
+}
+function bindAIResponseActions(project){
+  if(!project)return;
+  $('[data-ai-action]').forEach(button=>{
+    button.onclick=async()=>{
+      const action=String(button.dataset.aiAction||'');
+      const index=Number(button.dataset.messageIndex);
+      if(!Number.isInteger(index))return;
+      button.disabled=true;
+      try{await runAIAction(project,action,index);}
+      catch(error){notify(String(error?.message||'Action failed.'),'warn');}
+      finally{button.disabled=false;}
+    };
+  });
+}
+function drawConversation(history,selector){
+  const el=$(selector);if(!el)return;
+  const project=activeProject();
+  const source=Array.isArray(history)?history:[];
+  if(project&&Array.isArray(project.conversation)&&project.conversation.length===source.length){
+    el.innerHTML=conversationHtml(project);
+    bindAIResponseActions(project);
+  }else{
+    el.innerHTML=source.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');
+  }
+  el.scrollTop=el.scrollHeight;
+}
 function mergeDiscoveryProject(previous={},next={}){
   const out={...(previous||{})};
   const scalar=['title','goal','type','platform','visualDirection','currentState'];
@@ -1204,8 +1299,9 @@ function renderProject(project){
   }
   const dockLog=$('#assistant-dock-log');
   if(dockLog&&Array.isArray(project.conversation)){
-    dockLog.innerHTML=project.conversation.slice(-MAX_HISTORY).map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');
+    dockLog.innerHTML=conversationHtml(project);
     dockLog.scrollTop=dockLog.scrollHeight;
+    bindAIResponseActions(project);
   }
 }
 
@@ -1894,10 +1990,10 @@ function skillContext(){
   return ' Enabled skills: '+skills.map(s=>s.name).join(', ')+'.';
 }
 function refreshConversationViews(project){
-  const messages=Array.isArray(project.conversation)?project.conversation.slice(-MAX_HISTORY):[];
-  const html=messages.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${esc(m.text)}</div>`).join('');
+  const html=conversationHtml(project);
   const log=$('#project-log');if(log){log.innerHTML=html;log.scrollTop=log.scrollHeight;}
   const dock=$('#assistant-dock-log');if(dock){dock.innerHTML=html;dock.scrollTop=dock.scrollHeight;}
+  bindAIResponseActions(project);
 }
 function buildMutationPreview(project,data){
   const preview=JSON.parse(JSON.stringify(project));
