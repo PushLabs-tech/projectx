@@ -806,7 +806,22 @@ function bindStartComposer(){
   const send=$('#start-send');
   if(!input||!send)return;
   try{const pending=sessionStorage.getItem('projectx_pending_intent');if(pending&&!input.value){input.value=pending;sessionStorage.removeItem('projectx_pending_intent');}}catch{}
-  send.onclick=()=>beginCreation(input.value);
+  const value=id=>String($('#'+id)?.value||'').trim();
+  const buildIntent=()=>{
+    const base=String(input.value||'').trim();
+    if(!base)return '';
+    const direction=[
+      ['Visual character',value('design-character')],
+      ['Reference sites/products',value('design-references')],
+      ['Typography',value('design-type')],
+      ['Color direction',value('design-colors')],
+      ['Avoid',value('design-banned')],
+      ['Distinctive idea',value('design-distinctive')]
+    ].filter(([,v])=>v);
+    if(!direction.length)return base;
+    return base+'\\n\\n[PROJECTX DESIGN DIRECTION]\\n'+direction.map(([k,v])=>k+': '+v).join('\\n')+'\\n[/PROJECTX DESIGN DIRECTION]';
+  };
+  send.onclick=()=>beginCreation(buildIntent());
   input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send.click();}};
   $$('[data-template]').forEach(btn=>btn.onclick=()=>{
     const t=UI.TEMPLATES.find(x=>x.id===btn.dataset.template);if(!t)return;

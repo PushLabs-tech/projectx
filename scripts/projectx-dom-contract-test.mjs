@@ -39,7 +39,7 @@ assert.match(ui, /id="plan-dock-form"/);
 assert.match(ui, /id="start-input"/);
 assert.match(ui, /px-hero|px-product-shot/);
 assert.match(ui, /What are you building\?/);
-assert.match(ui, /CORE_NAV = \['overview', 'build', 'preview', 'files', 'settings'\]/);
+assert.match(ui, /CORE_NAV = \['overview', 'build', 'design', 'preview', 'files', 'settings'\]/);
 assert.match(ui, /PROJECT AGENT/);
 assert.match(ui, /What are you building\?/);
 assert.match(ui, /replit-shell/);
