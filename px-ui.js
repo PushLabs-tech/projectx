@@ -208,7 +208,7 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   const title = project ? esc(project.title) : 'ProjectX';
   if(project){
     const tools = navForProject(project);
-    const visible = tools.filter(([id])=>['build','preview','files','settings'].includes(id));
+    const visible = tools.filter(([id])=>['build','design','preview','files','settings'].includes(id));
     const rail = visible.map(([id,name])=>`<button class="px-rail-tool ${(nav||active)===id?'active':''}" data-project-tool="${esc(id)}" title="${esc(name)}" aria-label="${esc(name)}">${projectIcon(id)}<span class="px-rail-label">${esc(name)}</span></button>`).join('');
     const recent = recents.map(p => `<button data-open="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.type)}</span></button>`).join('') || '<div class="sub" style="padding:8px 10px">No projects yet</div>';
     const agentPane = right ? `<aside class="px-right replit-agent" id="px-right">
