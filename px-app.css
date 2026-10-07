@@ -1461,3 +1461,93 @@ html, body {
 .px-shell:not(.actual-replit-shell) .px-center.main{
   background:transparent;
 }
+
+
+/* AI response actions — adapted from the supplied 21st.dev pattern for ProjectX's vanilla runtime */
+.msg-row{
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+  margin:0 0 14px;
+  min-width:0;
+}
+.msg-row.user{justify-content:flex-end}
+.msg-row .px-msg-avatar{
+  flex:0 0 auto;
+  width:22px;
+  height:22px;
+  border-radius:7px;
+  display:grid;
+  place-items:center;
+  background:#e8e4dd;
+  color:#625d56;
+  font:700 8px/1 var(--px-mono);
+  letter-spacing:-.02em;
+  border:1px solid #ddd7ce;
+  margin-top:2px;
+}
+.msg-row.ai .px-msg-avatar{
+  background:#1d1b19;
+  border-color:#1d1b19;
+  color:#fff;
+  font-size:9px;
+}
+.msg-row.user .px-msg-avatar{order:2}
+.msg-row .px-msg-stack{
+  min-width:0;
+  max-width:min(92%,640px);
+}
+.msg-row .msg{
+  margin:0!important;
+}
+.px-ai-actions{
+  display:flex;
+  align-items:center;
+  gap:2px;
+  margin-top:6px;
+  opacity:.8;
+}
+.px-ai-action{
+  width:26px;
+  height:26px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid transparent;
+  border-radius:7px;
+  background:transparent;
+  color:#8b857c;
+  cursor:pointer;
+}
+.px-ai-action svg{
+  width:14px;
+  height:14px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.px-ai-action:hover{
+  color:var(--px-text);
+  background:#ece8e1;
+  border-color:#ded8cf;
+}
+.px-ai-action.selected{
+  color:var(--px-accent);
+  background:rgba(54,84,255,.08);
+  border-color:rgba(54,84,255,.16);
+}
+.px-ai-action:disabled{opacity:.45}
+.px-agent-body #assistant-dock-log .msg-row,
+.actual-replit-shell #assistant-dock-log .msg-row{
+  margin-bottom:12px;
+}
+.px-agent-body #assistant-dock-log .msg-row .px-msg-stack,
+.actual-replit-shell #assistant-dock-log .msg-row .px-msg-stack{
+  max-width:100%;
+}
+@media(max-width:720px){
+  .msg-row .px-msg-stack{max-width:calc(100% - 30px)}
+  .px-ai-action{width:28px;height:28px}
+}
