@@ -33,7 +33,7 @@ export const PROJECT_NAV = [
   ['settings', 'Settings']
 ];
 
-export const CORE_NAV = ['overview', 'build', 'preview', 'files', 'settings'];
+export const CORE_NAV = ['overview', 'build', 'design', 'preview', 'files', 'settings'];
 export const ADVANCED_NAV = PROJECT_NAV.filter(([id]) => !CORE_NAV.includes(id));
 
 export const TEMPLATES = [
@@ -297,9 +297,9 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
   const cards = projects.slice(0, 6).map(p => `<button class="px-recent-card" data-open="${esc(p.id)}"><div class="px-recent-card-title">${esc(p.title)}</div><div class="px-recent-card-meta">${esc(p.type)} · ${esc(p.status)}</div><div class="sub">${esc(String(p.intent || p.spec?.goal || '').slice(0,110))}</div></button>`).join('');
   return `<div class="px-home-builder">
     <div class="px-home-builder-inner">
-      <div class="px-home-eyebrow">PROJECTX AGENT</div>
-      <h1>What are you building?</h1>
-      <p>Describe an idea, product, site, game, or anything you want to bring to life.</p>
+      <div class="px-home-eyebrow">PROJECTX / NEW PROJECT</div>
+      <h1>Start with the outcome.<br><span>Give it a visual direction.</span></h1>
+      <p>Describe what you want to make. Before ProjectX builds, give it enough taste to avoid the generic AI look.</p>
       <div class="px-home-composer composer">
         <textarea id="start-input" placeholder="Build a website for my sneaker-cleaning business…"></textarea>
         <div class="px-home-composer-foot">
@@ -311,9 +311,28 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
             <button class="px-shortcut" data-template="research">Research</button>
             <button class="px-shortcut" data-template="deck">Deck</button>
           </div>
-          <button class="send px-home-send" id="start-send" aria-label="Start project">↑</button>
+          <button class="send px-home-send" id="start-send" aria-label="Start project">→</button>
         </div>
       </div>
+      <details class="px-design-direction">
+        <summary>
+          <span><b>Design direction</b><small>Optional, but strongly recommended</small></span>
+          <span class="px-design-summary">Set the taste before the build</span>
+        </summary>
+        <div class="px-design-grid">
+          <label><span>Visual character</span><select id="design-character">
+            <option value="">Let ProjectX decide</option>
+            <option>Editorial / typographic</option><option>Minimal / product-led</option><option>Technical / precise</option>
+            <option>Playful / expressive</option><option>Luxury / restrained</option><option>Brutalist / raw</option><option>Dark / cinematic</option>
+          </select></label>
+          <label><span>Reference sites or products</span><input id="design-references" placeholder="e.g. Linear, Apple, labs.google, a site you like"></label>
+          <label><span>Typography / type preference</span><input id="design-type" placeholder="e.g. grotesk + mono, serif editorial, system sans"></label>
+          <label><span>Color direction</span><input id="design-colors" placeholder="e.g. bone + ink + one electric blue accent"></label>
+          <label class="px-design-wide"><span>Things to avoid</span><input id="design-banned" placeholder="e.g. purple gradients, glassmorphism, huge centered hero, excessive cards"></label>
+          <label class="px-design-wide"><span>What should feel distinctive?</span><textarea id="design-distinctive" rows="2" placeholder="Describe the one visual idea you want people to remember."></textarea></label>
+        </div>
+        <div class="px-design-note"><strong>Design rule</strong><span>References are inspiration, not a copy target. ProjectX turns them into reusable tokens, layout rules and component decisions.</span></div>
+      </details>
       <div class="px-home-hint"><span>${session ? 'Cloud workspace connected' : guestReady ? 'Guest AI ready' : 'Connect AI when you need it'}</span><span>⌘ Enter to start</span></div>
     </div>
     <section class="px-home-recent">
