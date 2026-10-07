@@ -265,7 +265,7 @@ export function chrome({esc, session, recents, active, body, project, nav, right
   const tools = APP_TOOLS;
   const left = tools.map(([id, name]) => `<button class="${id === active ? 'active' : ''}" data-nav="${esc(id)}" data-search="${esc(name)}">${esc(name)}</button>`).join('');
   const recent = recents.map(p => `<button data-open="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.type)}</span></button>`).join('') || '<div class="sub" style="padding:8px 10px">No projects yet</div>';
-  return `<div class="px-shell" id="px-shell">
+  return `<div class="px-shell no-right" id="px-shell">
     <aside class="px-left side" id="px-left">
       <button class="logo" data-nav="home" title="Home">ProjectX</button>
       <button class="ghost px-switcher" id="px-project-switch" type="button">Projects ▾</button>
