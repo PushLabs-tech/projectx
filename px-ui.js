@@ -298,7 +298,7 @@ export function launcherMarkup({esc, session, projects, guestReady}) {
   return `<div class="px-home-builder">
     <div class="px-home-builder-inner">
       <div class="px-home-eyebrow">PROJECTX / NEW PROJECT</div>
-      <h1>Start with the outcome.<br><span>Give it a visual direction.</span></h1>
+      <h1>What are you building?<br><span>Give it a visual direction.</span></h1>
       <p>Describe what you want to make. Before ProjectX builds, give it enough taste to avoid the generic AI look.</p>
       <div class="px-home-composer composer">
         <textarea id="start-input" placeholder="Build a website for my sneaker-cleaning business…"></textarea>
