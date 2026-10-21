@@ -2466,6 +2466,11 @@ function renderFileDiff(before,after){
  a.slice(a.length-suffix,Math.min(a.length-suffix+2,a.length)).forEach(line=>rows.push('<div class="px-diff-line context"><span> </span><code>'+esc(line||' ')+'</code></div>'));
  return '<div class="px-diff-summary">Unsaved diff · '+removed.length+' removed · '+added.length+' added · contiguous changed block</div><div class="px-diff-lines">'+rows.join('')+'</div>';
 }
+function highlightEditorText(source){
+ const escaped=String(source??'').replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]));
+ const pattern=/(\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|<\/?[A-Za-z][^>]*>|\b(?:const|let|var|function|return|if|else|for|while|class|new|import|export|from|default|async|await|try|catch|throw|true|false|null|undefined|this|extends|typeof|instanceof|of|in|switch|case|break|continue|static|interface|type|enum|def|print|None|and|or|not|pass|with|as|elif|lambda|self)\b|\b\d+(?:\.\d+)?\b)/g;
+ return escaped.replace(pattern,token=>{let kind='px-token-keyword';if(/^(?:\/\/|\/\*)/.test(token))kind='px-token-comment';else if(/^(?:"|')/.test(token))kind='px-token-string';else if(/^</.test(token))kind='px-token-tag';else if(/^\d/.test(token))kind='px-token-number';return '<span class="'+kind+'">'+token+'</span>';})+'\n';
+}
 function renderFiles(project){
   const paths=Object.keys(project.files||{}).sort();
   const first=paths.includes(project.uiFilePath)?project.uiFilePath:(paths[0]||null);
@@ -2476,7 +2481,7 @@ function renderFiles(project){
   const tree=paths.length?fileTreeHtml(fileTreeNodes(paths),esc,first):'<div class="sub">No generated files yet. Build to create them, or New to add a path.</div>';
   const tabs=project.uiFileTabs.map(p=>`<button class="${p===first?'active':''}" data-file-tab="${esc(p)}">${esc(p.split('/').pop())}</button>`).join('')||'<span class="sub" style="padding:8px">No open file</span>';
   const split=Boolean(settingsState.splitFiles);
-  body.innerHTML=`<div class="box"><div class="px-ide" id="px-ide"><div class="px-ide-tree file-list">${tree}<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div class="px-ide-main"><div class="px-ide-tabs" id="px-file-tabs">${tabs}</div><div class="px-ide-work ${split?'split':''}"><textarea id="file-code-editor" class="code-editor" spellcheck="false">${esc(first?project.files[first]:'Build the project to create real files.')}</textarea><div class="px-ide-preview" ${split?'':'hidden'}><iframe id="file-preview-frame" sandbox="allow-scripts" title="File preview"></iframe></div></div><div id="px-file-diff" class="px-file-diff" hidden></div><div class="row"><b id="file-name">${esc(first||'No file selected')}</b><div class="actions"><button class="ghost" id="split-files">${split?'Hide preview':'Split preview'}</button>${first?'<button class="ghost" id="preview-file">Diff</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':''}</div></div><div class="sub" id="file-dirty"></div></div></div></div>`;
+  body.innerHTML=`<div class="box"><div class="px-ide" id="px-ide"><div class="px-ide-tree file-list">${tree}<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div class="px-ide-main"><div class="px-ide-tabs" id="px-file-tabs">${tabs}</div><div class="px-ide-work ${split?'split':''}"><div class="px-code-editor-wrap"><pre id="file-code-highlight" class="px-code-highlight" aria-hidden="true">${highlightEditorText(first?project.files[first]:'Build the project to create real files.')}</pre><textarea id="file-code-editor" class="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Source code editor">${esc(first?project.files[first]:'Build the project to create real files.')}</textarea></div><div class="px-ide-preview" ${split?'':'hidden'}><iframe id="file-preview-frame" sandbox="allow-scripts" title="File preview"></iframe></div></div><div id="px-file-diff" class="px-file-diff" hidden></div><div class="row"><b id="file-name">${esc(first||'No file selected')}</b><div class="actions"><button class="ghost" id="split-files">${split?'Hide preview':'Split preview'}</button>${first?'<button class="ghost" id="preview-file">Diff</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':''}</div></div><div class="sub" id="file-dirty"></div></div></div></div>`;
   let currentPath=first;
   const markDirty=()=>{const dirty=currentPath&&project.files[currentPath]!==$('#file-code-editor').value;$('#file-dirty').textContent=dirty?'Unsaved changes in '+currentPath+' · ⌘S to save':'';$('#file-dirty')?.classList.toggle('file-dirty',Boolean(dirty));$$('[data-file-tab]').forEach(t=>t.classList.toggle('file-dirty',t.dataset.fileTab===currentPath&&dirty));};
   const selectFile=path=>{
@@ -2487,6 +2492,7 @@ function renderFiles(project){
     $$('[data-file-tab]',body).forEach(x=>x.classList.toggle('active',x.dataset.fileTab===path));
     $('#file-name').textContent=path;
     $('#file-code-editor').value=project.files[path]||'';
+    const highlight=$('#file-code-highlight');if(highlight)highlight.innerHTML=highlightEditorText(project.files[path]||'');
     markDirty();
     refreshFilePreview(project);
   };
@@ -2495,7 +2501,8 @@ function renderFiles(project){
     button.oncontextmenu=e=>{e.preventDefault();showFileCtx(e.clientX,e.clientY,button.dataset.file,project);};
   });
   $$('[data-file-tab]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.fileTab));
-  $('#file-code-editor')?.addEventListener('input',()=>{markDirty();if(settingsState.splitFiles)refreshFilePreview(project);});
+  $('#file-code-editor')?.addEventListener('input',()=>{markDirty();const editor=$('#file-code-editor'),highlight=$('#file-code-highlight');if(highlight)highlight.innerHTML=highlightEditorText(editor.value);if(settingsState.splitFiles)refreshFilePreview(project);});
+  $('#file-code-editor')?.addEventListener('scroll',()=>{const editor=$('#file-code-editor'),highlight=$('#file-code-highlight');if(highlight){highlight.style.transform='translateY('+(-editor.scrollTop)+'px)';highlight.style.marginLeft=(-editor.scrollLeft)+'px';}});
   $('#file-code-editor')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();if(saveOpenFile(project)){markDirty();notify('File saved. Rebuild and verify to refresh the generated artifact.','success');}}});
   $('#split-files')?.addEventListener('click',()=>{settingsState.splitFiles=!settingsState.splitFiles;persistSettings();renderFiles(project);});
   $('#new-file')?.addEventListener('click',()=>{
