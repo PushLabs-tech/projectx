@@ -127,8 +127,16 @@ export function publicMarkup() {
         <div class="pxl-composer-wrap">
           <div class="pxl-composer">
             <div class="pxl-composer-top"><span class="pxl-composer-kicker">NEW PROJECT</span><span class="pxl-composer-status"><i></i> READY WHEN YOU ARE</span></div>
-            <label class="pxl-prompt-label" for="public-prompt">What are you trying to make happen?</label>
-            <textarea id="public-prompt" rows="3" placeholder="Build a website for my sneaker-cleaning business…"></textarea>
+            <div class="pxl-domain-pills" role="group" aria-label="Choose a starting domain">
+              <button type="button" class="active" data-domain="web" data-placeholder="What do you want to build for the web?">Web &amp; SaaS</button>
+              <button type="button" data-domain="games" data-placeholder="Describe the playable game you want to make…">Games</button>
+              <button type="button" data-domain="business" data-placeholder="What business outcome do you want to achieve?">Business</button>
+              <button type="button" data-domain="github" data-placeholder="Describe the repository, bug, or improvement…">GitHub repo</button>
+              <button type="button" data-domain="research" data-placeholder="What do you need to research or understand?">Research</button>
+              <button type="button" data-domain="operations" data-placeholder="What workflow do you want to organize?">Operations</button>
+            </div>
+            <label class="pxl-prompt-label" for="start-input">What are you building?</label>
+            <textarea id="start-input" rows="3" placeholder="What do you want to make happen? Start with the outcome; details can come later."></textarea>
             <div class="pxl-chip-row" aria-label="Example starting points">
               <button type="button" data-example="Build a polished landing page for a local service business.">Website <span>↗</span></button>
               <button type="button" data-example="Build a useful web app that solves a real problem.">Web app <span>↗</span></button>
