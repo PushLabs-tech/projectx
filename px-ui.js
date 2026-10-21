@@ -105,64 +105,107 @@ export function navForProject(project) {
 }
 
 export function publicMarkup() {
-  return `<div class="px-public-nav">
-    <a href="./" class="logo">ProjectX</a>
-    <div class="px-cta">
-      <a class="ghost" href="#px-examples">Examples</a>
-      <button class="ghost" id="public-workspace">Open workspace</button>
-      <button class="ghost" id="public-signin">Sign in</button>
-      <button class="primary" id="public-signup">Create account</button>
-    </div>
-  </div>
-  <section class="px-hero">
-    <div>
-      <div class="kicker">UNIVERSAL AI WORKSPACE</div>
-      <h1>Tell ProjectX what you want to accomplish.</h1>
-      <p class="lead">ProjectX understands the outcome, organizes the work, builds the artifact, and keeps a durable project brain so you can inspect, approve, test, and ship — without starting over every prompt.</p>
-      <div class="px-cta">
-        <button class="primary" id="public-start">Start a project</button>
-        <button class="ghost" id="public-examples">See examples</button>
+  return `<div class="pxl-page" id="pxl-top">
+    <header class="pxl-nav">
+      <a class="pxl-brand" href="./" aria-label="ProjectX home"><span class="pxl-brand-mark">P<span>×</span></span><span>ProjectX</span></a>
+      <nav class="pxl-links" aria-label="Main navigation">
+        <a href="#pxl-product">Product</a>
+        <a href="#pxl-workflow">How it works</a>
+        <a href="#px-examples">Examples</a>
+      </nav>
+      <div class="pxl-nav-actions">
+        <button class="pxl-signin" id="public-signin" type="button">Sign in</button>
+        <button class="pxl-button pxl-button-dark pxl-button-small" id="public-workspace" type="button">Start building <span aria-hidden="true">↗</span></button>
       </div>
-    </div>
-    <div class="px-product-shot" aria-hidden="true">
-      <div class="px-shot-col">ProjectX<br><span class="sub">Overview</span><br><span class="sub">Assistant</span><br><span class="sub">Design</span><br><span class="sub">Files</span><br><span class="sub">Preview</span><br><span class="sub">Tasks</span><br><span class="sub">Brain</span></div>
-      <div class="px-shot-col px-shot-main"><b>Work surface</b><div class="sub">Live preview · canvas · files</div><div class="px-shot-status">Task · Homepage · Ready for review</div><div class="sub">Nothing lands on the main project until you approve it.</div></div>
-      <div class="px-shot-col">Assistant<br><span class="sub">Thinking</span><br><span class="sub">Working</span><br><span class="sub">Awaiting approval</span><br><span class="sub">Approve · Reject</span></div>
-    </div>
-  </section>
-  <section class="px-how">
-    <div class="kicker">HOW WORK MOVES</div>
-    <ol>
-      <li><b>Describe</b> the outcome in your own words.</li>
-      <li><b>Understand</b> it as a project brain — requirements, constraints, decisions.</li>
-      <li><b>Work</b> as visible tasks while you keep planning.</li>
-      <li><b>Review</b> files, designs, and tests before they become the main state.</li>
-    </ol>
-  </section>
-  <div class="px-examples" id="px-examples">
-    <button data-example="Build a polished expense tracker web app."><b>Software</b><span class="sub">Expense tracker web app</span></button>
-    <button data-example="Build a mobile horror game with progression, enemies, and a shop."><b>Game</b><span class="sub">Mobile horror game</span></button>
-    <button data-example="Help me launch a sneaker cleaning business."><b>Business</b><span class="sub">Sneaker cleaning launch</span></button>
-    <button data-example="Create a research report comparing battery technologies for a solar prototype."><b>Research</b><span class="sub">Battery technology brief</span></button>
-    <button data-example="Create a pitch deck for a student startup."><b>Creative</b><span class="sub">Student startup pitch</span></button>
-    <button data-example="Research a market, design a landing page, build it, and prepare a pitch."><b>Hybrid</b><span class="sub">Market, page, and pitch</span></button>
-  </div>
-  <section class="px-faq" id="px-faq">
-    <div class="kicker">FAQ</div>
-    <details open><summary>What happens after I describe an outcome?</summary><p>ProjectX opens discovery: one contextual decision at a time, four AI options plus “Describe in your own words.” A project brain is written only after valid discovery.</p></details>
-    <details><summary>Do I need an AI key?</summary><p>No, to open the workspace. Discovery and Agent work need a connected provider, a guest Gemini key in this browser, or a signed-in vault. Without AI you can still create a local draft project and inspect files.</p></details>
-    <details><summary>Does ProjectX run my app on a cloud VM?</summary><p>Browser-safe previews run in a sandboxed iframe. Connected GitHub repositories can also run an exact snapshot in an ephemeral isolated build runner. Export remains available until a host is connected.</p></details>
-  </section>
-  <section class="px-how">
-    <div class="kicker">FREE STACK</div>
-    <p class="lead" style="max-width:62ch">ProjectX is built to run on GitHub Pages, Supabase, Edge Functions, and bring-your-own keys. Demo AI, when configured server-side, is rate-limited and never exposed in the browser.</p>
-  </section>
-  <footer class="px-footer">
-    <a href="./privacy.html">Privacy</a>
-    <a href="./terms.html">Terms</a>
-    <a href="./billing.html">Plans</a>
-    <span>Describe an outcome. ProjectX keeps the context.</span>
-  </footer>`;
+    </header>
+
+    <main>
+      <section class="pxl-hero">
+        <div class="pxl-hero-copy">
+          <div class="pxl-eyebrow"><span class="pxl-live-dot"></span> THE UNIVERSAL CREATION ENGINE</div>
+          <h1>From intention<br>to <em>something real.</em></h1>
+          <p class="pxl-lead">Tell ProjectX what you want to accomplish. It turns the goal into a plan, coordinates the work, and helps you verify the result.</p>
+          <div class="pxl-hero-actions">
+            <button class="pxl-button pxl-button-dark" id="public-start" type="button">Start with an idea <span aria-hidden="true">↗</span></button>
+            <button class="pxl-text-link" id="public-examples" type="button">Explore examples <span aria-hidden="true">↓</span></button>
+          </div>
+          <div class="pxl-proof"><span></span><p>Not another chat window.<br><strong>A workspace built around outcomes.</strong></p></div>
+        </div>
+
+        <div class="pxl-product" id="pxl-product" aria-label="Illustrative ProjectX workspace preview">
+          <div class="pxl-window-bar">
+            <div class="pxl-window-dots"><i></i><i></i><i></i></div>
+            <span>projectx / workspace</span>
+            <span class="pxl-window-label"><b></b> WORKSPACE PREVIEW</span>
+          </div>
+          <div class="pxl-app-shell">
+            <aside class="pxl-app-sidebar">
+              <div class="pxl-app-brand"><span class="pxl-mini-mark">P×</span> ProjectX</div>
+              <div class="pxl-new-project">＋ New project</div>
+              <div class="pxl-side-label">WORKSPACE</div>
+              <div class="pxl-side-item pxl-side-active"><span>▦</span> Overview</div>
+              <div class="pxl-side-item"><span>◫</span> Projects <small>3</small></div>
+              <div class="pxl-side-item"><span>✓</span> Tasks</div>
+              <div class="pxl-side-item"><span>⌘</span> AI agents</div>
+              <div class="pxl-side-bottom"><span class="pxl-avatar">P</span><span><strong>Personal workspace</strong><small>Free plan</small></span></div>
+            </aside>
+            <div class="pxl-app-main">
+              <div class="pxl-app-top"><span>Workspace <b>/</b> Project overview</span><span class="pxl-avatar pxl-avatar-small">P</span></div>
+              <div class="pxl-app-content">
+                <div class="pxl-greeting"><div><span class="pxl-mono-label">PROJECTX / 01</span><h2>Make progress on<br>what matters.</h2><p>One clear next step beats a hundred open tabs.</p></div></div>
+                <div class="pxl-current-project">
+                  <div class="pxl-project-heading"><span class="pxl-project-icon">↗</span><span><small>ACTIVE PROJECT</small><strong>Launch a neighborhood café</strong></span><span class="pxl-dots">···</span></div>
+                  <div class="pxl-progress"><span></span></div>
+                  <div class="pxl-project-meta"><span>Project plan</span><span><b>3</b> of 8 steps clarified</span></div>
+                  <div class="pxl-work-row"><span class="pxl-step pxl-done">✓</span><span class="pxl-work-label"><strong>Define the concept</strong><small>Audience, offer, and location</small></span><span class="pxl-status pxl-status-done">CLARIFIED</span></div>
+                  <div class="pxl-work-row"><span class="pxl-step pxl-next">02</span><span class="pxl-work-label"><strong>Estimate startup costs</strong><small>Build a practical cost model</small></span><span class="pxl-status pxl-status-next">NEXT UP</span></div>
+                  <div class="pxl-work-row"><span class="pxl-step">03</span><span class="pxl-work-label"><strong>Create launch checklist</strong><small>Owners, dependencies, milestones</small></span></div>
+                  <div class="pxl-note"><span>✳</span><span><strong>Keep the context.</strong> Decisions and next steps stay connected to the work.</span></div>
+                </div>
+                <div class="pxl-app-tabs"><span>Project brain</span><span>Activity</span><span>Files</span><span class="pxl-tab-open">Open project ↗</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="pxl-caption"><span>ONE CONNECTED WORKSPACE</span><span>Plan · Build · Verify</span></div>
+        </div>
+      </section>
+
+      <section class="pxl-outcome" id="pxl-workflow">
+        <div class="pxl-section-label">FROM ASK TO OUTCOME</div>
+        <div class="pxl-workflow-head"><h2>One continuous line<br>from idea to <em>done.</em></h2><p>Each step has a purpose. Your goal, decisions, files, and progress stay connected instead of disappearing into a long conversation.</p></div>
+        <div class="pxl-steps">
+          <article><span>01</span><h3>Understand</h3><p>Clarify the goal, context, constraints, and what success looks like.</p></article>
+          <article><span>02</span><h3>Plan</h3><p>Turn ambiguity into steps, decisions, and concrete deliverables.</p></article>
+          <article><span>03</span><h3>Build</h3><p>Create the artifacts and keep work organized in one workspace.</p></article>
+          <article><span>04</span><h3>Verify</h3><p>Review what works, surface gaps, and decide what should happen next.</p></article>
+        </div>
+      </section>
+
+      <section class="pxl-examples-head">
+        <div><div class="pxl-section-label">NOT JUST FOR CODE</div><h2>Different goals.<br><em>One place to move them forward.</em></h2></div>
+        <p>Choose a starting point. ProjectX can help organize software, research, business planning, creative work, or goals that combine several of them.</p>
+      </section>
+      <section class="pxl-example-grid" id="px-examples" aria-label="Project examples">
+        <button class="pxl-example-card" data-example="Build a polished expense tracker web app." type="button"><span class="pxl-example-index">01 / SOFTWARE</span><strong>Build an expense tracker</strong><span>Plan the features, create the interface, and track verification.</span><b class="pxl-example-arrow">↗</b></button>
+        <button class="pxl-example-card" data-example="Help me launch a sneaker cleaning business." type="button"><span class="pxl-example-index">02 / BUSINESS</span><strong>Launch a small business</strong><span>Define the offer, estimate costs, and organize the launch.</span><b class="pxl-example-arrow">↗</b></button>
+        <button class="pxl-example-card" data-example="Create a research report comparing battery technologies for a solar prototype." type="button"><span class="pxl-example-index">03 / RESEARCH</span><strong>Make a research brief</strong><span>Structure questions, compare evidence, and prepare a decision.</span><b class="pxl-example-arrow">↗</b></button>
+        <button class="pxl-example-card" data-example="Create a pitch deck for a student startup." type="button"><span class="pxl-example-index">04 / CREATIVE</span><strong>Prepare a startup pitch</strong><span>Organize the story, shape the presentation, and refine the result.</span><b class="pxl-example-arrow">↗</b></button>
+        <button class="pxl-example-card" data-example="Build a mobile horror game with progression, enemies, and a shop." type="button"><span class="pxl-example-index">05 / GAME</span><strong>Design a game project</strong><span>Break the core loop, features, and release tasks into steps.</span><b class="pxl-example-arrow">↗</b></button>
+        <button class="pxl-example-card" data-example="Research a market, design a landing page, build it, and prepare a pitch." type="button"><span class="pxl-example-index">06 / HYBRID</span><strong>Bring several disciplines together</strong><span>Connect research, design, building, and launch work.</span><b class="pxl-example-arrow">↗</b></button>
+      </section>
+
+      <section class="pxl-bottom-cta">
+        <div><div class="pxl-section-label">MAKE THE NEXT STEP CLEAR</div><h2>Start with what<br>you want to <em>change.</em></h2></div>
+        <div><p>Describe the outcome in your own words. ProjectX will help you turn it into a project you can inspect and move forward.</p><button class="pxl-button pxl-button-light" id="public-signup" type="button">Create your workspace <span aria-hidden="true">↗</span></button></div>
+      </section>
+    </main>
+
+    <footer class="pxl-footer">
+      <a class="pxl-brand" href="./"><span class="pxl-brand-mark">P<span>×</span></span><span>ProjectX</span></a>
+      <span>Describe an outcome. Keep the context.</span>
+      <div><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a><a href="./billing.html">Plans</a><button id="public-signin" type="button">Sign in</button></div>
+    </footer>
+  </div>`;
 }
 
 export function authMarkup({mode}) {
