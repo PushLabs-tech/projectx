@@ -120,7 +120,7 @@ export function publicMarkup() {
     </header>
 
     <main>
-      <section class="pxl-hero">
+      <section class="pxl-hero px-hero">
         <div class="pxl-hero-copy">
           <div class="pxl-eyebrow"><span class="pxl-live-dot"></span> THE UNIVERSAL CREATION ENGINE</div>
           <h1>From intention<br>to <em>something real.</em></h1>
@@ -132,7 +132,7 @@ export function publicMarkup() {
           <div class="pxl-proof"><span></span><p>Not another chat window.<br><strong>A workspace built around outcomes.</strong></p></div>
         </div>
 
-        <div class="pxl-product" id="pxl-product" aria-label="Illustrative ProjectX workspace preview">
+        <div class="pxl-product px-product-shot" id="pxl-product" aria-label="Illustrative ProjectX workspace preview">
           <div class="pxl-window-bar">
             <div class="pxl-window-dots"><i></i><i></i><i></i></div>
             <span>projectx / workspace</span>
