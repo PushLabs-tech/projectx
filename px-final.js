@@ -891,7 +891,7 @@ function publicHome(){
     const input=$('#start-input');
     if(input){input.dataset.domain=button.dataset.domain||'';input.placeholder=button.dataset.placeholder||'What do you want to make happen?';input.focus();}
   });
-  $('[data-example]').forEach(btn=>btn.onclick=()=>{
+  $$('[data-example]').forEach(btn=>btn.onclick=()=>{
     try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example||'');sessionStorage.setItem('projectx_pending_domain',btn.dataset.example?.includes('game')?'games':'web');}catch{}
     state.forceWorkspace=true;
     history.replaceState(null,'',location.pathname+'#workspace');
