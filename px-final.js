@@ -1558,7 +1558,7 @@ function renderArchitecture(project){
       renderArchitecture(project);return;
     }
     snapshot(project,'Before dependency graph change');
-    applyProjectMutation(project,{sectionOperations:[{op:'update',id:nodeId,patch:{dependsOn:next}}]});
+    applyProjectMutation(project,{workspaceSections:proposed});
     saveProject(project);await syncRemoteProject(project);renderArchitecture(project);
     notify('Dependency graph updated. Affected artifacts may require verification.','success');
   }));
