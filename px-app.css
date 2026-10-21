@@ -2445,3 +2445,14 @@ html, body {
 #px-app.px-public .pxl-billing-toggle button{border:0;border-radius:7px;background:transparent;padding:9px 12px;color:var(--px-text-secondary);cursor:pointer;font-size:12px}
 #px-app.px-public .pxl-billing-toggle button.active{background:#fff;color:var(--px-text-primary);box-shadow:var(--px-shadow-sm)}
 @media(max-width:650px){#px-app.px-public .pxl-pricing-head{align-items:flex-start;flex-direction:column}}
+
+/* Unsaved source diff */
+#px-ide .px-file-diff{margin-top:10px;border:1px solid var(--px-border);border-radius:10px;overflow:hidden;background:var(--px-surface)}
+#px-ide .px-diff-summary{padding:10px 12px;font-size:11px;color:var(--px-text-secondary);border-bottom:1px solid var(--px-border)}
+#px-ide .px-diff-lines{max-height:280px;overflow:auto;font:11px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+#px-ide .px-diff-line{display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;padding:0 10px;white-space:pre}
+#px-ide .px-diff-line code{font:inherit;white-space:pre}
+#px-ide .px-diff-line.removed{background:rgba(220,70,70,.10);color:#ff9b9b}
+#px-ide .px-diff-line.added{background:rgba(35,160,100,.12);color:#8dddb4}
+#px-ide .px-diff-line.context{color:var(--px-text-secondary)}
+#px-ide .px-diff-empty{padding:14px;color:var(--px-text-secondary);font-size:12px}
