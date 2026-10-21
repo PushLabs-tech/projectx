@@ -872,8 +872,8 @@ function publicHome(){
   $('#public-workspace').onclick=openWorkspace;
   $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
   $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
-  $('[data-domain]').forEach(button=>button.onclick=()=>{
-    $('[data-domain]').forEach(item=>item.classList.toggle('active',item===button));
+  $$('[data-domain]').forEach(button=>button.onclick=()=>{
+    $$('[data-domain]').forEach(item=>item.classList.toggle('active',item===button));
     const input=$('#start-input');
     if(input){input.dataset.domain=button.dataset.domain||'';input.placeholder=button.dataset.placeholder||'What do you want to make happen?';input.focus();}
   });
