@@ -712,6 +712,17 @@ function bindChrome(root){
       const list=$('#px-switch-list');if(list)list.hidden=!list.hidden;return;
     }
     if(!e.target.closest('#px-switch-list')) {const list=$('#px-switch-list');if(list)list.hidden=true;}
+    const modeButton=e.target.closest('[data-workspace-mode]');
+    if(modeButton){
+      const project=activeProject();
+      if(!project)return;
+      const mode=modeButton.dataset.workspaceMode;
+      const target=mode==='studio'?'build':mode==='canvas'?'overview':'files';
+      project.uiWorkspaceMode=mode;
+      project.uiNav=target;
+      saveProject(project);
+      return renderProject(project);
+    }
     if(!e.target.closest('#px-ctx')) {const ctx=$('#px-ctx');if(ctx)ctx.hidden=true;}
     if(e.target.closest('#px-share')&&!e.target.closest('.px-share-box')) hideShare();
     const openFile=e.target.closest('[data-open-file]')?.dataset.openFile;
