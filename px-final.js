@@ -696,6 +696,23 @@ function filterSideSearch(q){
   extra.innerHTML=hits.map(f=>`<button data-project-tool="files" data-open-file="${esc(f)}">${esc(f)}</button>`).join('');
 }
 function bindChrome(root){
+  let studioResizeActive=false;
+  root.addEventListener('pointerdown',e=>{
+    const shell=$('#px-shell');
+    const agent=e.target.closest('.replit-agent');
+    if(!shell||shell.dataset.uiMode!=='studio'||!agent||window.matchMedia('(max-width: 900px)').matches)return;
+    if(e.clientX<agent.getBoundingClientRect().right-8)return;
+    studioResizeActive=true;agent.setPointerCapture?.(e.pointerId);e.preventDefault();
+  });
+  root.addEventListener('pointermove',e=>{
+    if(!studioResizeActive)return;
+    const shell=$('#px-shell');if(!shell)return;
+    const rail=parseFloat(getComputedStyle(shell).getPropertyValue('--px-replit-rail'))||72;
+    const width=Math.max(280,Math.min(window.innerWidth-rail-340,e.clientX-rail));
+    shell.style.setProperty('--px-studio-agent-width',width+'px');
+  });
+  const stopStudioResize=()=>{studioResizeActive=false;};
+  root.addEventListener('pointerup',stopStudioResize);root.addEventListener('pointercancel',stopStudioResize);
   
   root.onclick=async e=>{
     const cmd=e.target.closest('[data-cmd]')?.dataset.cmd;
