@@ -846,8 +846,21 @@ function publicHome(){
   const openWorkspace=()=>{state.forceWorkspace=true;history.replaceState(null,'',location.pathname+'#workspace');workspaceHome();};
   $('#public-signin').onclick=()=>authScreen('signin');
   $('#public-signup').onclick=()=>authScreen('signup');
-  $('#public-start').onclick=openWorkspace;
+  const startFromLanding=()=>{
+    const prompt=$('#public-prompt');
+    const intent=String(prompt?.value||'').trim();
+    if(intent){try{sessionStorage.setItem('projectx_pending_intent',intent);}catch{}}
+    openWorkspace();
+    if(intent){
+      const input=$('#start-input');
+      if(input)input.value=intent;
+    }
+  };
+  $('#public-start').onclick=startFromLanding;
+  $('#public-start-arrow').onclick=startFromLanding;
+  $('#public-prompt').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter')startFromLanding();};
   $('#public-workspace').onclick=openWorkspace;
+  $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
   $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
   $$('[data-example]').forEach(btn=>btn.onclick=()=>{
     try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example||'');}catch{}
