@@ -2430,3 +2430,10 @@ html, body {
 #px-shell .px-project-name-edit:hover span,#px-shell .px-project-name-edit:focus-visible span{opacity:1}
 #px-shell .px-domain-badge{font:10px var(--px-font-mono);text-transform:uppercase;letter-spacing:.04em;color:var(--px-text-secondary);border:1px solid var(--px-border);border-radius:999px;padding:4px 7px;white-space:nowrap}
 @media(max-width:700px){#px-shell .px-domain-badge{display:none}#px-shell .px-project-name-edit{max-width:150px}}
+
+/* Optional draggable divider between the Studio agent and preview */
+#px-shell.actual-replit-shell[data-ui-mode="studio"]{grid-template-columns:var(--px-replit-rail) minmax(280px,var(--px-studio-agent-width,38%)) minmax(0,1fr)}
+#px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent{position:relative}
+#px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent:after{content:"";position:absolute;z-index:6;top:0;right:-4px;bottom:0;width:8px;cursor:col-resize;touch-action:none}
+#px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent:after:hover{background:var(--px-accent-glow)}
+@media(max-width:900px){#px-shell.actual-replit-shell[data-ui-mode="studio"]{grid-template-columns:var(--px-replit-rail) minmax(0,1fr)}#px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent:after{display:none}}
