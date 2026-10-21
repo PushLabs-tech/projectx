@@ -394,7 +394,6 @@ export function interviewMarkup() {
 
 export function projectHead({esc, project}) {
  const hasFiles=Object.keys(project.files||{}).length>0,summary=String(project.understanding?.summary||project.intent||'').trim(),mode=project.uiMode||'studio';
- const active=key=>mode===key?' active':'';
  return `<div class="px-replit-project px-tri-workspace" data-ui-mode="${esc(mode)}">
  <div class="px-workspace-title px-workspace-topbar"><div class="px-workspace-title-main"><span class="px-workspace-kicker">PROJECT / ${esc(String(project.domain||project.kind||'UNIVERSAL').toUpperCase())}</span><strong>${esc(project.title)}</strong><span class="px-workspace-desc">${esc(summary||'Build, preview, and refine your project.')} <i class="px-sync-state">● Local state</i></span></div>
  <div class="px-workspace-actions"><button class="ghost" data-workspace-action="tests" type="button">Run tests</button><button class="ghost" data-workspace-action="preview" type="button">Preview ↗</button></div></div>
