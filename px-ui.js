@@ -316,7 +316,8 @@ export function chrome({esc, session, recents, active, body, project, nav, right
       <header class="px-topbar actual-replit-topbar">
         <button class="ghost px-nav-toggle" id="px-nav-toggle" aria-label="Open navigation">Menu</button>
         <div class="px-project-titlebar">
-          <strong>${title}</strong>
+          <button type="button" class="px-project-name-edit" data-project-title-edit title="Rename project">${title} <span aria-hidden="true">✎</span></button>
+          <span class="px-domain-badge">${esc(project.domain||project.kind||project.type||'Project')}</span>
           <span class="px-project-status"><span class="px-live-dot"></span>${status ? esc(status) : 'Ready'}</span>
         </div>
         <div class="px-center-actions px-mode-switch" role="group" aria-label="Workspace mode">
