@@ -730,6 +730,8 @@ function bindChrome(root){
     if(!e.target.closest('#px-switch-list')) {const list=$('#px-switch-list');if(list)list.hidden=true;}
     const runtimeFix=e.target.closest('[data-runtime-auto-fix]');
     if(runtimeFix){const input=$('#assistant-dock-input');const form=$('#assistant-dock-form');if(input&&form){input.value='Fix the root cause of this preview runtime error and verify the result: '+String(runtimeFix.dataset.runtimeMessage||'Runtime error');form.requestSubmit();}return;}
+    const renameButton=e.target.closest('[data-project-title-edit]');
+    if(renameButton){const project=activeProject();if(!project)return;const next=String(prompt('Rename project',project.title||'Untitled project')||'').trim();if(next&&next!==project.title){project.title=next.slice(0,120);saveProject(project);renderProject(project);}return;}
     const modeButton=e.target.closest('[data-workspace-mode]');
     if(modeButton){
       const project=activeProject();
