@@ -1307,6 +1307,31 @@ async function subscribeProjectRealtime(projectId){
     }).on('postgres_changes',{event:'INSERT',schema:'public',table:'project_execution_events',filter:'project_id=eq.'+projectId},()=>{const current=activeProject();if(current&&current.id===projectId&&current.uiNav==='runs')renderExecutionRuns(current);}).subscribe();
 }
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{} await subscribeProjectRealtime(id);}}
+function renderOutcomeCanvas(project){
+ const root=$('#project-body');if(!root)return;
+ const stages=[
+  ['01','Goal','Clarify the outcome','goal'],
+  ['02','Requirements','Capture constraints','plan'],
+  ['03','Milestones','Break work into steps','plan'],
+  ['04','Architecture','Choose a practical approach','plan'],
+  ['05','Dependencies','Map tools and prerequisites','build'],
+  ['06','Artifacts','Track files and deliverables','build'],
+  ['07','Implementation','Create the first version','build'],
+  ['08','Verification','Run available checks','verify'],
+  ['09','Corrections','Resolve identified issues','repair'],
+  ['10','Next iteration','Use feedback to improve','adapt']
+ ];
+ const tasks=Array.isArray(project.tasks)?project.tasks:[];
+ const files=Object.keys(project.files||{});
+ const done=tasks.filter(t=>['done','completed','verified'].includes(String(t.status||'').toLowerCase())).length;
+ const total=tasks.length;
+ const nodes=stages.map((stage,i)=>{
+  const state=i===0?'active':i<4?'planned':i===5&&files.length?'active':i===7&&done===total&&total?'verified':'planned';
+  const detail=i===0?(project.intent||project.understanding?.summary||'Add a goal in the Studio agent.'):i===5?(files.length+' project file(s) available'):i===7?(total?done+' of '+total+' task(s) marked complete':'Verification status not recorded yet'):stage[2];
+  return '<article class="px-outcome-node" data-state="'+state+'"><span class="px-outcome-number">'+stage[0]+'</span><span class="px-outcome-state">'+(state==='verified'?'VERIFIED':state==='active'?'ACTIVE':'PLANNED')+'</span><h3>'+esc(stage[1])+'</h3><p>'+esc(detail)+'</p><small>'+esc(stage[2].toUpperCase())+'</small></article>';
+ }).join('');
+ root.innerHTML='<div class="px-outcome-canvas"><header class="px-outcome-head"><div><span class="kicker">PROJECT MAP / CANVAS MODE</span><h2>'+esc(project.title||'Untitled project')+'</h2><p class="sub">A high-level map of the intent-to-execution loop. Statuses reflect saved project data; they are not a claim that an automated stage ran.</p></div><div class="px-outcome-summary"><b>'+files.length+'</b><span>Artifacts</span><b>'+done+'/'+total+'</b><span>Tasks complete</span></div></header><div class="px-outcome-graph">'+nodes+'</div><div class="px-outcome-footer"><span>GOAL → PLAN → BUILD → VERIFY → ADAPT</span><button type="button" class="primary" data-workspace-mode="studio">Continue in Studio ↗</button></div></div>';
+}
 function renderProject(project){
  if(!project.uiNav||project.uiNav==='assistant'||project.uiNav==='overview')project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
  if(!['studio','canvas','console'].includes(project.uiMode))project.uiMode='studio';
@@ -1318,7 +1343,7 @@ function renderProject(project){
   $$('[data-workspace-action]',$('#px-app')).forEach(button=>button.onclick=()=>{if(button.dataset.workspaceAction==='tests'){project.uiMode='console';project.uiNav='tests';}else{project.uiMode='studio';project.uiNav='preview';}saveProject(project);renderProject(project);});
  $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
  $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode='studio';project.uiNav=button.dataset.projectTool;saveProject(project);renderProject(project);});
- if(project.uiMode==='canvas')renderCanvas(project);
+ if(project.uiMode==='canvas')renderOutcomeCanvas(project);
  else if(project.uiMode==='console')renderProjectTool(project,project.uiNav==='tests'?'tests':'files');
  else if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav)renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
  else renderProjectTool(project,project.uiNav);
