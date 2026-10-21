@@ -919,6 +919,12 @@ function publicHome(){
   $('#pxl-task-advance')?.addEventListener('click',()=>{taskStage=(taskStage+1)%taskStages.length;const status=$('#pxl-task-status'),card=$('#pxl-task-card');if(status)status.textContent='Landing page · '+taskStages[taskStage];if(card)card.textContent='Landing page · '+taskStages[taskStage];});
   const updateEconomics=()=>{const price=Number($('#pxl-price')?.value||80),cac=Number($('#pxl-cac')?.value||20),contribution=price-cac,margin=price?Math.round(contribution/price*100):0;const p=$('#pxl-price-value'),c=$('#pxl-cac-value'),v=$('#pxl-contribution'),m=$('#pxl-margin');if(p)p.textContent='$'+price;if(c)c.textContent='$'+cac;if(v)v.textContent='$'+contribution;if(m)m.textContent=margin+'% before other operating costs';};
   $('#pxl-price')?.addEventListener('input',updateEconomics);$('#pxl-cac')?.addEventListener('input',updateEconomics);
+  $$('[data-billing-toggle]').forEach(button=>button.onclick=()=>{
+    const annual=button.dataset.billingToggle==='annual';
+    $$('[data-billing-toggle]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
+    $$('[data-monthly-price]').forEach(price=>{price.textContent=annual?price.dataset.annualPrice:price.dataset.monthlyPrice;});
+    $$('[data-billing-suffix]').forEach(suffix=>{suffix.textContent=annual?'/ year':'/ month';});
+  });
   $$('[data-plan-start]').forEach(button=>button.onclick=()=>{if(button.dataset.planStart==='enterprise'){notify('Enterprise enquiries are not connected yet.','info');return;}$('#start-input')?.focus();$('#start-input')?.scrollIntoView({behavior:'smooth',block:'center'});notify('Plan pricing is illustrative; billing is not enabled from this page.','info');});
 
 }
