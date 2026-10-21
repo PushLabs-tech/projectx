@@ -1316,7 +1316,7 @@ function renderProject(project){
  else if(project.uiMode==='studio'&&['canvas','files','tests'].includes(project.uiNav))project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
  const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default,assistantDock=UI.assistantDock({esc,project,actions});
  shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
- $$('[data-ui-mode]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode=button.dataset.uiMode;project.uiNav=project.uiMode==='canvas'?'canvas':project.uiMode==='console'?'files':Object.keys(project.files||{}).length?'preview':'build';saveProject(project);renderProject(project);});
+ $('[data-workspace-mode]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode=button.dataset.workspaceMode;project.uiNav=project.uiMode==='canvas'?'canvas':project.uiMode==='console'?'files':Object.keys(project.files||{}).length?'preview':'build';saveProject(project);renderProject(project);});
  $$('[data-workspace-action]',$('#px-app')).forEach(button=>button.onclick=()=>{if(button.dataset.workspaceAction==='tests'){project.uiMode='console';project.uiNav='tests';}else{project.uiMode='studio';project.uiNav='preview';}saveProject(project);renderProject(project);});
  $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
  $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode='studio';project.uiNav=button.dataset.projectTool;saveProject(project);renderProject(project);});
