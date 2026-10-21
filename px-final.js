@@ -844,7 +844,7 @@ function bindStartComposer(){
     p.understanding={summary:t.intent,category:t.type,confidence:0.5};
     saveProject(p);openProject(p.id);
   });
-  $$$('[data-example]').forEach(btn=>btn.onclick=()=>{
+  $('[data-example]').forEach(btn=>btn.onclick=()=>{
     input.value=btn.dataset.example||'';
     input.focus();
   });
