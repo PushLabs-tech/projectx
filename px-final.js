@@ -858,7 +858,7 @@ function publicHome(){
   $('#public-signin').onclick=()=>authScreen('signin');
   $('#public-signup').onclick=()=>authScreen('signup');
   const startFromLanding=()=>{
-    const prompt=$('#public-prompt');
+    const prompt=$('#start-input');
     const intent=String(prompt?.value||'').trim();
     if(intent){try{sessionStorage.setItem('projectx_pending_intent',intent);}catch{}}
     openWorkspace();
@@ -873,6 +873,11 @@ function publicHome(){
   $('#public-workspace').onclick=openWorkspace;
   $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
   $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
+  $('[data-domain]').forEach(button=>button.onclick=()=>{
+    $('[data-domain]').forEach(item=>item.classList.toggle('active',item===button));
+    const input=$('#start-input');
+    if(input){input.dataset.domain=button.dataset.domain||'';input.placeholder=button.dataset.placeholder||'What do you want to make happen?';input.focus();}
+  });
   $$('[data-example]').forEach(btn=>btn.onclick=()=>{
     try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example||'');}catch{}
     state.forceWorkspace=true;
