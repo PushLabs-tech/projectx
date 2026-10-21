@@ -122,7 +122,7 @@ export function publicMarkup() {
     <main>
       <section class="pxl-hero px-hero">
         <div class="pxl-hero-copy">
-          <div class="pxl-eyebrow"><span class="pxl-live-dot"></span> THE UNIVERSAL CREATION ENGINE</div>
+          <div class="pxl-eyebrow"><span class="pxl-live-dot"></span> UNIVERSAL AI WORKSPACE · THE CREATION ENGINE</div>
           <h1>From intention<br>to <em>something real.</em></h1>
           <p class="pxl-lead">Tell ProjectX what you want to accomplish. It turns the goal into a plan, coordinates the work, and helps you verify the result.</p>
           <div class="pxl-hero-actions">
