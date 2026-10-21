@@ -30,7 +30,7 @@ import {
   prepareReconciliationRepair,
   diagnoseFailures,
   createRepairActionContract,
-  scheduleRepairCycle,
+  scheduleRepairCycle
 } from './projectx-core.js';
 import { summarizeSandboxEvents } from './projectx-sandbox.js';
 import * as UI from './px-ui.js';
@@ -696,6 +696,24 @@ function filterSideSearch(q){
   extra.innerHTML=hits.map(f=>`<button data-project-tool="files" data-open-file="${esc(f)}">${esc(f)}</button>`).join('');
 }
 function bindChrome(root){
+  let studioResizeActive=false;
+  root.addEventListener('pointerdown',e=>{
+    const shell=$('#px-shell');
+    const agent=e.target.closest('.replit-agent');
+    if(!shell||shell.dataset.uiMode!=='studio'||!agent||window.matchMedia('(max-width: 900px)').matches)return;
+    if(e.clientX<agent.getBoundingClientRect().right-8)return;
+    studioResizeActive=true;agent.setPointerCapture?.(e.pointerId);e.preventDefault();
+  });
+  root.addEventListener('pointermove',e=>{
+    if(!studioResizeActive)return;
+    const shell=$('#px-shell');if(!shell)return;
+    const rail=parseFloat(getComputedStyle(shell).getPropertyValue('--px-replit-rail'))||72;
+    const width=Math.max(280,Math.min(window.innerWidth-rail-340,e.clientX-rail));
+    shell.style.setProperty('--px-studio-agent-width',width+'px');
+  });
+  const stopStudioResize=()=>{studioResizeActive=false;};
+  root.addEventListener('pointerup',stopStudioResize);root.addEventListener('pointercancel',stopStudioResize);
+  
   root.onclick=async e=>{
     const cmd=e.target.closest('[data-cmd]')?.dataset.cmd;
     if(cmd==='palette')return openPalette();
@@ -712,6 +730,20 @@ function bindChrome(root){
       const list=$('#px-switch-list');if(list)list.hidden=!list.hidden;return;
     }
     if(!e.target.closest('#px-switch-list')) {const list=$('#px-switch-list');if(list)list.hidden=true;}
+    const runtimeFix=e.target.closest('[data-runtime-auto-fix]');
+    if(runtimeFix){const input=$('#assistant-dock-input');const form=$('#assistant-dock-form');if(input&&form){input.value='Fix the root cause of this preview runtime error and verify the result: '+String(runtimeFix.dataset.runtimeMessage||'Runtime error');form.requestSubmit();}return;}
+    const renameButton=e.target.closest('[data-project-title-edit]');
+    if(renameButton){const project=activeProject();if(!project)return;const next=String(prompt('Rename project',project.title||'Untitled project')||'').trim();if(next&&next!==project.title){project.title=next.slice(0,120);saveProject(project);renderProject(project);}return;}
+    const modeButton=e.target.closest('[data-workspace-mode]');
+    if(modeButton){
+      const project=activeProject();
+      if(!project)return;
+      const mode=modeButton.dataset.workspaceMode;
+      project.uiMode=mode;
+      project.uiNav=mode==='studio'?(Object.keys(project.files||{}).length?'preview':'build'):mode==='canvas'?'canvas':'files';
+      saveProject(project);
+      return renderProject(project);
+    }
     if(!e.target.closest('#px-ctx')) {const ctx=$('#px-ctx');if(ctx)ctx.hidden=true;}
     if(e.target.closest('#px-share')&&!e.target.closest('.px-share-box')) hideShare();
     const openFile=e.target.closest('[data-open-file]')?.dataset.openFile;
@@ -805,7 +837,7 @@ function bindStartComposer(){
   const input=$('#start-input');
   const send=$('#start-send');
   if(!input||!send)return;
-  try{const pending=sessionStorage.getItem('projectx_pending_intent');if(pending&&!input.value){input.value=pending;sessionStorage.removeItem('projectx_pending_intent');}}catch{}
+  try{const pending=sessionStorage.getItem('projectx_pending_intent');const domain=sessionStorage.getItem('projectx_pending_domain');if(pending&&!input.value){input.value=domain&&domain!=='web'?'[Preferred ProjectX domain: '+domain+']\\n'+pending:pending;sessionStorage.removeItem('projectx_pending_intent');sessionStorage.removeItem('projectx_pending_domain');}}catch{}
   const value=id=>String($('#'+id)?.value||'').trim();
   const buildIntent=()=>{
     const base=String(input.value||'').trim();
@@ -847,29 +879,54 @@ function publicHome(){
   $('#public-signin').onclick=()=>authScreen('signin');
   $('#public-signup').onclick=()=>authScreen('signup');
   const startFromLanding=()=>{
-    const prompt=$('#public-prompt');
-    const intent=String(prompt?.value||'').trim();
-    if(intent){try{sessionStorage.setItem('projectx_pending_intent',intent);}catch{}}
-    openWorkspace();
-    if(intent){
-      const input=$('#start-input');
-      if(input)input.value=intent;
-    }
+    const prompt=$('#start-input');
+    const rawIntent=String(prompt?.value||'').trim();
+    if(!rawIntent){prompt?.focus();return;}
+    const domain=String(prompt?.dataset.domain||'web');
+    const intent=domain==='web'?rawIntent:'[Preferred ProjectX domain: '+domain+']\\n'+rawIntent;
+    beginCreation(intent);
   };
   $('#public-start').onclick=startFromLanding;
   $('#public-start-arrow').onclick=startFromLanding;
-  $('#public-prompt').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter')startFromLanding();};
+  $('#start-input').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}};
   $('#public-workspace').onclick=openWorkspace;
   $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
   $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
+  $$('[data-domain]').forEach(button=>button.onclick=()=>{
+    $$('[data-domain]').forEach(item=>item.classList.toggle('active',item===button));
+    const input=$('#start-input');
+    if(input){input.dataset.domain=button.dataset.domain||'';input.placeholder=button.dataset.placeholder||'What do you want to make happen?';input.focus();}
+  });
   $$('[data-example]').forEach(btn=>btn.onclick=()=>{
-    try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example||'');}catch{}
+    try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example||'');sessionStorage.setItem('projectx_pending_domain',btn.dataset.example?.includes('game')?'games':'web');}catch{}
     state.forceWorkspace=true;
     history.replaceState(null,'',location.pathname+'#workspace');
     workspaceHome();
     const input=$('#start-input');
     if(input)input.value=btn.dataset.example||'';
   });
+
+  $$('[data-demo-tab]').forEach(button=>button.onclick=()=>{
+    const key=button.dataset.demoTab;
+    $$('[data-demo-tab]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-selected',String(active));});
+    $$('[data-demo-panel]').forEach(panel=>panel.hidden=panel.dataset.demoPanel!==key);
+  });
+  let gamePosition=2;
+  const drawGame=()=>{$$('[data-game-cell]').forEach(cell=>{const n=Number(cell.dataset.gameCell);cell.classList.toggle('player',n===gamePosition);cell.textContent=n===gamePosition?'●':n===3?'▲':'·';});const status=$('#pxl-game-status');if(status)status.textContent='Player position: '+(gamePosition+1)+' / 5'+(gamePosition===3?' · obstacle reached':'');};
+  $$('[data-game-move]').forEach(button=>button.onclick=()=>{gamePosition=Math.max(0,Math.min(4,gamePosition+Number(button.dataset.gameMove)));drawGame();});
+  $('[data-game-reset]')?.addEventListener('click',()=>{gamePosition=2;drawGame();});
+  let taskStage=0;const taskStages=['Planned','In progress','Ready for review','Done'];
+  $('#pxl-task-advance')?.addEventListener('click',()=>{taskStage=(taskStage+1)%taskStages.length;const status=$('#pxl-task-status'),card=$('#pxl-task-card');if(status)status.textContent='Landing page · '+taskStages[taskStage];if(card)card.textContent='Landing page · '+taskStages[taskStage];});
+  const updateEconomics=()=>{const price=Number($('#pxl-price')?.value||80),cac=Number($('#pxl-cac')?.value||20),contribution=price-cac,margin=price?Math.round(contribution/price*100):0;const p=$('#pxl-price-value'),c=$('#pxl-cac-value'),v=$('#pxl-contribution'),m=$('#pxl-margin');if(p)p.textContent='$'+price;if(c)c.textContent='$'+cac;if(v)v.textContent='$'+contribution;if(m)m.textContent=margin+'% before other operating costs';};
+  $('#pxl-price')?.addEventListener('input',updateEconomics);$('#pxl-cac')?.addEventListener('input',updateEconomics);
+  $$('[data-billing-toggle]').forEach(button=>button.onclick=()=>{
+    const annual=button.dataset.billingToggle==='annual';
+    $$('[data-billing-toggle]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
+    $$('[data-monthly-price]').forEach(price=>{price.textContent=annual?price.dataset.annualPrice:price.dataset.monthlyPrice;});
+    $$('[data-billing-suffix]').forEach(suffix=>{suffix.textContent=annual?'/ year':'/ month';});
+  });
+  $$('[data-plan-start]').forEach(button=>button.onclick=()=>{if(button.dataset.planStart==='enterprise'){notify('Enterprise enquiries are not connected yet.','info');return;}$('#start-input')?.focus();$('#start-input')?.scrollIntoView({behavior:'smooth',block:'center'});notify('Plan pricing is illustrative; billing is not enabled from this page.','info');});
+
 }
 function routeFromLocation(){
   const hash=String(location.hash||'').replace(/^#/,'').split('?')[0];
@@ -1292,30 +1349,49 @@ async function subscribeProjectRealtime(projectId){
     }).on('postgres_changes',{event:'INSERT',schema:'public',table:'project_execution_events',filter:'project_id=eq.'+projectId},()=>{const current=activeProject();if(current&&current.id===projectId&&current.uiNav==='runs')renderExecutionRuns(current);}).subscribe();
 }
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{} await subscribeProjectRealtime(id);}}
+function renderOutcomeCanvas(project){
+ const root=$('#project-body');if(!root)return;
+ const stages=[
+  ['01','Goal','Clarify the outcome','goal'],
+  ['02','Requirements','Capture constraints','plan'],
+  ['03','Milestones','Break work into steps','plan'],
+  ['04','Architecture','Choose a practical approach','plan'],
+  ['05','Dependencies','Map tools and prerequisites','build'],
+  ['06','Artifacts','Track files and deliverables','build'],
+  ['07','Implementation','Create the first version','build'],
+  ['08','Verification','Run available checks','verify'],
+  ['09','Corrections','Resolve identified issues','repair'],
+  ['10','Next iteration','Use feedback to improve','adapt']
+ ];
+ const tasks=Array.isArray(project.tasks)?project.tasks:[];
+ const files=Object.keys(project.files||{});
+ const done=tasks.filter(t=>['done','completed','verified'].includes(String(t.status||'').toLowerCase())).length;
+ const total=tasks.length;
+ const nodes=stages.map((stage,i)=>{
+  const state=i===0?'active':i<4?'planned':i===5&&files.length?'active':i===7&&done===total&&total?'verified':'planned';
+  const detail=i===0?(project.intent||project.understanding?.summary||'Add a goal in the Studio agent.'):i===5?(files.length+' project file(s) available'):i===7?(total?done+' of '+total+' task(s) marked complete':'Verification status not recorded yet'):stage[2];
+  return '<article class="px-outcome-node" data-state="'+state+'"><span class="px-outcome-number">'+stage[0]+'</span><span class="px-outcome-state">'+(state==='verified'?'VERIFIED':state==='active'?'ACTIVE':'PLANNED')+'</span><h3>'+esc(stage[1])+'</h3><p>'+esc(detail)+'</p><small>'+esc(stage[2].toUpperCase())+'</small></article>';
+ }).join('');
+ root.innerHTML='<div class="px-outcome-canvas"><header class="px-outcome-head"><div><span class="kicker">PROJECT MAP / CANVAS MODE</span><h2>'+esc(project.title||'Untitled project')+'</h2><p class="sub">A high-level map of the intent-to-execution loop. Statuses reflect saved project data; they are not a claim that an automated stage ran.</p></div><div class="px-outcome-summary"><b>'+files.length+'</b><span>Artifacts</span><b>'+done+'/'+total+'</b><span>Tasks complete</span></div></header><div class="px-outcome-graph">'+nodes+'</div><div class="px-outcome-footer"><span>GOAL → PLAN → BUILD → VERIFY → ADAPT</span><button type="button" class="primary" data-workspace-mode="studio">Continue in Studio ↗</button></div></div>';
+}
 function renderProject(project){
-  if(!project.uiNav || project.uiNav==='assistant' || project.uiNav==='overview'){
-    project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
-  }
-  const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default;
-  const assistantDock=UI.assistantDock({esc,project,actions});
-  shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
-  $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
-  $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{
-    project.uiNav=button.dataset.projectTool;
-    saveProject(project);
-    renderProject(project);
-  });
-  if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav){
-    renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
-  } else {
-    renderProjectTool(project,project.uiNav);
-  }
-  const dockLog=$('#assistant-dock-log');
-  if(dockLog&&Array.isArray(project.conversation)){
-    dockLog.innerHTML=conversationHtml(project);
-    dockLog.scrollTop=dockLog.scrollHeight;
-    bindAIResponseActions(project);
-  }
+ if(!project.uiNav||project.uiNav==='assistant'||project.uiNav==='overview')project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
+ if(!['studio','canvas','console'].includes(project.uiMode))project.uiMode='studio';
+ if(project.uiMode==='canvas')project.uiNav='canvas';
+ else if(project.uiMode==='console'&&project.uiNav!=='tests')project.uiNav='files';
+ else if(project.uiMode==='studio'&&['canvas','files','tests'].includes(project.uiNav))project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
+ const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default,assistantDock=UI.assistantDock({esc,project,actions});
+ shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
+ const shellRoot=$('#px-shell');if(shellRoot){shellRoot.dataset.uiMode=project.uiMode;$('[data-workspace-mode]',shellRoot).forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.workspaceMode===project.uiMode));});}
+  $$('[data-workspace-action]',$('#px-app')).forEach(button=>button.onclick=()=>{if(button.dataset.workspaceAction==='tests'){project.uiMode='console';project.uiNav='tests';}else{project.uiMode='studio';project.uiNav='preview';}saveProject(project);renderProject(project);});
+ $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
+ $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode='studio';project.uiNav=button.dataset.projectTool;saveProject(project);renderProject(project);});
+ if(project.uiMode==='canvas')renderOutcomeCanvas(project);
+ else if(project.uiMode==='console')renderProjectTool(project,project.uiNav==='tests'?'tests':'files');
+ else if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav)renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
+ else renderProjectTool(project,project.uiNav);
+ const dockLog=$('#assistant-dock-log');
+ if(dockLog&&Array.isArray(project.conversation)){dockLog.innerHTML=conversationHtml(project);dockLog.scrollTop=dockLog.scrollHeight;bindAIResponseActions(project);}
 }
 
 let executionRunsTimer=null;
@@ -1457,9 +1533,35 @@ function renderBrain(project){
 }
 function renderArchitecture(project){
   const sections=buildDependencyMap(project.sections||[]);
-  const cards=sections.map(s=>'<div class="architecture-node"><b>'+esc(s.name)+'</b><div class="sub">'+esc(s.kind)+' · '+esc(s.agent||'planner')+'</div>'+(s.capabilities?.length?'<div class="sub" style="margin-top:5px">Capabilities: '+esc(s.capabilities.join(', '))+'</div>':'')+(s.dependsOn?.length?'<div class="sub" style="margin-top:5px">Depends on: '+esc(s.dependsOn.map(id=>(sections.find(x=>x.id===id)||{}).name||id).join(', '))+'</div>':'')+'</div>').join('');
-  const agents=(project.agents||[]).map(a=>'<div class="architecture-node"><b>'+esc(a.name||a.key||a.id)+'</b><div class="sub">'+esc(a.purpose||'Project specialist')+'</div>'+(a.tools?.length?'<div class="sub" style="margin-top:5px">Tools: '+esc(a.tools.join(', '))+'</div>':'')+'</div>').join('');
-  toolShell('PROJECT INTELLIGENCE','Live Architecture','Dependency view generated from the current project sections and assembled specialists.','<h3 style="margin:0 0 8px">Workspace graph</h3><div class="architecture-grid">'+(cards||'<div class="placeholder">No architecture nodes yet.</div>')+'</div><h3 style="margin:18px 0 8px">Specialists</h3><div class="architecture-grid">'+(agents||'<div class="placeholder">No project-specific specialists recorded yet.</div>')+'</div>');
+  const cards=sections.map(section=>{
+    const options=sections.filter(item=>item.id!==section.id).map(item=>'<option value="'+esc(item.id)+'" '+(section.dependsOn?.includes(item.id)?'selected':'')+'>'+esc(item.name)+'</option>').join('');
+    return '<div class="architecture-node"><b>'+esc(section.name)+'</b><div class="sub">'+esc(section.kind)+' · '+esc(section.agent||'planner')+'</div>'+(section.capabilities?.length?'<div class="sub" style="margin-top:5px">Capabilities: '+esc(section.capabilities.join(', '))+'</div>':'')+'<label class="px-dependency-editor"><span>Depends on</span><select multiple size="3" data-dependency-node="'+esc(section.id)+'" aria-label="Dependencies for '+esc(section.name)+'">'+options+'</select><small>Use Ctrl/Cmd to select multiple dependencies. Cycles are blocked.</small></label></div>';
+  }).join('');
+  const agents=(project.agents||[]).map(agent=>'<div class="architecture-node"><b>'+esc(agent.name||agent.key||agent.id)+'</b><div class="sub">'+esc(agent.purpose||'Project specialist')+'</div>'+(agent.tools?.length?'<div class="sub" style="margin-top:5px">Tools: '+esc(agent.tools.join(', '))+'</div>':'')+'</div>').join('');
+  toolShell('PROJECT INTELLIGENCE','Live Architecture','Edit the dependency graph for the current project sections. Changes are versioned through the normal project mutation and persistence path.','<h3 style="margin:0 0 8px">Workspace dependency graph</h3><div class="architecture-grid">'+(cards||'<div class="placeholder">No architecture nodes yet.</div>')+'</div><h3 style="margin:18px 0 8px">Specialists</h3><div class="architecture-grid">'+(agents||'<div class="placeholder">No project-specific specialists recorded yet.</div>')+'</div>');
+  $$('[data-dependency-node]',$('#project-body')).forEach(select=>select.addEventListener('change',async()=>{
+    const nodeId=select.dataset.dependencyNode;
+    const next=Array.from(select.selectedOptions).map(option=>option.value).filter(id=>id!==nodeId);
+    const currentSections=project.sections||[];
+    const node=currentSections.find(item=>item.id===nodeId);
+    if(!node)return;
+    const proposed=currentSections.map(item=>item.id===nodeId?{...item,dependsOn:next}:item);
+    const reaches=(from,target,seen=new Set())=>{
+      if(from===target)return true;
+      if(seen.has(from))return false;
+      seen.add(from);
+      const item=proposed.find(entry=>entry.id===from);
+      return (item?.dependsOn||[]).some(id=>reaches(id,target,seen));
+    };
+    if(next.some(id=>reaches(id,nodeId))){
+      notify('Dependency rejected: this change would create a cycle.','error');
+      renderArchitecture(project);return;
+    }
+    snapshot(project,'Before dependency graph change');
+    applyProjectMutation(project,{workspaceSections:proposed});
+    saveProject(project);await syncRemoteProject(project);renderArchitecture(project);
+    notify('Dependency graph updated. Affected artifacts may require verification.','success');
+  }));
 }
 function simulationState(project){
   const validation=validateSpec(project.spec,project.type),sections=(project.sections||[]).filter(s=>s.id!=='chat');
@@ -1621,6 +1723,42 @@ function projectSecurityChecks(project){
 function reconciliationStatusLabel(queue){
   return queue ? String(queue.status||'pending').replace(/_/g,' ') : 'not started';
 }
+async function executeTargetedRepair(project,action){
+  if(!session)throw new Error('Sign in and connect an AI provider before ProjectX can execute a repair.');
+  const diagnosis=action?.diagnosis||{};
+  const allowedPaths=[...new Set((Array.isArray(action?.repairPaths)?action.repairPaths:[]).map(path=>sanitizePath(path)).filter(path=>path&&Object.hasOwn(project.files||{},path)))].slice(0,12);
+  if(!allowedPaths.length)throw new Error('The repair diagnosis did not identify safe, existing files to change.');
+  const failures=(Array.isArray(diagnosis.failures)?diagnosis.failures:[]).slice(0,12);
+  const prompt='Perform a minimal, surgical repair for this verified ProjectX failure. Diagnosis: '+String(diagnosis.summary||action.label||'Verification failure').slice(0,800)+'. Category: '+String(diagnosis.category||'unknown')+'. Failure evidence: '+JSON.stringify(failures).slice(0,3500)+'. Allowed paths only: '+JSON.stringify(allowedPaths)+'. Preserve unrelated behavior, do not add dependencies or remote assets, and return only complete replacement content for files that truly need changes.';
+  const data=await aiJson('discuss',{project,history:[],message:prompt,system:'Return JSON only: {"fileOperations":[{"op":"write","path":string,"content":string}]}. Only write existing files from the exact allowed path list. Do not return deletes, new paths, prose, or more than 12 operations.'},9000);
+  const operations=[],seen=new Set();
+  for(const op of Array.isArray(data?.fileOperations)?data.fileOperations:[]){
+    const path=sanitizePath(op?.path);
+    if(op?.op!=='write'||!path||!allowedPaths.includes(path)||seen.has(path)||typeof op.content!=='string'||op.content.length>600000)continue;
+    seen.add(path);if(op.content!==project.files[path])operations.push({op:'write',path,content:op.content});
+  }
+  if(!operations.length)throw new Error('The repair agent returned no valid, changed replacements within the diagnosed file boundary.');
+  const candidate=migrateProject(JSON.parse(JSON.stringify(project)));
+  for(const op of operations)candidate.files[op.path]=op.content;
+  const checks=await runTests(candidate);
+  const security=projectSecurityChecks(candidate);
+  const blocking=security.filter(item=>item.blockBuild&&!item.pass);
+  const failed=checks.filter(item=>!item.pass);
+  if(failed.length||blocking.length){
+    project.tests={status:'failed',specVersion:project.specVersion,verifiedAgainstVersion:project.specVersion,results:[...checks,...security],updatedAt:now()};
+    project.status='needs-fix';saveProject(project);
+    return {ok:false,message:'The targeted patch did not pass verification, so no changed files were applied.',evidence:[...failed,...blocking].slice(0,12),outputVersion:project.specVersion};
+  }
+  snapshot(project,'Before targeted repair');
+  const mutation=applyProjectMutation(project,{fileOperations:operations});
+  if(!mutation.changed)throw new Error('The validated repair did not produce a project mutation.');
+  project.tests={status:'passed',specVersion:project.specVersion,verifiedAgainstVersion:project.specVersion,results:[...checks,...security],updatedAt:now()};
+  project.status='needs-build';project.updatedAt=now();
+  project.executionState={...(project.executionState||{}),lastRepair:{at:now(),diagnosisId:diagnosis.diagnosisId||null,paths:operations.map(op=>op.path),verified:true}};
+  saveProject(project);await syncRemoteProject(project);
+  return {ok:true,message:'Applied and verified a minimal repair to '+operations.map(op=>op.path).join(', ')+'.',evidence:[{kind:'targeted-repair',paths:operations.map(op=>op.path),verification:'passed',checks:checks.length}],outputVersion:project.specVersion};
+}
+
 async function executeTargetedFileUpdate(project,action){
   const path=String(action?.targetId||'').replace(/^file:/,'');
   if(!path||!Object.hasOwn(project.files||{},path))throw new Error('Target file is no longer present in the current project state.');
@@ -1801,6 +1939,8 @@ async function executeReconciliationQueue(project){
         };
       }else if(action.type==='update'){
         result=await executeTargetedFileUpdate(project,action);
+      }else if(action.type==='repair'){
+        result=await executeTargetedRepair(project,action);
       }else if(action.type==='verify'){
         maybeInjectE2EVerificationFailure(project);
         result=await executeLocalVerification(project);
@@ -2290,8 +2430,10 @@ async function buildArtifact(project,repairResults=[]){
 }
 function mountArtifact(project){
   const area=$('#output-area');if(!area)return;
-  area.innerHTML='<div class="px-preview-toolbar"><div class="px-preview-modes"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="px-preview-state"><span class="px-live-dot"></span> Live preview</div></div><div class="px-artifact-stage"><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Project output"></iframe></div></div>';
+  area.innerHTML='<div class="px-preview-toolbar"><div class="px-preview-modes"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="px-preview-state"><span class="px-live-dot"></span> Live preview</div><div class="px-preview-actions"><button type="button" class="ghost" data-preview-refresh title="Reload preview">↻ Reload</button><button type="button" class="ghost" data-preview-popout title="Open preview in a new tab">↗ Pop out</button></div></div><div class="px-artifact-stage"><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Project output"></iframe></div></div>';
   const frame=$('#project-frame');frame.srcdoc=assemblePreviewHtml(project.files||{});runtimeTestCleanup?.();
+  $('[data-preview-refresh]')?.addEventListener('click',()=>{const active=$('#project-frame');if(active)active.srcdoc=assemblePreviewHtml(project.files||{});});
+  $('[data-preview-popout]')?.addEventListener('click',()=>{const active=$('#project-frame');if(!active)return;const blob=new Blob([assemblePreviewHtml(project.files||{})],{type:'text/html'});const url=URL.createObjectURL(blob);const opened=window.open(url,'_blank');if(!opened){URL.revokeObjectURL(url);notify('Pop-out was blocked by the browser. Allow pop-ups to open the preview.','warning');}else{opened.opener=null;setTimeout(()=>URL.revokeObjectURL(url),60000);}});
   const onMessage=e=>{
     if(e.source!==frame.contentWindow)return;
     if(e.data?.type==='PROJECTX_SANDBOX_EVENT'){
@@ -2299,6 +2441,7 @@ function mountArtifact(project){
       if(event.kind==='runtime_error'||event.kind==='unhandled_rejection'){
         const msg=String(event.message||'Runtime error');
         notify('Preview failed to run. '+msg+'. Open Agent to diagnose.','error');
+        const log=$('#assistant-dock-log');if(log){const card=document.createElement('div');card.className='px-runtime-error-card';const label=document.createElement('strong');label.textContent='Preview runtime error';const detail=document.createElement('p');detail.textContent=msg;const fix=document.createElement('button');fix.type='button';fix.className='primary';fix.textContent='Auto-Fix Root Cause';fix.dataset.runtimeAutoFix='true';fix.dataset.runtimeMessage=msg;card.append(label,detail,fix);log.append(card);log.scrollTop=log.scrollHeight;}
         setAgentStatus('Failed');
         const dock=$('#assistant-dock-input');if(dock)dock.value='Fix preview runtime error: '+msg;
       }else if(event.kind==='resource_error'){
@@ -2375,6 +2518,23 @@ function showFileCtx(x,y,path,project){
     if(act==='delete')$('#delete-file')?.click();
   };
 }
+function renderFileDiff(before,after){
+ const a=String(before??'').split(/\r?\n/),b=String(after??'').split(/\r?\n/);
+ let prefix=0;while(prefix<a.length&&prefix<b.length&&a[prefix]===b[prefix])prefix++;
+ let suffix=0;while(suffix<a.length-prefix&&suffix<b.length-prefix&&a[a.length-1-suffix]===b[b.length-1-suffix])suffix++;
+ const removed=a.slice(prefix,a.length-suffix),added=b.slice(prefix,b.length-suffix);
+ if(!removed.length&&!added.length)return '<div class="px-diff-empty">No unsaved changes.</div>';
+ const rows=[];a.slice(Math.max(0,prefix-2),prefix).forEach(line=>rows.push('<div class="px-diff-line context"><span> </span><code>'+esc(line||' ')+'</code></div>'));
+ removed.slice(0,500).forEach(line=>rows.push('<div class="px-diff-line removed"><span>−</span><code>'+esc(line||' ')+'</code></div>'));
+ added.slice(0,500).forEach(line=>rows.push('<div class="px-diff-line added"><span>+</span><code>'+esc(line||' ')+'</code></div>'));
+ a.slice(a.length-suffix,Math.min(a.length-suffix+2,a.length)).forEach(line=>rows.push('<div class="px-diff-line context"><span> </span><code>'+esc(line||' ')+'</code></div>'));
+ return '<div class="px-diff-summary">Unsaved diff · '+removed.length+' removed · '+added.length+' added · contiguous changed block</div><div class="px-diff-lines">'+rows.join('')+'</div>';
+}
+function highlightEditorText(source){
+ const escaped=String(source??'').replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]));
+ const pattern=/(\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|<\/?[A-Za-z][^>]*>|\b(?:const|let|var|function|return|if|else|for|while|class|new|import|export|from|default|async|await|try|catch|throw|true|false|null|undefined|this|extends|typeof|instanceof|of|in|switch|case|break|continue|static|interface|type|enum|def|print|None|and|or|not|pass|with|as|elif|lambda|self)\b|\b\d+(?:\.\d+)?\b)/g;
+ return escaped.replace(pattern,token=>{let kind='px-token-keyword';if(/^(?:\/\/|\/\*)/.test(token))kind='px-token-comment';else if(/^(?:"|')/.test(token))kind='px-token-string';else if(/^</.test(token))kind='px-token-tag';else if(/^\d/.test(token))kind='px-token-number';return '<span class="'+kind+'">'+token+'</span>';})+'\n';
+}
 function renderFiles(project){
   const paths=Object.keys(project.files||{}).sort();
   const first=paths.includes(project.uiFilePath)?project.uiFilePath:(paths[0]||null);
@@ -2385,7 +2545,7 @@ function renderFiles(project){
   const tree=paths.length?fileTreeHtml(fileTreeNodes(paths),esc,first):'<div class="sub">No generated files yet. Build to create them, or New to add a path.</div>';
   const tabs=project.uiFileTabs.map(p=>`<button class="${p===first?'active':''}" data-file-tab="${esc(p)}">${esc(p.split('/').pop())}</button>`).join('')||'<span class="sub" style="padding:8px">No open file</span>';
   const split=Boolean(settingsState.splitFiles);
-  body.innerHTML=`<div class="box"><div class="px-ide" id="px-ide"><div class="px-ide-tree file-list">${tree}<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div class="px-ide-main"><div class="px-ide-tabs" id="px-file-tabs">${tabs}</div><div class="px-ide-work ${split?'split':''}"><textarea id="file-code-editor" class="code-editor" spellcheck="false">${esc(first?project.files[first]:'Build the project to create real files.')}</textarea><div class="px-ide-preview" ${split?'':'hidden'}><iframe id="file-preview-frame" sandbox="allow-scripts" title="File preview"></iframe></div></div><div class="row"><b id="file-name">${esc(first||'No file selected')}</b><div class="actions"><button class="ghost" id="split-files">${split?'Hide preview':'Split preview'}</button>${first?'<button class="ghost" id="preview-file">Diff hint</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':''}</div></div><div class="sub" id="file-dirty"></div></div></div></div>`;
+  body.innerHTML=`<div class="box"><div class="px-ide" id="px-ide"><div class="px-ide-tree file-list">${tree}<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div class="px-ide-main"><div class="px-ide-tabs" id="px-file-tabs">${tabs}</div><div class="px-ide-work ${split?'split':''}"><div class="px-code-editor-wrap"><pre id="file-code-highlight" class="px-code-highlight" aria-hidden="true">${highlightEditorText(first?project.files[first]:'Build the project to create real files.')}</pre><textarea id="file-code-editor" class="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Source code editor">${esc(first?project.files[first]:'Build the project to create real files.')}</textarea></div><div class="px-ide-preview" ${split?'':'hidden'}><iframe id="file-preview-frame" sandbox="allow-scripts" title="File preview"></iframe></div></div><div id="px-file-diff" class="px-file-diff" hidden></div><div class="row"><b id="file-name">${esc(first||'No file selected')}</b><div class="actions"><button class="ghost" id="split-files">${split?'Hide preview':'Split preview'}</button>${first?'<button class="ghost" id="preview-file">Diff</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':''}</div></div><div class="sub" id="file-dirty"></div></div></div></div>`;
   let currentPath=first;
   const markDirty=()=>{const dirty=currentPath&&project.files[currentPath]!==$('#file-code-editor').value;$('#file-dirty').textContent=dirty?'Unsaved changes in '+currentPath+' · ⌘S to save':'';$('#file-dirty')?.classList.toggle('file-dirty',Boolean(dirty));$$('[data-file-tab]').forEach(t=>t.classList.toggle('file-dirty',t.dataset.fileTab===currentPath&&dirty));};
   const selectFile=path=>{
@@ -2396,6 +2556,7 @@ function renderFiles(project){
     $$('[data-file-tab]',body).forEach(x=>x.classList.toggle('active',x.dataset.fileTab===path));
     $('#file-name').textContent=path;
     $('#file-code-editor').value=project.files[path]||'';
+    const highlight=$('#file-code-highlight');if(highlight)highlight.innerHTML=highlightEditorText(project.files[path]||'');
     markDirty();
     refreshFilePreview(project);
   };
@@ -2404,7 +2565,9 @@ function renderFiles(project){
     button.oncontextmenu=e=>{e.preventDefault();showFileCtx(e.clientX,e.clientY,button.dataset.file,project);};
   });
   $$('[data-file-tab]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.fileTab));
-  $('#file-code-editor')?.addEventListener('input',()=>{markDirty();if(settingsState.splitFiles)refreshFilePreview(project);});
+  $('#file-code-editor')?.addEventListener('input',()=>{markDirty();const editor=$('#file-code-editor'),highlight=$('#file-code-highlight');if(highlight)highlight.innerHTML=highlightEditorText(editor.value);if(settingsState.splitFiles)refreshFilePreview(project);});
+  $('#file-code-editor')?.addEventListener('scroll',()=>{const editor=$('#file-code-editor'),highlight=$('#file-code-highlight');if(highlight){highlight.style.transform='translateY('+(-editor.scrollTop)+'px)';highlight.style.marginLeft=(-editor.scrollLeft)+'px';}});
+  $('#file-code-editor')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();if(saveOpenFile(project)){markDirty();notify('File saved. Rebuild and verify to refresh the generated artifact.','success');}}});
   $('#split-files')?.addEventListener('click',()=>{settingsState.splitFiles=!settingsState.splitFiles;persistSettings();renderFiles(project);});
   $('#new-file')?.addEventListener('click',()=>{
     const raw=prompt('New file path');const path=sanitizePath(raw||'');
@@ -2413,12 +2576,7 @@ function renderFiles(project){
     applyProjectMutation(project,{fileOperations:[{op:'write',path,content:''}]});
     project.uiFilePath=path;saveProject(project);renderFiles(project);
   });
-  $('#preview-file')?.addEventListener('click',()=>{
-    if(!currentPath||!Object.hasOwn(project.files,currentPath))return;
-    const before=String(project.files[currentPath]||''),after=$('#file-code-editor').value;
-    const beforeLines=before?before.split(/\r?\n/).length:0,afterLines=after?after.split(/\r?\n/).length:0;
-    notify(before===after?'No changes pending.':currentPath+' · '+Math.abs(afterLines-beforeLines)+' line count delta pending save.','info');
-  });
+  $('#preview-file')?.addEventListener('click',()=>{if(!currentPath||!Object.hasOwn(project.files,currentPath))return;const panel=$('#px-file-diff');if(!panel)return;panel.hidden=!panel.hidden;if(!panel.hidden)panel.innerHTML=renderFileDiff(project.files[currentPath],$('#file-code-editor').value);});
   $('#save-file')?.addEventListener('click',async()=>{
     if(!saveOpenFile(project))return notify('No file changes to save.','info');
     notify('File saved. Generated output is now stale until rebuilt and verified.','success');markDirty();
