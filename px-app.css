@@ -2468,3 +2468,8 @@ html, body {
 #px-ide .px-token-comment{color:#7f849c;font-style:italic}
 #px-ide .px-token-tag{color:#8bd5ca}
 #px-ide .px-token-number{color:#eed49f}
+
+/* Editable architecture dependencies */
+#px-app .px-dependency-editor{display:grid;gap:5px;margin-top:12px;font-size:11px;color:var(--px-text-secondary)}
+#px-app .px-dependency-editor select{width:100%;min-height:72px;padding:7px;border:1px solid var(--px-border);border-radius:8px;background:var(--px-surface);color:var(--px-text-primary);font:12px/1.5 inherit}
+#px-app .px-dependency-editor small{font-size:10px;line-height:1.5}
