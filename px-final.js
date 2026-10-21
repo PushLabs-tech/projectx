@@ -1753,7 +1753,7 @@ async function executeTargetedRepair(project,action){
   const mutation=applyProjectMutation(project,{fileOperations:operations});
   if(!mutation.changed)throw new Error('The validated repair did not produce a project mutation.');
   project.tests={status:'passed',specVersion:project.specVersion,verifiedAgainstVersion:project.specVersion,results:[...checks,...security],updatedAt:now()};
-  project.status='verified';project.updatedAt=now();
+  project.status='needs-build';project.updatedAt=now();
   project.executionState={...(project.executionState||{}),lastRepair:{at:now(),diagnosisId:diagnosis.diagnosisId||null,paths:operations.map(op=>op.path),verified:true}};
   saveProject(project);await syncRemoteProject(project);
   return {ok:true,message:'Applied and verified a minimal repair to '+operations.map(op=>op.path).join(', ')+'.',evidence:[{kind:'targeted-repair',paths:operations.map(op=>op.path),verification:'passed',checks:checks.length}],outputVersion:project.specVersion};
