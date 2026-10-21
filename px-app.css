@@ -2308,3 +2308,25 @@ html, body {
 #px-app.px-public .pxl-domain-pills button.active,#px-app.px-public .pxl-domain-pills button:hover{background:var(--px-accent-light);border-color:rgba(242,84,45,.36);color:var(--px-accent-hover)}
 #px-app.px-public #start-input{display:block;width:100%;box-sizing:border-box;min-height:100px;resize:vertical;border:0;outline:0;background:transparent;color:var(--px-text-primary);font:15px/1.65 var(--px-font-sans);padding:12px 0}
 #px-app.px-public #start-input:focus-visible{outline:2px solid var(--px-accent-glow);outline-offset:2px}
+
+/* Outcome canvas: milestone and dependency map */
+#px-app .px-outcome-canvas{padding:clamp(16px,3vw,32px);min-width:0}
+#px-app .px-outcome-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:28px}
+#px-app .px-outcome-head h2{font-size:clamp(25px,3vw,38px);letter-spacing:-.045em;margin:8px 0}
+#px-app .px-outcome-head p{max-width:650px;line-height:1.7}
+#px-app .px-outcome-summary{display:grid;grid-template-columns:auto auto;gap:4px 10px;padding:12px 16px;border:1px solid var(--px-border);border-radius:12px;background:#fff;white-space:nowrap}
+#px-app .px-outcome-summary b{font:18px var(--px-font-mono);color:var(--px-accent)}
+#px-app .px-outcome-summary span{align-self:center;font-size:11px;color:var(--px-text-secondary)}
+#px-app .px-outcome-graph{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+#px-app .px-outcome-node{position:relative;min-width:0;padding:16px;border:1px solid var(--px-border-strong);border-radius:13px;background:#fff;box-shadow:var(--px-shadow-sm)}
+#px-app .px-outcome-node:not(:nth-child(5n)):after{content:"";position:absolute;right:-15px;top:27px;width:14px;border-top:1px solid #c9c2b8}
+#px-app .px-outcome-node[data-state="active"]{border-color:rgba(242,84,45,.55);background:linear-gradient(180deg,#fff,rgba(242,84,45,.035))}
+#px-app .px-outcome-node[data-state="verified"]{border-color:rgba(16,185,129,.55)}
+#px-app .px-outcome-number,#px-app .px-outcome-state{font:10px var(--px-font-mono);letter-spacing:.03em;color:var(--px-text-tertiary)}
+#px-app .px-outcome-state{float:right}
+#px-app .px-outcome-node h3{font-size:16px;letter-spacing:-.02em;margin:22px 0 8px}
+#px-app .px-outcome-node p{font-size:12px;line-height:1.65;overflow-wrap:anywhere;color:var(--px-text-secondary);min-height:40px}
+#px-app .px-outcome-node small{font:9px var(--px-font-mono);letter-spacing:.05em;color:var(--px-accent)}
+#px-app .px-outcome-footer{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:22px;padding-top:18px;border-top:1px solid var(--px-border);font:10px var(--px-font-mono);letter-spacing:.04em;color:var(--px-text-secondary)}
+@media(max-width:900px){#px-app .px-outcome-graph{grid-template-columns:repeat(2,minmax(0,1fr))}#px-app .px-outcome-node:after{display:none}}
+@media(max-width:540px){#px-app .px-outcome-head{display:block}#px-app .px-outcome-summary{display:inline-grid;margin-top:14px}#px-app .px-outcome-graph{grid-template-columns:1fr}#px-app .px-outcome-footer{align-items:flex-start;flex-direction:column}}
