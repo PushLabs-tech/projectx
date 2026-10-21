@@ -1539,7 +1539,7 @@ function renderArchitecture(project){
   }).join('');
   const agents=(project.agents||[]).map(agent=>'<div class="architecture-node"><b>'+esc(agent.name||agent.key||agent.id)+'</b><div class="sub">'+esc(agent.purpose||'Project specialist')+'</div>'+(agent.tools?.length?'<div class="sub" style="margin-top:5px">Tools: '+esc(agent.tools.join(', '))+'</div>':'')+'</div>').join('');
   toolShell('PROJECT INTELLIGENCE','Live Architecture','Edit the dependency graph for the current project sections. Changes are versioned through the normal project mutation and persistence path.','<h3 style="margin:0 0 8px">Workspace dependency graph</h3><div class="architecture-grid">'+(cards||'<div class="placeholder">No architecture nodes yet.</div>')+'</div><h3 style="margin:18px 0 8px">Specialists</h3><div class="architecture-grid">'+(agents||'<div class="placeholder">No project-specific specialists recorded yet.</div>')+'</div>');
-  $('[data-dependency-node]',$('#project-body')).forEach(select=>select.addEventListener('change',async()=>{
+  $$('[data-dependency-node]',$('#project-body')).forEach(select=>select.addEventListener('change',async()=>{
     const nodeId=select.dataset.dependencyNode;
     const next=Array.from(select.selectedOptions).map(option=>option.value).filter(id=>id!==nodeId);
     const currentSections=project.sections||[];
