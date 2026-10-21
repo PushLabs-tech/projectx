@@ -696,6 +696,11 @@ function filterSideSearch(q){
   extra.innerHTML=hits.map(f=>`<button data-project-tool="files" data-open-file="${esc(f)}">${esc(f)}</button>`).join('');
 }
 function bindChrome(root){
+  root.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&$('#file-code-editor')&&e.target===$('#file-code-editor')){
+      e.preventDefault();const project=activeProject();if(project&&saveOpenFile(project)){notify('File saved. Rebuild and verify to refresh the generated artifact.','success');}
+    }
+  });
   root.onclick=async e=>{
     const cmd=e.target.closest('[data-cmd]')?.dataset.cmd;
     if(cmd==='palette')return openPalette();
@@ -712,6 +717,8 @@ function bindChrome(root){
       const list=$('#px-switch-list');if(list)list.hidden=!list.hidden;return;
     }
     if(!e.target.closest('#px-switch-list')) {const list=$('#px-switch-list');if(list)list.hidden=true;}
+    const runtimeFix=e.target.closest('[data-runtime-auto-fix]');
+    if(runtimeFix){const input=$('#assistant-dock-input');const form=$('#assistant-dock-form');if(input&&form){input.value='Fix the root cause of this preview runtime error and verify the result: '+String(runtimeFix.dataset.runtimeMessage||'Runtime error');form.requestSubmit();}return;}
     const modeButton=e.target.closest('[data-workspace-mode]');
     if(modeButton){
       const project=activeProject();
@@ -1340,6 +1347,7 @@ function renderProject(project){
  else if(project.uiMode==='studio'&&['canvas','files','tests'].includes(project.uiNav))project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
  const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default,assistantDock=UI.assistantDock({esc,project,actions});
  shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
+ const shellRoot=$('#px-shell');if(shellRoot)shellRoot.dataset.uiMode=project.uiMode;
   $$('[data-workspace-action]',$('#px-app')).forEach(button=>button.onclick=()=>{if(button.dataset.workspaceAction==='tests'){project.uiMode='console';project.uiNav='tests';}else{project.uiMode='studio';project.uiNav='preview';}saveProject(project);renderProject(project);});
  $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
  $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode='studio';project.uiNav=button.dataset.projectTool;saveProject(project);renderProject(project);});
@@ -2323,8 +2331,10 @@ async function buildArtifact(project,repairResults=[]){
 }
 function mountArtifact(project){
   const area=$('#output-area');if(!area)return;
-  area.innerHTML='<div class="px-preview-toolbar"><div class="px-preview-modes"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="px-preview-state"><span class="px-live-dot"></span> Live preview</div></div><div class="px-artifact-stage"><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Project output"></iframe></div></div>';
+  area.innerHTML='<div class="px-preview-toolbar"><div class="px-preview-modes"><button class="ghost active" data-viewport="desktop">Desktop</button><button class="ghost" data-viewport="tablet">Tablet</button><button class="ghost" data-viewport="mobile">Mobile</button></div><div class="px-preview-state"><span class="px-live-dot"></span> Live preview</div><div class="px-preview-actions"><button type="button" class="ghost" data-preview-refresh title="Reload preview">↻ Reload</button><button type="button" class="ghost" data-preview-popout title="Open preview in a new tab">↗ Pop out</button></div></div><div class="px-artifact-stage"><div class="artifact preview-desktop"><iframe id="project-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Project output"></iframe></div></div>';
   const frame=$('#project-frame');frame.srcdoc=assemblePreviewHtml(project.files||{});runtimeTestCleanup?.();
+  $('[data-preview-refresh]')?.addEventListener('click',()=>{const active=$('#project-frame');if(active)active.srcdoc=assemblePreviewHtml(project.files||{});});
+  $('[data-preview-popout]')?.addEventListener('click',()=>{const active=$('#project-frame');if(!active)return;const blob=new Blob([assemblePreviewHtml(project.files||{})],{type:'text/html'});const url=URL.createObjectURL(blob);const opened=window.open(url,'_blank','noopener');if(!opened){URL.revokeObjectURL(url);notify('Pop-out was blocked by the browser. Allow pop-ups to open the preview.','warning');}else setTimeout(()=>URL.revokeObjectURL(url),60000);});
   const onMessage=e=>{
     if(e.source!==frame.contentWindow)return;
     if(e.data?.type==='PROJECTX_SANDBOX_EVENT'){
@@ -2332,6 +2342,7 @@ function mountArtifact(project){
       if(event.kind==='runtime_error'||event.kind==='unhandled_rejection'){
         const msg=String(event.message||'Runtime error');
         notify('Preview failed to run. '+msg+'. Open Agent to diagnose.','error');
+        const log=$('#assistant-dock-log');if(log){const card=document.createElement('div');card.className='px-runtime-error-card';const label=document.createElement('strong');label.textContent='Preview runtime error';const detail=document.createElement('p');detail.textContent=msg;const fix=document.createElement('button');fix.type='button';fix.className='primary';fix.textContent='Auto-Fix Root Cause';fix.dataset.runtimeAutoFix='true';fix.dataset.runtimeMessage=msg;card.append(label,detail,fix);log.append(card);log.scrollTop=log.scrollHeight;}
         setAgentStatus('Failed');
         const dock=$('#assistant-dock-input');if(dock)dock.value='Fix preview runtime error: '+msg;
       }else if(event.kind==='resource_error'){
