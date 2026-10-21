@@ -42,7 +42,7 @@ assert.match(runtime, /data-ai-action="retry"/);
 assert.match(runtime, /function bindAIResponseActions\(/);
 assert.match(appCss, /\.px-ai-actions/);
 assert.match(ui, /id="start-input"/);
-assert.match(ui, /px-hero|px-product-shot/);
+assert.match(ui, /px-hero|px-product-shot|pxl-hero/);
 assert.match(ui, /What are you building\?/);
 assert.match(ui, /CORE_NAV = \['overview', 'build', 'design', 'preview', 'files', 'settings'\]/);
 assert.match(ui, /PROJECT AGENT/);
