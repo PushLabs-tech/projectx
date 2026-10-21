@@ -203,7 +203,7 @@ export function publicMarkup() {
     <footer class="pxl-footer">
       <a class="pxl-brand" href="./"><span class="pxl-brand-mark">P<span>×</span></span><span>ProjectX</span></a>
       <span>Describe an outcome. Keep the context.</span>
-      <div><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a><a href="./billing.html">Plans</a><button id="public-signin" type="button">Sign in</button></div>
+      <div><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a><a href="./billing.html">Plans</a><a href="#login">Sign in</a></div>
     </footer>
   </div>`;
 }
