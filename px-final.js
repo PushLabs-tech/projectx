@@ -1723,6 +1723,42 @@ function projectSecurityChecks(project){
 function reconciliationStatusLabel(queue){
   return queue ? String(queue.status||'pending').replace(/_/g,' ') : 'not started';
 }
+async function executeTargetedRepair(project,action){
+  if(!session)throw new Error('Sign in and connect an AI provider before ProjectX can execute a repair.');
+  const diagnosis=action?.diagnosis||{};
+  const allowedPaths=[...new Set((Array.isArray(action?.repairPaths)?action.repairPaths:[]).map(path=>sanitizePath(path)).filter(path=>path&&Object.hasOwn(project.files||{},path)))].slice(0,12);
+  if(!allowedPaths.length)throw new Error('The repair diagnosis did not identify safe, existing files to change.');
+  const failures=(Array.isArray(diagnosis.failures)?diagnosis.failures:[]).slice(0,12);
+  const prompt='Perform a minimal, surgical repair for this verified ProjectX failure. Diagnosis: '+String(diagnosis.summary||action.label||'Verification failure').slice(0,800)+'. Category: '+String(diagnosis.category||'unknown')+'. Failure evidence: '+JSON.stringify(failures).slice(0,3500)+'. Allowed paths only: '+JSON.stringify(allowedPaths)+'. Preserve unrelated behavior, do not add dependencies or remote assets, and return only complete replacement content for files that truly need changes.';
+  const data=await aiJson('discuss',{project,history:[],message:prompt,system:'Return JSON only: {"fileOperations":[{"op":"write","path":string,"content":string}]}. Only write existing files from the exact allowed path list. Do not return deletes, new paths, prose, or more than 12 operations.'},9000);
+  const operations=[],seen=new Set();
+  for(const op of Array.isArray(data?.fileOperations)?data.fileOperations:[]){
+    const path=sanitizePath(op?.path);
+    if(op?.op!=='write'||!path||!allowedPaths.includes(path)||seen.has(path)||typeof op.content!=='string'||op.content.length>600000)continue;
+    seen.add(path);if(op.content!==project.files[path])operations.push({op:'write',path,content:op.content});
+  }
+  if(!operations.length)throw new Error('The repair agent returned no valid, changed replacements within the diagnosed file boundary.');
+  const candidate=migrateProject(JSON.parse(JSON.stringify(project)));
+  for(const op of operations)candidate.files[op.path]=op.content;
+  const checks=await runTests(candidate);
+  const security=projectSecurityChecks(candidate);
+  const blocking=security.filter(item=>item.blockBuild&&!item.pass);
+  const failed=checks.filter(item=>!item.pass);
+  if(failed.length||blocking.length){
+    project.tests={status:'failed',specVersion:project.specVersion,verifiedAgainstVersion:project.specVersion,results:[...checks,...security],updatedAt:now()};
+    project.status='needs-fix';saveProject(project);
+    return {ok:false,message:'The targeted patch did not pass verification, so no changed files were applied.',evidence:[...failed,...blocking].slice(0,12),outputVersion:project.specVersion};
+  }
+  snapshot(project,'Before targeted repair');
+  const mutation=applyProjectMutation(project,{fileOperations:operations});
+  if(!mutation.changed)throw new Error('The validated repair did not produce a project mutation.');
+  project.tests={status:'passed',specVersion:project.specVersion,verifiedAgainstVersion:project.specVersion,results:[...checks,...security],updatedAt:now()};
+  project.status='verified';project.updatedAt=now();
+  project.executionState={...(project.executionState||{}),lastRepair:{at:now(),diagnosisId:diagnosis.diagnosisId||null,paths:operations.map(op=>op.path),verified:true}};
+  saveProject(project);await syncRemoteProject(project);
+  return {ok:true,message:'Applied and verified a minimal repair to '+operations.map(op=>op.path).join(', ')+'.',evidence:[{kind:'targeted-repair',paths:operations.map(op=>op.path),verification:'passed',checks:checks.length}],outputVersion:project.specVersion};
+}
+
 async function executeTargetedFileUpdate(project,action){
   const path=String(action?.targetId||'').replace(/^file:/,'');
   if(!path||!Object.hasOwn(project.files||{},path))throw new Error('Target file is no longer present in the current project state.');
@@ -1903,6 +1939,8 @@ async function executeReconciliationQueue(project){
         };
       }else if(action.type==='update'){
         result=await executeTargetedFileUpdate(project,action);
+      }else if(action.type==='repair'){
+        result=await executeTargetedRepair(project,action);
       }else if(action.type==='verify'){
         maybeInjectE2EVerificationFailure(project);
         result=await executeLocalVerification(project);
