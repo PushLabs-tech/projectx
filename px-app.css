@@ -2437,3 +2437,11 @@ html, body {
 #px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent:after{content:"";position:absolute;z-index:6;top:0;right:-4px;bottom:0;width:8px;cursor:col-resize;touch-action:none}
 #px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent:after:hover{background:var(--px-accent-glow)}
 @media(max-width:900px){#px-shell.actual-replit-shell[data-ui-mode="studio"]{grid-template-columns:var(--px-replit-rail) minmax(0,1fr)}#px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent:after{display:none}}
+
+#px-app.px-public .pxl-pricing-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-end}
+#px-app.px-public .pxl-pricing-head h2{font-size:clamp(28px,4vw,44px);letter-spacing:-.045em;margin:12px 0}
+#px-app.px-public .pxl-pricing-head p{max-width:650px;color:var(--px-text-secondary);font-size:13px;line-height:1.7}
+#px-app.px-public .pxl-billing-toggle{display:flex;gap:3px;padding:4px;border:1px solid var(--px-border);border-radius:10px;background:var(--px-surface-subtle);flex-shrink:0}
+#px-app.px-public .pxl-billing-toggle button{border:0;border-radius:7px;background:transparent;padding:9px 12px;color:var(--px-text-secondary);cursor:pointer;font-size:12px}
+#px-app.px-public .pxl-billing-toggle button.active{background:#fff;color:var(--px-text-primary);box-shadow:var(--px-shadow-sm)}
+@media(max-width:650px){#px-app.px-public .pxl-pricing-head{align-items:flex-start;flex-direction:column}}
