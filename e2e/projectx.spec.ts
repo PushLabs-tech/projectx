@@ -5,7 +5,7 @@ test("public shell renders", async ({ page }) => {
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
   await page.goto("/");
   await expect(page).toHaveTitle(/ProjectX/);
-  await expect(page.getByText("Tell ProjectX what you want to accomplish")).toBeVisible();
+  await expect(page.getByText("Tell it what you want to accomplish")).toBeVisible();
   await expect(page.locator("#public-start")).toBeVisible();
   await expect(page.locator("#px-app")).toBeVisible();
   expect(errors).toEqual([]);
