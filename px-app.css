@@ -1813,3 +1813,166 @@ html, body {
   #px-app.px-public .px-product-shot .px-shot-col:first-child { display: none; }
   #px-app.px-public .px-shot-main { min-height: 220px; }
 }
+
+
+/* ============================================================
+   MOBILE CREATION LAYOUT FIX — screenshot-driven
+   Keep the creation prompt and design contract usable on phones.
+   ============================================================ */
+@media (max-width: 760px) {
+  #px-app .px-home-builder {
+    width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  #px-app .px-home-builder-inner {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 30px 16px 40px;
+  }
+
+  #px-app .px-home-builder h1 {
+    max-width: 100%;
+    font-size: clamp(34px, 8.5vw, 46px);
+    line-height: 1.06;
+    letter-spacing: -.055em;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  #px-app .px-home-lead {
+    max-width: 100%;
+    font-size: 15px;
+    line-height: 1.55;
+    margin-bottom: 22px;
+  }
+
+  #px-app .px-home-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px;
+    width: 100%;
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  #px-app .px-home-grid > *,
+  #px-app .px-home-composer,
+  #px-app .px-design-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    grid-column: 1 / -1;
+  }
+
+  #px-app .px-home-composer {
+    border-radius: 16px !important;
+  }
+
+  #px-app .px-home-composer textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 116px !important;
+    padding: 16px !important;
+    font-size: 16px !important;
+    line-height: 1.5;
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  #px-app .px-home-composer-foot {
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 8px 10px 10px;
+  }
+
+  #px-app .px-home-hint {
+    max-width: 100%;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  #px-app .px-design-panel {
+    overflow: hidden;
+    border-radius: 16px;
+    backdrop-filter: none;
+  }
+
+  #px-app .px-design-panel-head {
+    padding: 16px;
+  }
+
+  #px-app .px-design-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px;
+    padding: 16px;
+    min-width: 0;
+  }
+
+  #px-app .px-design-grid label,
+  #px-app .px-design-grid input,
+  #px-app .px-design-grid select,
+  #px-app .px-design-grid textarea {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 14px;
+  }
+
+  #px-app .px-design-grid input,
+  #px-app .px-design-grid select,
+  #px-app .px-design-grid textarea {
+    min-height: 46px;
+    padding: 11px 12px;
+  }
+
+  #px-app .px-design-grid textarea {
+    min-height: 84px;
+  }
+
+  #px-app .px-design-note {
+    display: block;
+    padding: 12px 16px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  #px-app .px-home-recent {
+    margin-top: 28px;
+  }
+
+  #px-app .px-recent-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  #px-app .px-home-builder-inner {
+    padding: 24px 14px 32px;
+  }
+
+  #px-app .px-home-builder h1 {
+    font-size: clamp(32px, 9vw, 38px);
+  }
+
+  #px-app .px-home-grid {
+    gap: 12px;
+  }
+
+  #px-app .px-design-panel-head,
+  #px-app .px-design-grid {
+    padding-left: 13px;
+    padding-right: 13px;
+  }
+
+  #px-app .px-design-grid input,
+  #px-app .px-design-grid select,
+  #px-app .px-design-grid textarea {
+    font-size: 14px;
+  }
+}
