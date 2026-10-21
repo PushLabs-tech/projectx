@@ -2454,6 +2454,18 @@ function showFileCtx(x,y,path,project){
     if(act==='delete')$('#delete-file')?.click();
   };
 }
+function renderFileDiff(before,after){
+ const a=String(before??'').split(/\r?\n/),b=String(after??'').split(/\r?\n/);
+ let prefix=0;while(prefix<a.length&&prefix<b.length&&a[prefix]===b[prefix])prefix++;
+ let suffix=0;while(suffix<a.length-prefix&&suffix<b.length-prefix&&a[a.length-1-suffix]===b[b.length-1-suffix])suffix++;
+ const removed=a.slice(prefix,a.length-suffix),added=b.slice(prefix,b.length-suffix);
+ if(!removed.length&&!added.length)return '<div class="px-diff-empty">No unsaved changes.</div>';
+ const rows=[];a.slice(Math.max(0,prefix-2),prefix).forEach(line=>rows.push('<div class="px-diff-line context"><span> </span><code>'+esc(line||' ')+'</code></div>'));
+ removed.slice(0,500).forEach(line=>rows.push('<div class="px-diff-line removed"><span>−</span><code>'+esc(line||' ')+'</code></div>'));
+ added.slice(0,500).forEach(line=>rows.push('<div class="px-diff-line added"><span>+</span><code>'+esc(line||' ')+'</code></div>'));
+ a.slice(a.length-suffix,Math.min(a.length-suffix+2,a.length)).forEach(line=>rows.push('<div class="px-diff-line context"><span> </span><code>'+esc(line||' ')+'</code></div>'));
+ return '<div class="px-diff-summary">Unsaved diff · '+removed.length+' removed · '+added.length+' added · contiguous changed block</div><div class="px-diff-lines">'+rows.join('')+'</div>';
+}
 function renderFiles(project){
   const paths=Object.keys(project.files||{}).sort();
   const first=paths.includes(project.uiFilePath)?project.uiFilePath:(paths[0]||null);
@@ -2464,7 +2476,7 @@ function renderFiles(project){
   const tree=paths.length?fileTreeHtml(fileTreeNodes(paths),esc,first):'<div class="sub">No generated files yet. Build to create them, or New to add a path.</div>';
   const tabs=project.uiFileTabs.map(p=>`<button class="${p===first?'active':''}" data-file-tab="${esc(p)}">${esc(p.split('/').pop())}</button>`).join('')||'<span class="sub" style="padding:8px">No open file</span>';
   const split=Boolean(settingsState.splitFiles);
-  body.innerHTML=`<div class="box"><div class="px-ide" id="px-ide"><div class="px-ide-tree file-list">${tree}<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div class="px-ide-main"><div class="px-ide-tabs" id="px-file-tabs">${tabs}</div><div class="px-ide-work ${split?'split':''}"><textarea id="file-code-editor" class="code-editor" spellcheck="false">${esc(first?project.files[first]:'Build the project to create real files.')}</textarea><div class="px-ide-preview" ${split?'':'hidden'}><iframe id="file-preview-frame" sandbox="allow-scripts" title="File preview"></iframe></div></div><div class="row"><b id="file-name">${esc(first||'No file selected')}</b><div class="actions"><button class="ghost" id="split-files">${split?'Hide preview':'Split preview'}</button>${first?'<button class="ghost" id="preview-file">Diff hint</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':''}</div></div><div class="sub" id="file-dirty"></div></div></div></div>`;
+  body.innerHTML=`<div class="box"><div class="px-ide" id="px-ide"><div class="px-ide-tree file-list">${tree}<div class="actions" style="margin-top:8px"><button class="ghost" id="new-file">New</button></div></div><div class="px-ide-main"><div class="px-ide-tabs" id="px-file-tabs">${tabs}</div><div class="px-ide-work ${split?'split':''}"><textarea id="file-code-editor" class="code-editor" spellcheck="false">${esc(first?project.files[first]:'Build the project to create real files.')}</textarea><div class="px-ide-preview" ${split?'':'hidden'}><iframe id="file-preview-frame" sandbox="allow-scripts" title="File preview"></iframe></div></div><div id="px-file-diff" class="px-file-diff" hidden></div><div class="row"><b id="file-name">${esc(first||'No file selected')}</b><div class="actions"><button class="ghost" id="split-files">${split?'Hide preview':'Split preview'}</button>${first?'<button class="ghost" id="preview-file">Diff</button><button class="ghost" id="save-file">Save</button><button class="ghost" id="rename-file">Rename</button><button class="ghost" id="delete-file">Delete</button><button class="download" id="download-file">Download</button>':''}</div></div><div class="sub" id="file-dirty"></div></div></div></div>`;
   let currentPath=first;
   const markDirty=()=>{const dirty=currentPath&&project.files[currentPath]!==$('#file-code-editor').value;$('#file-dirty').textContent=dirty?'Unsaved changes in '+currentPath+' · ⌘S to save':'';$('#file-dirty')?.classList.toggle('file-dirty',Boolean(dirty));$$('[data-file-tab]').forEach(t=>t.classList.toggle('file-dirty',t.dataset.fileTab===currentPath&&dirty));};
   const selectFile=path=>{
@@ -2493,12 +2505,7 @@ function renderFiles(project){
     applyProjectMutation(project,{fileOperations:[{op:'write',path,content:''}]});
     project.uiFilePath=path;saveProject(project);renderFiles(project);
   });
-  $('#preview-file')?.addEventListener('click',()=>{
-    if(!currentPath||!Object.hasOwn(project.files,currentPath))return;
-    const before=String(project.files[currentPath]||''),after=$('#file-code-editor').value;
-    const beforeLines=before?before.split(/\r?\n/).length:0,afterLines=after?after.split(/\r?\n/).length:0;
-    notify(before===after?'No changes pending.':currentPath+' · '+Math.abs(afterLines-beforeLines)+' line count delta pending save.','info');
-  });
+  $('#preview-file')?.addEventListener('click',()=>{if(!currentPath||!Object.hasOwn(project.files,currentPath))return;const panel=$('#px-file-diff');if(!panel)return;panel.hidden=!panel.hidden;if(!panel.hidden)panel.innerHTML=renderFileDiff(project.files[currentPath],$('#file-code-editor').value);});
   $('#save-file')?.addEventListener('click',async()=>{
     if(!saveOpenFile(project))return notify('No file changes to save.','info');
     notify('File saved. Generated output is now stale until rebuilt and verified.','success');markDirty();
