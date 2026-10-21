@@ -2456,3 +2456,15 @@ html, body {
 #px-ide .px-diff-line.added{background:rgba(35,160,100,.12);color:#8dddb4}
 #px-ide .px-diff-line.context{color:var(--px-text-secondary)}
 #px-ide .px-diff-empty{padding:14px;color:var(--px-text-secondary);font-size:12px}
+
+/* Offline syntax-highlighted source editor */
+#px-ide .px-code-editor-wrap{position:relative;min-width:0;min-height:420px;flex:1;background:#101114;overflow:hidden}
+#px-ide .px-code-highlight,#px-ide .code-editor{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:18px 20px;border:0;box-sizing:border-box;white-space:pre;tab-size:2;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:0;text-align:left}
+#px-ide .px-code-highlight{pointer-events:none;color:#e8e8ec;background:#101114;overflow:hidden;overflow-wrap:normal}
+#px-ide .code-editor{z-index:2;resize:none;background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:#ff805f;outline:none;scrollbar-color:#45464f #101114}
+#px-ide .code-editor::selection{background:rgba(242,84,45,.35);-webkit-text-fill-color:transparent}
+#px-ide .px-token-keyword{color:#c6a0f6}
+#px-ide .px-token-string{color:#a6da95}
+#px-ide .px-token-comment{color:#7f849c;font-style:italic}
+#px-ide .px-token-tag{color:#8bd5ca}
+#px-ide .px-token-number{color:#eed49f}
