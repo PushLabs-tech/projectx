@@ -1304,29 +1304,23 @@ async function subscribeProjectRealtime(projectId){
 }
 async function openProject(id){const project=state.projects.find(p=>p.id===id);if(!project)return;state.active=id;persistLocal();renderProject(project);if(session){try{const result=await edge('getProject',{projectId:id});if(result.project){const remote=migrateProject(result.project);const i=state.projects.findIndex(p=>p.id===id);if(i>=0)state.projects[i]=remote;else state.projects.push(remote);state.active=id;persistLocal();renderProject(remote);}}catch{} await subscribeProjectRealtime(id);}}
 function renderProject(project){
-  if(!project.uiNav || project.uiNav==='assistant' || project.uiNav==='overview'){
-    project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
-  }
-  const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default;
-  const assistantDock=UI.assistantDock({esc,project,actions});
-  shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
-  $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
-  $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{
-    project.uiNav=button.dataset.projectTool;
-    saveProject(project);
-    renderProject(project);
-  });
-  if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav){
-    renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
-  } else {
-    renderProjectTool(project,project.uiNav);
-  }
-  const dockLog=$('#assistant-dock-log');
-  if(dockLog&&Array.isArray(project.conversation)){
-    dockLog.innerHTML=conversationHtml(project);
-    dockLog.scrollTop=dockLog.scrollHeight;
-    bindAIResponseActions(project);
-  }
+ if(!project.uiNav||project.uiNav==='assistant'||project.uiNav==='overview')project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
+ if(!['studio','canvas','console'].includes(project.uiMode))project.uiMode='studio';
+ if(project.uiMode==='canvas')project.uiNav='canvas';
+ else if(project.uiMode==='console'&&project.uiNav!=='tests')project.uiNav='files';
+ else if(project.uiMode==='studio'&&['canvas','files','tests'].includes(project.uiNav))project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
+ const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default,assistantDock=UI.assistantDock({esc,project,actions});
+ shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
+ $$('[data-ui-mode]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode=button.dataset.uiMode;project.uiNav=project.uiMode==='canvas'?'canvas':project.uiMode==='console'?'files':Object.keys(project.files||{}).length?'preview':'build';saveProject(project);renderProject(project);});
+ $$('[data-workspace-action]',$('#px-app')).forEach(button=>button.onclick=()=>{if(button.dataset.workspaceAction==='tests'){project.uiMode='console';project.uiNav='tests';}else{project.uiMode='studio';project.uiNav='preview';}saveProject(project);renderProject(project);});
+ $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
+ $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode='studio';project.uiNav=button.dataset.projectTool;saveProject(project);renderProject(project);});
+ if(project.uiMode==='canvas')renderCanvas(project);
+ else if(project.uiMode==='console')renderProjectTool(project,project.uiNav==='tests'?'tests':'files');
+ else if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav)renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
+ else renderProjectTool(project,project.uiNav);
+ const dockLog=$('#assistant-dock-log');
+ if(dockLog&&Array.isArray(project.conversation)){dockLog.innerHTML=conversationHtml(project);dockLog.scrollTop=dockLog.scrollHeight;bindAIResponseActions(project);}
 }
 
 let executionRunsTimer=null;
