@@ -109,7 +109,7 @@ export function publicMarkup() {
     <header class="pxl-nav">
       <a class="pxl-brand" href="./" aria-label="ProjectX home"><span class="pxl-brand-mark">P<span>×</span></span><span>ProjectX</span></a>
       <nav class="pxl-links" aria-label="Main navigation">
-        <a href="#pxl-capabilities">Platform</a><a href="#pxl-workflow">How it works</a><a href="#px-examples">Explore ideas</a>
+        <a href="#pxl-capabilities">Platform</a><a href="#pxl-loop">Execution loop</a><a href="#pxl-domains">Domains</a><a href="#pxl-compare">Compare</a><a href="#pxl-pricing">Pricing</a>
       </nav>
       <div class="pxl-nav-actions"><button class="pxl-signin" id="public-signin" type="button">Sign in</button><button class="pxl-button pxl-button-dark pxl-button-small" id="public-workspace" type="button">Start building <span aria-hidden="true">↗</span></button></div>
     </header>
@@ -181,6 +181,65 @@ export function publicMarkup() {
         </div>
       </section>
 
+
+      <section class="pxl-demo" id="pxl-demo">
+        <div class="pxl-section-label">PROOF OF WORK / INTERACTIVE DEMOS</div>
+        <div class="pxl-workflow-head"><h2>See outcomes, not just promises.</h2><p>Explore small, interactive examples of how a workspace can turn a goal into something you can inspect and change.</p></div>
+        <div class="pxl-demo-shell">
+          <div class="pxl-demo-tabs" role="tablist" aria-label="Interactive examples">
+            <button type="button" class="active" role="tab" aria-selected="true" data-demo-tab="game">Playable game</button>
+            <button type="button" role="tab" aria-selected="false" data-demo-tab="crm">Task board</button>
+            <button type="button" role="tab" aria-selected="false" data-demo-tab="economics">Unit economics</button>
+          </div>
+          <div class="pxl-demo-panel" data-demo-panel="game">
+            <div class="pxl-demo-copy"><span class="pxl-card-label">DEMO 01 / GAME LOGIC</span><h3>A tiny game you can play.</h3><p>Use the controls to move through a lightweight obstacle demo. This is a front-end demonstration, not a generated project.</p><div class="pxl-demo-controls"><button type="button" data-game-move="-1">← Left</button><button type="button" data-game-move="1">Right →</button><button type="button" data-game-reset="true">Restart</button></div><p class="pxl-demo-status" id="pxl-game-status" aria-live="polite">Player position: 2 / 5</p></div>
+            <div class="pxl-game-board" id="pxl-game-board" role="img" aria-label="Small grid game demo"><span data-game-cell="0">·</span><span data-game-cell="1">·</span><span data-game-cell="2" class="player">●</span><span data-game-cell="3">▲</span><span data-game-cell="4">·</span></div>
+          </div>
+          <div class="pxl-demo-panel" data-demo-panel="crm" hidden>
+            <div class="pxl-demo-copy"><span class="pxl-card-label">DEMO 02 / WORKFLOW</span><h3>A task board with state.</h3><p>Move a sample task through the workflow to see its status update.</p><button type="button" class="pxl-button pxl-button-dark" id="pxl-task-advance">Advance “Landing page”</button><p class="pxl-demo-status" id="pxl-task-status" aria-live="polite">Landing page · Planned</p></div>
+            <div class="pxl-mini-kanban"><div><b>PLANNED</b><span>Define user goal</span><span id="pxl-task-card">Landing page</span></div><div><b>IN PROGRESS</b><span>Review layout</span></div><div><b>DONE</b><span>Write project brief</span></div></div>
+          </div>
+          <div class="pxl-demo-panel" data-demo-panel="economics" hidden>
+            <div class="pxl-demo-copy"><span class="pxl-card-label">DEMO 03 / BUSINESS MODEL</span><h3>Change the assumptions.</h3><p>Adjust sample numbers to explore revenue per sale and contribution after acquisition cost. This is illustrative, not financial advice.</p>
+              <label class="pxl-range">Price per sale <output id="pxl-price-value">$80</output><input id="pxl-price" type="range" min="20" max="200" value="80" step="5"></label>
+              <label class="pxl-range">Acquisition cost <output id="pxl-cac-value">$20</output><input id="pxl-cac" type="range" min="0" max="100" value="20" step="5"></label>
+            </div>
+            <div class="pxl-economics-result"><span>Contribution / sale</span><strong id="pxl-contribution">$60</strong><span id="pxl-margin">75% before other operating costs</span><small>Example values only</small></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pxl-loop-full" id="pxl-loop">
+        <div class="pxl-section-label">THE EXECUTION LOOP / FROM INTENT TO ITERATION</div>
+        <div class="pxl-workflow-head"><h2>Ten stages. One connected thread.</h2><p>ProjectX is organized around a repeatable workflow. Individual steps depend on the project type and available integrations.</p></div>
+        <div class="pxl-loop-grid">
+          <article><span>01</span><h3>Understand</h3><p>Clarify the intended outcome and success criteria.</p></article><article><span>02</span><h3>Classify</h3><p>Identify the domain, constraints, and execution path.</p></article><article><span>03</span><h3>Plan</h3><p>Turn the goal into milestones and concrete tasks.</p></article><article><span>04</span><h3>Simulate</h3><p>Surface dependencies, risks, and missing decisions.</p></article><article><span>05</span><h3>Create</h3><p>Produce the first useful version of the deliverable.</p></article><article><span>06</span><h3>Connect</h3><p>Organize files, tools, and project context.</p></article><article><span>07</span><h3>Execute</h3><p>Run the available workflow and record its state.</p></article><article><span>08</span><h3>Verify</h3><p>Use available checks to find observable failures.</p></article><article><span>09</span><h3>Repair</h3><p>Address identified issues and re-check affected work.</p></article><article><span>10</span><h3>Adapt</h3><p>Use results and feedback to plan the next iteration.</p></article>
+        </div>
+      </section>
+
+      <section class="pxl-domain-section" id="pxl-domains">
+        <div class="pxl-section-label">ONE ENGINE / MULTIPLE OUTCOME TYPES</div><div class="pxl-workflow-head"><h2>Designed for more than websites.</h2><p>Start with the job to be done. The right workspace and artifacts depend on the domain.</p></div>
+        <div class="pxl-domain-grid">
+          <article><span>01 / WEB</span><h3>Web &amp; SaaS</h3><p>Pages, product flows, app shells, and interface iterations.</p></article><article><span>02 / PLAY</span><h3>Playable games</h3><p>Game loops, input handling, mechanics, and playtesting.</p></article><article><span>03 / LAUNCH</span><h3>Business formation</h3><p>Offers, pricing assumptions, launch plans, and SOPs.</p></article><article><span>04 / CODE</span><h3>Repositories</h3><p>Files, change review, test output, and developer workflows.</p></article><article><span>05 / EVIDENCE</span><h3>Research</h3><p>Questions, evidence organization, and decision briefs.</p></article><article><span>06 / OPERATIONS</span><h3>Physical operations</h3><p>Checklists, logistics planning, handoffs, and repeatable work.</p></article><article><span>07 / LEARN</span><h3>Learning projects</h3><p>Milestones, practice tasks, and tangible learning outputs.</p></article><article><span>08 / CREATE</span><h3>Creative work</h3><p>Concepts, content, presentations, and iterative production.</p></article>
+        </div>
+      </section>
+
+      <section class="pxl-compare-section" id="pxl-compare">
+        <div class="pxl-section-label">POSITIONING / CHOOSE THE RIGHT TOOL</div><div class="pxl-workflow-head"><h2>Different tools. Different centers of gravity.</h2><p>This is a high-level positioning guide, not a benchmark or claim that one product is universally better.</p></div>
+        <div class="pxl-compare-wrap"><table class="pxl-compare-table"><thead><tr><th>Primary need</th><th>General AI chat</th><th>Cloud IDE</th><th>AI web builder</th><th>ProjectX direction</th></tr></thead><tbody>
+          <tr><th>Explore an idea</th><td>Strong</td><td>Possible</td><td>Possible</td><td>Goal-first planning</td></tr><tr><th>Build code</th><td>Generate / explain</td><td>Core workflow</td><td>Web-focused</td><td>Artifacts with project context</td></tr><tr><th>Visual preview</th><td>Limited by setup</td><td>Available in many tools</td><td>Core workflow</td><td>Preview for supported artifacts</td></tr><tr><th>Non-code outcomes</th><td>Flexible responses</td><td>Usually code-centered</td><td>Usually web-centered</td><td>Plans, documents, operations, and research</td></tr><tr><th>Verification</th><td>Often user-directed</td><td>Developer workflow</td><td>Varies by product</td><td>Explicit checks where supported</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section class="pxl-pricing-section" id="pxl-pricing">
+        <div class="pxl-section-label">PLANS / PROPOSED PRICING</div><div class="pxl-workflow-head"><h2>Start small. Add capacity when you need it.</h2><p>Illustrative plan structure. Availability, limits, and billing must be confirmed before these are treated as purchasable offers.</p></div>
+        <div class="pxl-pricing-grid">
+          <article><span class="pxl-plan-name">STARTER</span><h3>$0 <small>/ month</small></h3><p>Explore the workspace and shape a first outcome.</p><ul><li>Core workspace</li><li>Manual project planning</li><li>Local project state</li></ul><button type="button" class="pxl-button pxl-button-dark" data-plan-start="starter">Start free</button></article>
+          <article class="featured"><span class="pxl-plan-name">CORE</span><h3>$20 <small>/ month</small></h3><p>For people building and iterating on projects.</p><ul><li>More project capacity</li><li>Connected workflows</li><li>Preview and verification tools</li></ul><button type="button" class="pxl-button pxl-button-dark" data-plan-start="core">Explore Core</button></article>
+          <article><span class="pxl-plan-name">PRO</span><h3>$79 <small>/ month</small></h3><p>For sustained, multi-step project work.</p><ul><li>Expanded workflow capacity</li><li>Advanced project controls</li><li>Team-ready foundations</li></ul><button type="button" class="pxl-button pxl-button-dark" data-plan-start="pro">Explore Pro</button></article>
+          <article><span class="pxl-plan-name">ENTERPRISE</span><h3>Custom</h3><p>For teams with security and integration needs.</p><ul><li>Deployment discussion</li><li>Governance requirements</li><li>Integration planning</li></ul><button type="button" class="pxl-button pxl-button-dark" data-plan-start="enterprise">Contact us</button></article>
+        </div>
+      </section>
       <section class="pxl-bottom-cta"><div><div class="pxl-section-label">YOUR NEXT STEP STARTS HERE</div><h2>Bring the idea.<br>Build the <em>momentum.</em></h2></div><div><p>You do not need the perfect prompt. Start with the outcome you want, and refine the details as you go.</p><button class="pxl-button pxl-button-light" id="public-signup" type="button">Create your workspace <span aria-hidden="true">↗</span></button></div></section>
     </main>
 
