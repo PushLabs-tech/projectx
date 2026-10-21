@@ -252,12 +252,16 @@ export function chrome({esc, session, recents, active, body, project, nav, right
           <strong>${title}</strong>
           <span class="px-project-status"><span class="px-live-dot"></span>${status ? esc(status) : 'Ready'}</span>
         </div>
-        <div class="px-center-actions">
-          <button class="ghost ${(nav||active)==='build'?'active':''}" data-project-tool="build">Build</button>
-          <button class="ghost ${(nav||active)==='preview'?'active':''}" data-project-tool="preview">Preview</button>
-          <button class="ghost ${(nav||active)==='files'?'active':''}" data-project-tool="files">Code</button>
+        <div class="px-center-actions px-mode-switch" role="group" aria-label="Workspace mode">
+          <button type="button" data-workspace-mode="studio" aria-pressed="${['build','design','preview'].includes(nav||active)?'true':'false'}">Studio</button>
+          <button type="button" data-workspace-mode="canvas" aria-pressed="${['overview','tasks','artifacts'].includes(nav||active)?'true':'false'}">Canvas</button>
+          <button type="button" data-workspace-mode="console" aria-pressed="${['files','git','terminal'].includes(nav||active)?'true':'false'}">Console</button>
         </div>
-        <span style="flex:1"></span>
+        <div class="px-center-actions px-mode-quicklinks">
+          <button class="ghost ${(nav||active)==='preview'?'active':''}" data-project-tool="preview">Preview</button>
+          <button class="ghost ${(nav||active)==='files'?'active':''}" data-project-tool="files">Files</button>
+        </div>
+      <span style="flex:1"></span>
         <button class="ghost" data-cmd="palette" title="Command palette">⌘K</button>
         <button class="ghost" data-cmd="share">Share</button>
         <button class="primary px-agent-toggle" data-cmd="toggle-assistant">Agent</button>
