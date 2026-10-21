@@ -857,7 +857,7 @@ function bindStartComposer(){
     p.understanding={summary:t.intent,category:t.type,confidence:0.5};
     saveProject(p);openProject(p.id);
   });
-  $$('[data-example]').forEach(btn=>btn.onclick=()=>{
+  $$$('[data-example]').forEach(btn=>btn.onclick=()=>{
     input.value=btn.dataset.example||'';
     input.focus();
   });
@@ -910,7 +910,6 @@ function publicHome(){
   $$('[data-game-move]').forEach(button=>button.onclick=()=>{gamePosition=Math.max(0,Math.min(4,gamePosition+Number(button.dataset.gameMove)));drawGame();});
   $('[data-game-reset]')?.addEventListener('click',()=>{gamePosition=2;drawGame();});
   let taskStage=0;const taskStages=['Planned','In progress','Ready for review','Done'];
-  $('[data-plan-start]')?.addEventListener('click',()=>{});
   $('#pxl-task-advance')?.addEventListener('click',()=>{taskStage=(taskStage+1)%taskStages.length;const status=$('#pxl-task-status'),card=$('#pxl-task-card');if(status)status.textContent='Landing page · '+taskStages[taskStage];if(card)card.textContent='Landing page · '+taskStages[taskStage];});
   const updateEconomics=()=>{const price=Number($('#pxl-price')?.value||80),cac=Number($('#pxl-cac')?.value||20),contribution=price-cac,margin=price?Math.round(contribution/price*100):0;const p=$('#pxl-price-value'),c=$('#pxl-cac-value'),v=$('#pxl-contribution'),m=$('#pxl-margin');if(p)p.textContent='$'+price;if(c)c.textContent='$'+cac;if(v)v.textContent='$'+contribution;if(m)m.textContent=margin+'% before other operating costs';};
   $('#pxl-price')?.addEventListener('input',updateEconomics);$('#pxl-cac')?.addEventListener('input',updateEconomics);
