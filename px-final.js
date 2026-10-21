@@ -863,9 +863,11 @@ function publicHome(){
   $('#public-signup').onclick=()=>authScreen('signup');
   const startFromLanding=()=>{
     const prompt=$('#start-input');
-    const intent=String(prompt?.value||'').trim();
-    if(intent){try{sessionStorage.setItem('projectx_pending_intent',intent);sessionStorage.setItem('projectx_pending_domain',$('#start-input')?.dataset.domain||'web');}catch{}}
-    openWorkspace();
+    const rawIntent=String(prompt?.value||'').trim();
+    if(!rawIntent){prompt?.focus();return;}
+    const domain=String(prompt?.dataset.domain||'web');
+    const intent=domain==='web'?rawIntent:'[Preferred ProjectX domain: '+domain+']\\n'+rawIntent;
+    beginCreation(intent);
   };
   $('#public-start').onclick=startFromLanding;
   $('#public-start-arrow').onclick=startFromLanding;
