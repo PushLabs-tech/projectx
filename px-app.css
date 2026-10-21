@@ -2422,3 +2422,11 @@ html, body {
 #px-app.px-public .pxl-bottom-cta{margin-top:0}
 @media(max-width:950px){#px-app.px-public .pxl-loop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#px-app.px-public .pxl-domain-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#px-app.px-public .pxl-pricing-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){#px-app.px-public .pxl-demo-panel{grid-template-columns:1fr;gap:20px}#px-app.px-public .pxl-mini-kanban{grid-template-columns:1fr}#px-app.px-public .pxl-loop-grid,#px-app.px-public .pxl-domain-grid,#px-app.px-public .pxl-pricing-grid{grid-template-columns:1fr}#px-app.px-public .pxl-compare-section{padding-left:14px;padding-right:14px}}
+
+/* Workspace title and domain metadata */
+#px-shell .px-project-name-edit{border:0;background:transparent;color:var(--px-text-primary);font:inherit;font-weight:700;cursor:text;padding:4px 6px;border-radius:6px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#px-shell .px-project-name-edit:hover{background:var(--px-surface-subtle)}
+#px-shell .px-project-name-edit span{font-size:10px;color:var(--px-text-tertiary);opacity:0;margin-left:4px}
+#px-shell .px-project-name-edit:hover span,#px-shell .px-project-name-edit:focus-visible span{opacity:1}
+#px-shell .px-domain-badge{font:10px var(--px-font-mono);text-transform:uppercase;letter-spacing:.04em;color:var(--px-text-secondary);border:1px solid var(--px-border);border-radius:999px;padding:4px 7px;white-space:nowrap}
+@media(max-width:700px){#px-shell .px-domain-badge{display:none}#px-shell .px-project-name-edit{max-width:150px}}
