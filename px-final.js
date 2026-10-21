@@ -1533,9 +1533,35 @@ function renderBrain(project){
 }
 function renderArchitecture(project){
   const sections=buildDependencyMap(project.sections||[]);
-  const cards=sections.map(s=>'<div class="architecture-node"><b>'+esc(s.name)+'</b><div class="sub">'+esc(s.kind)+' · '+esc(s.agent||'planner')+'</div>'+(s.capabilities?.length?'<div class="sub" style="margin-top:5px">Capabilities: '+esc(s.capabilities.join(', '))+'</div>':'')+(s.dependsOn?.length?'<div class="sub" style="margin-top:5px">Depends on: '+esc(s.dependsOn.map(id=>(sections.find(x=>x.id===id)||{}).name||id).join(', '))+'</div>':'')+'</div>').join('');
-  const agents=(project.agents||[]).map(a=>'<div class="architecture-node"><b>'+esc(a.name||a.key||a.id)+'</b><div class="sub">'+esc(a.purpose||'Project specialist')+'</div>'+(a.tools?.length?'<div class="sub" style="margin-top:5px">Tools: '+esc(a.tools.join(', '))+'</div>':'')+'</div>').join('');
-  toolShell('PROJECT INTELLIGENCE','Live Architecture','Dependency view generated from the current project sections and assembled specialists.','<h3 style="margin:0 0 8px">Workspace graph</h3><div class="architecture-grid">'+(cards||'<div class="placeholder">No architecture nodes yet.</div>')+'</div><h3 style="margin:18px 0 8px">Specialists</h3><div class="architecture-grid">'+(agents||'<div class="placeholder">No project-specific specialists recorded yet.</div>')+'</div>');
+  const cards=sections.map(section=>{
+    const options=sections.filter(item=>item.id!==section.id).map(item=>'<option value="'+esc(item.id)+'" '+(section.dependsOn?.includes(item.id)?'selected':'')+'>'+esc(item.name)+'</option>').join('');
+    return '<div class="architecture-node"><b>'+esc(section.name)+'</b><div class="sub">'+esc(section.kind)+' · '+esc(section.agent||'planner')+'</div>'+(section.capabilities?.length?'<div class="sub" style="margin-top:5px">Capabilities: '+esc(section.capabilities.join(', '))+'</div>':'')+'<label class="px-dependency-editor"><span>Depends on</span><select multiple size="3" data-dependency-node="'+esc(section.id)+'" aria-label="Dependencies for '+esc(section.name)+'">'+options+'</select><small>Use Ctrl/Cmd to select multiple dependencies. Cycles are blocked.</small></label></div>';
+  }).join('');
+  const agents=(project.agents||[]).map(agent=>'<div class="architecture-node"><b>'+esc(agent.name||agent.key||agent.id)+'</b><div class="sub">'+esc(agent.purpose||'Project specialist')+'</div>'+(agent.tools?.length?'<div class="sub" style="margin-top:5px">Tools: '+esc(agent.tools.join(', '))+'</div>':'')+'</div>').join('');
+  toolShell('PROJECT INTELLIGENCE','Live Architecture','Edit the dependency graph for the current project sections. Changes are versioned through the normal project mutation and persistence path.','<h3 style="margin:0 0 8px">Workspace dependency graph</h3><div class="architecture-grid">'+(cards||'<div class="placeholder">No architecture nodes yet.</div>')+'</div><h3 style="margin:18px 0 8px">Specialists</h3><div class="architecture-grid">'+(agents||'<div class="placeholder">No project-specific specialists recorded yet.</div>')+'</div>');
+  $$('[data-dependency-node]','#project-body').forEach(select=>select.addEventListener('change',async()=>{
+    const nodeId=select.dataset.dependencyNode;
+    const next=Array.from(select.selectedOptions).map(option=>option.value).filter(id=>id!==nodeId);
+    const currentSections=project.sections||[];
+    const node=currentSections.find(item=>item.id===nodeId);
+    if(!node)return;
+    const proposed=currentSections.map(item=>item.id===nodeId?{...item,dependsOn:next}:item);
+    const reaches=(from,target,seen=new Set())=>{
+      if(from===target)return true;
+      if(seen.has(from))return false;
+      seen.add(from);
+      const item=proposed.find(entry=>entry.id===from);
+      return (item?.dependsOn||[]).some(id=>reaches(id,target,seen));
+    };
+    if(next.some(id=>reaches(id,nodeId))){
+      notify('Dependency rejected: this change would create a cycle.','error');
+      renderArchitecture(project);return;
+    }
+    snapshot(project,'Before dependency graph change');
+    applyProjectMutation(project,{sectionOperations:[{op:'update',id:nodeId,patch:{dependsOn:next}}]});
+    saveProject(project);await syncRemoteProject(project);renderArchitecture(project);
+    notify('Dependency graph updated. Affected artifacts may require verification.','success');
+  }));
 }
 function simulationState(project){
   const validation=validateSpec(project.spec,project.type),sections=(project.sections||[]).filter(s=>s.id!=='chat');
