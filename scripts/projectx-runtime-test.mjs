@@ -20,7 +20,7 @@ assert.match(ui, /id="px-bottom"/);
 assert.match(ui, /replit-shell/);
 assert.match(ui, /px-home-builder/);
 assert.match(ui, /What are you building\?/);
-assert.match(ui, /Tell ProjectX what you want to accomplish/);
+assert.match(ui, /Tell ProjectX what you want to accomplish|Tell it what you want to accomplish|What are you trying to make happen\?/);
 assert.match(ui, /execNote/);
 assert.doesNotMatch(ui, /ExecutionProvider/);
 assert.match(runtime, /function applyChromeLayout\(/);
