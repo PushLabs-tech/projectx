@@ -696,11 +696,7 @@ function filterSideSearch(q){
   extra.innerHTML=hits.map(f=>`<button data-project-tool="files" data-open-file="${esc(f)}">${esc(f)}</button>`).join('');
 }
 function bindChrome(root){
-  root.addEventListener('keydown',e=>{
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&$('#file-code-editor')&&e.target===$('#file-code-editor')){
-      e.preventDefault();const project=activeProject();if(project&&saveOpenFile(project)){notify('File saved. Rebuild and verify to refresh the generated artifact.','success');}
-    }
-  });
+  
   root.onclick=async e=>{
     const cmd=e.target.closest('[data-cmd]')?.dataset.cmd;
     if(cmd==='palette')return openPalette();
@@ -822,7 +818,7 @@ function bindStartComposer(){
   const input=$('#start-input');
   const send=$('#start-send');
   if(!input||!send)return;
-  try{const pending=sessionStorage.getItem('projectx_pending_intent');if(pending&&!input.value){input.value=pending;sessionStorage.removeItem('projectx_pending_intent');}}catch{}
+  try{const pending=sessionStorage.getItem('projectx_pending_intent');const domain=sessionStorage.getItem('projectx_pending_domain');if(pending&&!input.value){input.value=domain&&domain!=='web'?'[Preferred ProjectX domain: '+domain+']\\n'+pending:pending;sessionStorage.removeItem('projectx_pending_intent');sessionStorage.removeItem('projectx_pending_domain');}}catch{}
   const value=id=>String($('#'+id)?.value||'').trim();
   const buildIntent=()=>{
     const base=String(input.value||'').trim();
@@ -866,7 +862,7 @@ function publicHome(){
   const startFromLanding=()=>{
     const prompt=$('#start-input');
     const intent=String(prompt?.value||'').trim();
-    if(intent){try{sessionStorage.setItem('projectx_pending_intent',intent);}catch{}}
+    if(intent){try{sessionStorage.setItem('projectx_pending_intent',intent);sessionStorage.setItem('projectx_pending_domain',$('#start-input')?.dataset.domain||'web');}catch{}}
     openWorkspace();
     if(intent){
       const input=$('#start-input');
@@ -875,7 +871,7 @@ function publicHome(){
   };
   $('#public-start').onclick=startFromLanding;
   $('#public-start-arrow').onclick=startFromLanding;
-  $('#start-input').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter')startFromLanding();};
+  $('#start-input').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}};
   $('#public-workspace').onclick=openWorkspace;
   $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
   $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
@@ -1347,7 +1343,7 @@ function renderProject(project){
  else if(project.uiMode==='studio'&&['canvas','files','tests'].includes(project.uiNav))project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
  const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default,assistantDock=UI.assistantDock({esc,project,actions});
  shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
- const shellRoot=$('#px-shell');if(shellRoot)shellRoot.dataset.uiMode=project.uiMode;
+ const shellRoot=$('#px-shell');if(shellRoot){shellRoot.dataset.uiMode=project.uiMode;$('[data-workspace-mode]',shellRoot).forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.workspaceMode===project.uiMode));});}
   $$('[data-workspace-action]',$('#px-app')).forEach(button=>button.onclick=()=>{if(button.dataset.workspaceAction==='tests'){project.uiMode='console';project.uiNav='tests';}else{project.uiMode='studio';project.uiNav='preview';}saveProject(project);renderProject(project);});
  $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
  $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode='studio';project.uiNav=button.dataset.projectTool;saveProject(project);renderProject(project);});
@@ -2449,6 +2445,7 @@ function renderFiles(project){
   });
   $$('[data-file-tab]',body).forEach(button=>button.onclick=()=>selectFile(button.dataset.fileTab));
   $('#file-code-editor')?.addEventListener('input',()=>{markDirty();if(settingsState.splitFiles)refreshFilePreview(project);});
+  $('#file-code-editor')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();if(saveOpenFile(project)){markDirty();notify('File saved. Rebuild and verify to refresh the generated artifact.','success');}}});
   $('#split-files')?.addEventListener('click',()=>{settingsState.splitFiles=!settingsState.splitFiles;persistSettings();renderFiles(project);});
   $('#new-file')?.addEventListener('click',()=>{
     const raw=prompt('New file path');const path=sanitizePath(raw||'');
