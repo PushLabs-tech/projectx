@@ -55,7 +55,7 @@ const GEMINI_MODEL_MIGRATIONS = new Map([
 ]);
 
 const $ = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const $$ = (s, r = document) => { const root = typeof r === 'string' ? document.querySelector(r) : r; return root ? [...root.querySelectorAll(s)] : []; };
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const read = (k, fallback) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? fallback; } catch { return fallback; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
@@ -1051,7 +1051,7 @@ async function runAIAction(project,action,index){
 }
 function bindAIResponseActions(project){
   if(!project)return;
-  $('[data-ai-action]').forEach(button=>{
+  $$('[data-ai-action]').forEach(button=>{
     button.onclick=async()=>{
       const action=String(button.dataset.aiAction||'');
       const index=Number(button.dataset.messageIndex);
@@ -1382,10 +1382,10 @@ function renderProject(project){
  else if(project.uiMode==='studio'&&['canvas','files','tests'].includes(project.uiNav))project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
  const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default,assistantDock=UI.assistantDock({esc,project,actions});
  shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
- const shellRoot=$('#px-shell');if(shellRoot){shellRoot.dataset.uiMode=project.uiMode;$('[data-workspace-mode]',shellRoot).forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.workspaceMode===project.uiMode));});}
+ const shellRoot=$('#px-shell');if(shellRoot){shellRoot.dataset.uiMode=project.uiMode;$$('[data-workspace-mode]',shellRoot).forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.workspaceMode===project.uiMode));});}
   $$('[data-workspace-action]',$('#px-app')).forEach(button=>button.onclick=()=>{if(button.dataset.workspaceAction==='tests'){project.uiMode='console';project.uiNav='tests';}else{project.uiMode='studio';project.uiNav='preview';}saveProject(project);renderProject(project);});
  $$('.tab',$('#px-app')).forEach(button=>button.onclick=()=>{project.selectedSection=button.dataset.section;saveProject(project);renderProject(project)});
- $('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode='studio';project.uiNav=button.dataset.projectTool;saveProject(project);renderProject(project);});
+ $$('[data-project-tool]',$('#px-app')).forEach(button=>button.onclick=()=>{project.uiMode='studio';project.uiNav=button.dataset.projectTool;saveProject(project);renderProject(project);});
  if(project.uiMode==='canvas')renderOutcomeCanvas(project);
  else if(project.uiMode==='console')renderProjectTool(project,project.uiNav==='tests'?'tests':'files');
  else if(project.uiNav==='overview'||project.uiNav==='assistant'||!project.uiNav)renderSection(project,project.sections.find(s=>s.id===project.selectedSection)||project.sections[0]);
@@ -3147,7 +3147,7 @@ async function renderDeploy(project){
       const evidence=row.health_evidence?.httpStatus?'HTTP '+row.health_evidence.httpStatus:'Health check pending';
       return '<div class="row"><div><b>'+esc(row.provider)+' · '+label+'</b><div class="sub">'+esc(row.created_at||'')+' · '+esc(String(row.source_hash||row.metadata?.deploymentPipeline?.sourceHash||'').slice(0,12))+' · '+esc(evidence)+'</div></div><div class="actions">'+runUrl+rollback+'</div></div>';
     }).join('');
-    $('[data-rollback]',panel).forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{await rollbackDeployment(project.id,btn.dataset.rollback);notify('Rollback requested.','success');await refresh();}catch(error){notify(error.message||String(error),'error');}finally{btn.disabled=false;}});
+    $$('[data-rollback]',panel).forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{await rollbackDeployment(project.id,btn.dataset.rollback);notify('Rollback requested.','success');await refresh();}catch(error){notify(error.message||String(error),'error');}finally{btn.disabled=false;}});
   };
   const refresh=async()=>{
     if(!session){panel.innerHTML='<div class="placeholder">Sign in to deploy and inspect deployment health.</div>';return;}
