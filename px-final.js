@@ -884,6 +884,7 @@ function publicHome(){
     if(!rawIntent){prompt?.focus();return;}
     const domain=String(prompt?.dataset.domain||'web');
     const intent=domain==='web'?rawIntent:'[Preferred ProjectX domain: '+domain+']\\n'+rawIntent;
+    $('#public-start-arrow')?.classList.add('is-loading');
     beginCreation(intent);
   };
   $('#public-start').onclick=startFromLanding;
@@ -926,7 +927,45 @@ function publicHome(){
     $$('[data-billing-suffix]').forEach(suffix=>{suffix.textContent=annual?'/ year':'/ month';});
   });
   $$('[data-plan-start]').forEach(button=>button.onclick=()=>{if(button.dataset.planStart==='enterprise'){notify('Enterprise enquiries are not connected yet.','info');return;}$('#start-input')?.focus();$('#start-input')?.scrollIntoView({behavior:'smooth',block:'center'});notify('Plan pricing is illustrative; billing is not enabled from this page.','info');});
-
+  initLandingMotion();
+}
+function initLandingMotion(){
+  const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const revealTargets=$$('.px-reveal-up, .px-reveal-stagger');
+  if('IntersectionObserver' in window&&!reduced){
+    const io=new IntersectionObserver(entries=>{entries.forEach(en=>{if(en.isIntersecting){en.target.classList.add('px-in-view');io.unobserve(en.target);}});},{threshold:0.12,rootMargin:'0px 0px -8% 0px'});
+    revealTargets.forEach(el=>io.observe(el));
+  }else revealTargets.forEach(el=>el.classList.add('px-in-view'));
+  const coreCanvas=$('#pxl-core-canvas'),pipeCanvas=$('#pxl-pipeline-canvas');
+  let core=null,pipeline=null;
+  import('./projectx-canvas-3d.js').then(mod=>{
+    try{if(coreCanvas)core=mod.initCreationCore(coreCanvas);}catch{}
+    try{if(pipeCanvas)pipeline=mod.initPipeline(pipeCanvas);}catch{}
+    const stages=$$('[data-pipeline-stage]'),status=$('#pxl-pipeline-status');
+    const names=['DESCRIBE','PLAN','BUILD','CONNECT & EXECUTE','SELF-HEAL'];
+    if('IntersectionObserver' in window&&stages.length){
+      const pio=new IntersectionObserver(entries=>{entries.forEach(en=>{if(en.isIntersecting){const i=Number(en.target.dataset.pipelineStage||0);pipeline?.setStage?.(i);stages.forEach(s=>s.classList.toggle('active',Number(s.dataset.pipelineStage)<=i));if(status)status.innerHTML='<i></i>STAGE 0'+(i+1)+' / '+names[i];}});},{threshold:0.55});
+      stages.forEach(s=>pio.observe(s));
+    }
+    $$('[data-domain]').forEach(button=>button.addEventListener('click',()=>{
+      button.classList.remove('px-pill-pop');void button.offsetWidth;button.classList.add('px-pill-pop');
+      core?.pulse?.(button.dataset.domain||'web');
+    }));
+    $('#start-input')?.addEventListener('input',()=>core?.type?.());
+  }).catch(()=>{coreCanvas?.classList.add('pxl-core-fallback');if(pipeCanvas)pipeCanvas.classList.add('pxl-core-fallback');});
+  if(!reduced&&window.matchMedia&&matchMedia('(pointer:fine)').matches){
+    const magnet=$('#public-start-arrow');
+    if(magnet){
+      const wrap=magnet.closest('.pxl-composer')||magnet.parentElement;
+      wrap.addEventListener('pointermove',e=>{
+        const r=magnet.getBoundingClientRect();
+        const dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2);
+        const dist=Math.hypot(dx,dy);
+        if(dist<120)magnet.style.transform='translate('+(dx*0.12)+'px,'+(dy*0.12)+'px)';
+      });
+      wrap.addEventListener('pointerleave',()=>{magnet.style.transform='';});
+    }
+  }
 }
 function routeFromLocation(){
   const hash=String(location.hash||'').replace(/^#/,'').split('?')[0];
