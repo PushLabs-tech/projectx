@@ -29,7 +29,7 @@ if (typeof window !== 'undefined') window.Engine = Engine;
   const now = () => Date.now();
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const $$ = (s, r = document) => { const root = typeof r === 'string' ? document.querySelector(r) : r; return root ? [...root.querySelectorAll(s)] : []; };
   const safePath = p => typeof p === "string" && p && !p.startsWith("/") && !p.includes("..") && !p.includes("\\");
   const clone = x => JSON.parse(JSON.stringify(x));
 
