@@ -1055,7 +1055,7 @@ html, body {
   .px-home-builder h1{font-size:clamp(38px,12vw,54px)}
   .px-home-composer textarea{min-height:100px!important}
   .px-home-composer-foot{align-items:flex-end}
-  .px-home-shortcuts{overflow:auto;flex-wrap:nowrap;padding-bottom:2px}
+  .px-home-shortcuts{overflow:visible;flex-wrap:wrap;padding-bottom:2px;min-width:0}
   .px-shortcut{white-space:nowrap}
   .px-design-grid{grid-template-columns:1fr}
   .px-design-wide{grid-column:auto}
@@ -1198,9 +1198,10 @@ html, body {
   color:#fff!important;
 }
 .px-home-shortcuts{
-  gap:4px;
-  overflow:auto;
-  flex-wrap:nowrap;
+  gap:6px;
+  overflow:visible;
+  flex-wrap:wrap;
+  min-width:0;
 }
 .px-shortcut{
   white-space:nowrap;
@@ -2559,3 +2560,16 @@ html, body {
 
 /* Let the Creation Core glow through the composer */
 #px-app.px-public .pxl-composer{background:rgba(255,255,255,.7);backdrop-filter:blur(14px) saturate(1.1);-webkit-backdrop-filter:blur(14px) saturate(1.1)}
+
+
+/* Batch 1 mobile repairs: keep project actions reachable and creation choices wrapped. */
+@media (max-width:760px){
+  .px-workspace-title.px-workspace-topbar{align-items:flex-start;flex-direction:column;gap:10px}
+  .px-workspace-title-main{min-width:0;width:100%}
+  .px-workspace-title-main>strong{overflow-wrap:anywhere}
+  .px-workspace-actions{display:flex!important;flex-wrap:wrap;gap:6px;width:100%;max-width:none}
+  .px-workspace-actions button{flex:1 1 auto;min-height:40px;white-space:normal}
+  .px-home-composer-foot{align-items:flex-start;flex-direction:column}
+  .px-home-shortcuts{width:100%;overflow:visible;flex-wrap:wrap;white-space:normal}
+  .px-shortcut{white-space:normal;max-width:100%}
+}
