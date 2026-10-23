@@ -29,6 +29,23 @@ test("responsive shell does not overflow horizontally", async ({ page }) => {
   expect(overflow).toBe(false);
 });
 
+test("mobile creation shortcuts wrap instead of requiring horizontal scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/#workspace");
+  const shortcuts = page.locator(".px-home-shortcuts");
+  await expect(shortcuts).toBeVisible();
+  const layout = await shortcuts.evaluate(el => ({
+    flexWrap: getComputedStyle(el).flexWrap,
+    overflowX: getComputedStyle(el).overflowX,
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+    optionCount: el.querySelectorAll("button").length
+  }));
+  expect(layout.flexWrap).toBe("wrap");
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 2);
+  expect(layout.optionCount).toBeGreaterThan(1);
+});
+
 
 test("project shell can open guest creation flow and expose execution workspace", async ({ page }) => {
   const errors:string[]=[];

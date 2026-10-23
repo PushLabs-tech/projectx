@@ -787,7 +787,12 @@ function openMoreTools(project){
   document.body.appendChild(modal); currentModal=modal;
   $('#more-tools-close')?.addEventListener('click',closeModal);
   modal.querySelectorAll('[data-more-tool]').forEach(btn=>btn.addEventListener('click',()=>{
-    const id=btn.dataset.moreTool; closeModal(); project.uiNav=id; saveProject(project); renderProjectTool(project,id);
+    const id=btn.dataset.moreTool;
+    closeModal();
+    project.uiNav=id;
+    project.uiMode=id==='canvas'?'canvas':id==='tests'?'console':id==='files'?'console':'studio';
+    saveProject(project);
+    renderProject(project);
   }));
 }
 function addProjectTool(project){
@@ -1414,11 +1419,14 @@ function renderOutcomeCanvas(project){
  root.innerHTML='<div class="px-outcome-canvas"><header class="px-outcome-head"><div><span class="kicker">PROJECT MAP / CANVAS MODE</span><h2>'+esc(project.title||'Untitled project')+'</h2><p class="sub">A high-level map of the intent-to-execution loop. Statuses reflect saved project data; they are not a claim that an automated stage ran.</p></div><div class="px-outcome-summary"><b>'+files.length+'</b><span>Artifacts</span><b>'+done+'/'+total+'</b><span>Tasks complete</span></div></header><div class="px-outcome-graph">'+nodes+'</div><div class="px-outcome-footer"><span>GOAL → PLAN → BUILD → VERIFY → ADAPT</span><button type="button" class="primary" data-workspace-mode="studio">Continue in Studio ↗</button></div></div>';
 }
 function renderProject(project){
- if(!project.uiNav||project.uiNav==='assistant'||project.uiNav==='overview')project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
  if(!['studio','canvas','console'].includes(project.uiMode))project.uiMode='studio';
- if(project.uiMode==='canvas')project.uiNav='canvas';
- else if(project.uiMode==='console'&&project.uiNav!=='tests')project.uiNav='files';
- else if(project.uiMode==='studio'&&['canvas','files','tests'].includes(project.uiNav))project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
+ if(!project.uiNav||project.uiNav==='assistant'||project.uiNav==='overview')project.uiNav=Object.keys(project.files||{}).length?'preview':'build';
+ // Keep the selected tool and workspace mode consistent. Do not silently
+ // replace Files/Tests with Preview/Build during a render.
+ if(project.uiNav==='canvas')project.uiMode='canvas';
+ else if(project.uiNav==='tests')project.uiMode='console';
+ else if(project.uiMode==='canvas'&&project.uiNav!=='canvas')project.uiNav='canvas';
+ else if(project.uiMode==='console'&&!['tests','files'].includes(project.uiNav))project.uiNav='files';
  const actions=UI.CONTEXT_ACTIONS[project.uiNav]||UI.CONTEXT_ACTIONS.default,assistantDock=UI.assistantDock({esc,project,actions});
  shell(UI.projectHead({esc,project}),'projects',{project,nav:project.uiNav,right:assistantDock,status:'Project v'+project.specVersion+' · '+ExecutionProvider.kind});
  const shellRoot=$('#px-shell');if(shellRoot){shellRoot.dataset.uiMode=project.uiMode;$$('[data-workspace-mode]',shellRoot).forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.workspaceMode===project.uiMode));});}
