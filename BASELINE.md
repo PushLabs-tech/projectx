@@ -7,7 +7,7 @@
 **Working branch:** `fix/beta-billing-guard-cancellation-ownership`  
 **Review PR:** [#55 — security and beta reliability fixes](https://github.com/PushLabs-tech/projectx/pull/55)  
 **Snapshot branch head when this report was prepared:** `3e8587fd3aacbcd98aff9d95afdf3a4ee2c130be` (subsequent commits continue this draft patch)  
-**Status:** Draft PR; not merged; no database migration or function deployment performed.
+**Status:** Draft PR; not merged; no database migration or function deployment performed. Latest inspected head: `c693badf1764f0f8eea7849c15b0e8ee6c63314f`.
 
 ## 1. Evidence boundary
 
@@ -23,7 +23,7 @@ The live GitHub Pages URL could not be retrieved by the browser inspection tool 
 - Several GitHub API updates were committed as individual commits on the branch. The branch has more commits than the number of logical batches; before merging, review the final diff as a single patch and consider squashing only through a normal PR workflow.
 - GitHub Actions on `51bdbe83bb68dcd2e1219130ad0c8c8064cecbda` passed the project checks and browser E2E. The E2E log reported **7 passed, 2 skipped**; the skipped tests are authenticated-account flows requiring `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD`.
 - On branch head `4c0c9e4b34f596f151efab21c9a3a34dfa178fe4`, GitHub Actions passed `npm audit --audit-level=high`, `npm test`, and browser E2E (the run completed successfully after the earlier observation). See the [branch CI runs](https://github.com/PushLabs-tech/projectx/actions).
-- A full E2E pass has not yet been recorded for the latest branch head as of this report. Do not extend earlier green results to newer commits without checking their run.
+- **Latest-head CI verified:** PR-triggered workflow run [40138571213](https://github.com/PushLabs-tech/projectx/actions/runs/40138571213) for exact head `c693badf1764f0f8eea7849c15b0e8ee6c63314f` completed successfully. All workflow steps passed, including npm dependency installation, `npm audit --audit-level=high`, `npm test` (including static security scan), Chromium install, and browser E2E. E2E result: **7 passed, 2 skipped**. The skipped tests are authenticated workspace flows because `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD` were absent; those live authenticated flows remain unverified.
 
 ## 3. Source / architecture map
 
@@ -81,7 +81,7 @@ Configured scripts:
 Evidence status:
 - **Executed in GitHub Actions, passed:** `npm audit --audit-level=high`, `npm test`, and `npm run e2e:ci` for branch head `4c0c9e4b34f596f151efab21c9a3a34dfa178fe4`. This is a historical green result and must not be substituted for CI on later commits.
 - **Executed in GitHub Actions, passed on prior branch head:** `npm test` and `npm run e2e:ci` on `51bdbe83bb68dcd2e1219130ad0c8c8064cecbda` (7 passed, 2 authenticated tests skipped).
-- **Pending as of this snapshot:** full E2E on the newest head and re-running CI on the later report/documentation commit.
+- **Latest observed run, passed:** PR-triggered workflow run [40138571213](https://github.com/PushLabs-tech/projectx/actions/runs/40138571213) on exact head `c693badf1764f0f8eea7849c15b0e8ee6c63314f`. A push-triggered duplicate run was cancelled by branch concurrency after dependency install, npm audit, and ProjectX checks passed; the PR-triggered run fully completed successfully.
 - **Not run locally:** `npm run build`, `npm test`, local Playwright, database migration tests, or authenticated live integration checks in this session.
 - The workflow currently uses `npm install` rather than `npm ci`; the repository has `bun.lock` but no committed `package-lock.json`. Therefore the npm dependency resolution is not pinned by a tracked npm lockfile. The audit checks the resolved CI dependency tree, not a reproducible, committed dependency graph.
 
@@ -127,7 +127,7 @@ Evidence status:
 
 ## 9. Recommended next batches, in order
 
-1. **Finish this PR's validation:** wait for latest-head npm audit, project checks, security scan and browser E2E; fix any failures; review final unified diff. Do not merge until the report and all code in the final head have green CI.
+1. **CI result is green on latest inspected head:** run [40138571213](https://github.com/PushLabs-tech/projectx/actions/runs/40138571213) passed all workflow steps at `c693badf1764f0f8eea7849c15b0e8ee6c63314f`. Re-run CI automatically after any later commit, review the final unified diff as one logical patch, and do not merge solely because CI is green.
 2. **Rate-limit validation:** run PostgreSQL migration/lint validation; test fixed-window boundary and concurrent calls on a disposable database; ensure the actions listed in `ACTION_RATE_LIMITS` match cost/abuse exposure. Add a separate monthly credits/usage quota only if the product's stated credit rules require one.
 3. **Lock down dependency reproducibility:** establish one package manager, generate and commit its lockfile, update CI to use the frozen/locked install, and preserve npm audit.
 4. **External Supabase verification (read-only first):** verify current migrations and function deployment/config; confirm `PROJECTX_BILLING_ENABLED` is false for beta; confirm Vault token/cron function boundary; inspect RLS/grants/storage policies; test two-user isolation. Do not apply migrations or deploy new code without confirming backups/rollback and the actual target project.
