@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { readBoundedRequestText, requestErrorStatus } from "../_shared/request.ts";
 
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
@@ -13,32 +14,7 @@ const PLANS={free:{id:"",name:"Free",amount:0,credits:20},pro:{id:Deno.env.get("
 const admin=createClient(SUPABASE_URL,SERVICE_KEY);
 const MAX_REQUEST_BYTES=1_000_000;
 
-async function readBoundedRequestBody(req:Request,maxBytes:number):Promise<string>{
-  const declaredLength=req.headers.get("content-length");
-  if(declaredLength&&/^\d+$/.test(declaredLength)&&Number(declaredLength)>maxBytes){
-    try{await req.body?.cancel();}catch{}
-    throw new Error("Request is too large");
-  }
-  const reader=req.body?.getReader();
-  if(!reader)return "";
-  const chunks:Uint8Array[]=[];
-  let totalBytes=0;
-  while(true){
-    const {done,value}=await reader.read();
-    if(done)break;
-    if(!value)continue;
-    totalBytes+=value.byteLength;
-    if(totalBytes>maxBytes){
-      try{await reader.cancel();}catch{}
-      throw new Error("Request is too large");
-    }
-    chunks.push(value);
-  }
-  const bytes=new Uint8Array(totalBytes);
-  let offset=0;
-  for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
-  return new TextDecoder("utf-8",{fatal:true}).decode(bytes);
-}
+const readBoundedRequestBody = readBoundedRequestText;
 async function entitlement(userId:string,planKey:string,status:string,subscriptionId?:string,periodEnd?:string|null){const p=PLANS[planKey as keyof typeof PLANS]||PLANS.free;await admin.from('billing_entitlements').upsert({user_id:userId,plan_key:planKey,status,monthly_credits:p.credits,credits_used:0,provider:'razorpay',provider_subscription_id:subscriptionId||null,period_end:periodEnd||null,updated_at:new Date().toISOString()},{onConflict:'user_id'});}
 async function trackPayment(userId:string,eventName:string,meta:Record<string,unknown>={}){
   await admin.from('payment_analytics').insert({user_id:userId,event_name:eventName,provider:'razorpay',plan_key:meta.plan||null,amount_paise:meta.amountPaise||null,currency:'INR',external_id:meta.externalId||null,properties:meta});
@@ -122,5 +98,5 @@ Deno.serve(async req=>{
       return json({ok:true,status:j.status||'cancelled'});
     }
     throw new Error('Unknown payment action');
-  }catch(e){const message=e instanceof Error?e.message:String(e);return json({ok:false,error:message},message==="Request is too large"?413:400);}
+  }catch(e){const message=e instanceof Error?e.message:String(e);return json({ok:false,error:message},requestErrorStatus(e));}
 });
