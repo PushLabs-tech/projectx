@@ -60,7 +60,7 @@ assert.ok(!/grant execute on function public\.projectx_consume_rate_limit[\s\S]*
 
 
 assert.match(boundedRequestHelper, /req\.body\?\.getReader\(\)/);
-assert.match(boundedRequestHelper, /\/\^\\\\d\+\$\//);
+assert.ok(boundedRequestHelper.includes("/^\\d+$/"), "Content-Length digits must be validated correctly");
 assert.match(boundedRequestHelper, /totalBytes \+= value\.byteLength/);
 assert.match(boundedRequestHelper, /if \(totalBytes > maxBytes\)/);
 assert.match(boundedRequestHelper, /Request is too large/);
