@@ -1103,6 +1103,7 @@ Deno.serve(async req => {
     if (actionRateLimit !== undefined) {
       const { data: allowed, error: limitError } = await admin.rpc("projectx_consume_rate_limit", {
         p_user_id: user.id,
+        p_action_key: action,
         p_limit: actionRateLimit,
         p_window_seconds: 60
       });
