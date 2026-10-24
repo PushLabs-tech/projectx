@@ -44,6 +44,13 @@ export async function readBoundedJson(req: Request, maxBytes: number): Promise<a
 }
 
 const REQUEST_ERROR_STATUS: Record<string, number> = Object.freeze({
+  "Missing session": 401,
+  "Invalid session": 401,
+  "Webhook secret is not configured": 503,
+  "Payment provider is not configured": 503,
+  "Unsupported plan": 400,
+  "Subscription id required": 400,
+  "Unknown payment action": 400,
   "Request is too large": 413,
   "FILE_TOO_LARGE": 413,
   "Invalid JSON": 400,
