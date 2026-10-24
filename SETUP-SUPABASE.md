@@ -18,14 +18,17 @@ In Supabase Auth:
 
 ## 3. Database
 
-Run:
+The schema and migrations are a sequence, not just two files. The repository currently contains legacy migration filenames as well as timestamped migrations, so do **not** assume a normal `supabase db push` will apply the full history correctly without first validating the migration ledger.
 
-```text
-supabase/schema.sql
-supabase/migrations/002_security_billing.sql
-```
+For a **disposable staging project only**, start with `supabase/schema.sql`, then review and apply every file under `supabase/migrations/` in dependency order. The current list includes security/RLS, analytics, canonical project brain, durable jobs, worker RPCs, billing entitlements, remote execution, execution transactions/control plane, deployment metadata, foreign-key/index hardening, payment webhook idempotency, and atomic AI rate limits. Confirm the exact order against dependencies and test from a clean database before adopting a repeatable production migration workflow.
 
-The migration enables audit/security/billing tables, removes plaintext connected-account token columns from the base design, and revokes client access to backend-only tables.
+Before any production migration:
+- Normalize and review the migration history using Supabase CLI against a disposable project.
+- Confirm the target project reference and backup/restore plan.
+- Apply the migration set to staging, run SQL/function integration tests, and inspect RLS/grants.
+- Obtain explicit release approval. Do not run migrations against production as part of this draft PR.
+
+The security/billing migrations define backend-only payment events and credentials, remove plaintext connected-account token columns, and restrict client access. Source files do not prove these changes have been applied to a live database.
 
 ## 4. Secrets
 
