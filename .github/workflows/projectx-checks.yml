@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Push and pull_request events for the same branch share a group so stale CI does not
+# consume runners after a newer commit supersedes it.
+concurrency:
+  group: projectx-checks-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
