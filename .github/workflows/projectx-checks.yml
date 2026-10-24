@@ -49,3 +49,60 @@ jobs:
           PROJECTX_E2E_EMAIL: ${{ secrets.PROJECTX_E2E_EMAIL }}
           PROJECTX_E2E_PASSWORD: ${{ secrets.PROJECTX_E2E_PASSWORD }}
         run: npm run e2e:ci
+
+
+  migration-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: projectx_migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d projectx_migration_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: projectx_migration_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Create disposable schema fixture
+        run: psql --set ON_ERROR_STOP=1 --file scripts/fixtures/projectx-migration-contract-schema.sql
+
+      - name: Apply PR migrations to disposable PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in \
+            supabase/migrations/20261025120000_payment_webhook_idempotency.sql \
+            supabase/migrations/20261025130000_atomic_ai_rate_limits.sql \
+            supabase/migrations/20261025140000_project_execution_concurrency.sql
+          do
+            echo "Applying $migration to disposable PostgreSQL"
+            psql --set ON_ERROR_STOP=1 --file "$migration"
+          done
+
+      - name: Run migration contract tests
+        run: psql --set ON_ERROR_STOP=1 --file scripts/projectx-migration-contract-test.sql
+
+      - name: Race concurrent project enqueue requests
+        run: bash scripts/projectx-enqueue-concurrency-test.sh
