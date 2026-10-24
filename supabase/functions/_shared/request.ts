@@ -63,6 +63,7 @@ const REQUEST_ERROR_STATUS: Record<string, number> = Object.freeze({
   "WORKSPACE_AND_EMAIL_REQUIRED": 400,
   "WORKSPACE_REQUIRED": 400,
   "INVITE_TOKEN_REQUIRED": 400,
+  "INVALID_ROLE": 400,
   "INVALID_EMAIL": 400,
   "Provider token required": 400,
   "Unsupported deployment provider": 400,
