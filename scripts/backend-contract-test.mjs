@@ -29,6 +29,11 @@ assert.match(ai, /research_findings/);
 assert.match(ai, /usage/);
 assert.match(ai, /securityEvents/);
 assert.match(ai, /assertSafeBaseUrl/);
+assert.ok(ai.includes("readBoundedRequestBody(req, MAX_BODY_BYTES)"));
+assert.ok(ai.includes('catch { throw new Error("Invalid JSON"); }'));
+assert.ok(ai.includes('if (/^invalid json$|^invalid request encoding$/i.test(message)) return 400;'));
+assert.match(payments, /declaredLength&&\/\^\\d\+\$\//);
+
 
 // Atomic per-action fixed-window rate limit: fail closed before any costly early-return action.
 assert.match(ai, /const ACTION_RATE_LIMITS: Record<string, number>/);
