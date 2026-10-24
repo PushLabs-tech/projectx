@@ -6,8 +6,8 @@
 **Baseline source commit:** `0570b00b17e505ebff38d50133e6bcd417028af3`  
 **Working branch:** `fix/beta-billing-guard-cancellation-ownership`  
 **Review PR:** [#55 — security and beta reliability fixes](https://github.com/PushLabs-tech/projectx/pull/55)  
-**Latest CI-verified PR head at this snapshot:** `e4481d80321d502409552f3201c92e5779aa71aa` via run [40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994).
-**Status:** Draft PR; not merged; no live database migration or Edge Function deployment performed. CI verification for the latest PR head is recorded in run [40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994).
+**Latest CI-verified PR head at this snapshot:** `ee54fd7bbf503affa748ed7c1a2dfc226c7c448d` via run [40141230616](https://github.com/PushLabs-tech/projectx/actions/runs/40141230616).
+**Status:** Draft PR; not merged; no live database migration or Edge Function deployment performed. CI verification for the latest PR head is recorded in run [40141230616](https://github.com/PushLabs-tech/projectx/actions/runs/40141230616).
 
 ## 1. Evidence boundary
 
@@ -23,8 +23,19 @@ The live GitHub Pages URL could not be retrieved by the browser inspection tool 
 - Several GitHub API updates were committed as individual commits on the branch. The branch has more commits than the number of logical batches; before merging, review the final diff as a single patch and consider squashing only through a normal PR workflow.
 - GitHub Actions on `51bdbe83bb68dcd2e1219130ad0c8c8064cecbda` passed the project checks and browser E2E. The E2E log reported **7 passed, 2 skipped**; the skipped tests are authenticated-account flows requiring `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD`.
 - On branch head `4c0c9e4b34f596f151efab21c9a3a34dfa178fe4`, GitHub Actions passed `npm audit --audit-level=high`, `npm test`, and browser E2E (the run completed successfully after the earlier observation). See the [branch CI runs](https://github.com/PushLabs-tech/projectx/actions).
-- **Latest PR head CI verified:** PR-triggered run [40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994) passed on `e4481d80321d502409552f3201c92e5779aa71aa`. Both jobs succeeded: `checks` (locked npm install, high-severity audit, ProjectX/security contracts, production build and browser E2E) and `migration-contracts` (applied the three new SQL migrations to disposable PostgreSQL 17, ran transactional/rate-limit/grant assertions, and raced parallel enqueue calls). E2E: **7 passed, 2 skipped** because authenticated CI credentials were absent; authenticated live flows remain unverified.
+- **Latest PR head CI verified:** PR-triggered run [40141230616](https://github.com/PushLabs-tech/projectx/actions/runs/40141230616) passed on `ee54fd7bbf503affa748ed7c1a2dfc226c7c448d`. Both jobs succeeded: `checks` (locked npm install, high-severity audit, ProjectX/security contracts, production build and browser E2E) and `migration-contracts` (applied the three new SQL migrations to disposable PostgreSQL 17, ran transactional/rate-limit/grant assertions, and raced parallel enqueue calls). E2E: **7 passed, 2 skipped** because authenticated CI credentials were absent; authenticated live flows remain unverified. Source follow-up after this snapshot has also hardened GitHub OAuth state consumption and checked GitHub/deployment/collaboration writes; those commits must pass the next workflow run before merge.
 
+
+## 2B. Additional source reliability fixes (2026-10-25)
+
+After the PostgreSQL migration contracts were added, a second review improved correctness in adjacent handlers:
+
+- The shared HTTP error map is now used by the payment handler; malformed JSON is classified as 400, oversized input as 413, missing provider configuration as 503, and unexpected backend failures default to 500.
+- Payment plan names are validated as own properties, avoiding inherited prototype names being treated as valid plans.
+- GitHub OAuth state is consumed once with a delete-returning claim, avoiding replay races; state, connection, repository-sync, repository-create, project/membership read and disconnect errors are not reported as success or mislabeled not-found.
+- Deployment target writes/reads and rollback status writes surface persistence failures rather than silently returning success.
+- Collaboration invite roles are limited to schema-supported values. Failed invite cleanup, invite acceptance writes, and membership reads are surfaced. Invitation email delivery status reflects the provider response instead of merely checking whether the Resend secret exists.
+- Static backend contracts were extended for these controls. Latest source-level contracts/build were green on the previously verified head, but the commits after that head require a fresh CI result before merge.
 
 ## 2A. Read-only connected Supabase assessment (2026-10-25)
 
@@ -91,9 +102,9 @@ Configured scripts:
 - CI now runs `npm audit --audit-level=high` after installing dependencies.
 
 Evidence status:
-- **Executed in GitHub Actions on latest PR head:** run [40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994) passed locked npm install, high-severity dependency audit, `npm test`, production build, and E2E, plus a separate disposable-PostgreSQL 17 migration-contract job. E2E: 7 passed, 2 skipped. No local test run is claimed.
+- **Executed in GitHub Actions on latest PR head:** run [40141230616](https://github.com/PushLabs-tech/projectx/actions/runs/40141230616) passed locked npm install, high-severity dependency audit, `npm test`, production build, and E2E, plus a separate disposable-PostgreSQL 17 migration-contract job. E2E: 7 passed, 2 skipped. No local test run is claimed.
 - **Executed in GitHub Actions, passed on prior branch head:** `npm test` and `npm run e2e:ci` on `51bdbe83bb68dcd2e1219130ad0c8c8064cecbda` (7 passed, 2 authenticated tests skipped).
-- **Latest observed PR run, passed:** [40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994) on `e4481d80321d502409552f3201c92e5779aa71aa`. It passed the npm/audit/test/build/browser suite and the new PostgreSQL migration test job. The SQL job applied the payment-webhook, per-action rate-limit and execution-enqueue migrations to a fresh disposable PostgreSQL 17 database, ran idempotency/rollback/credit preservation/RPC-grant checks, and confirmed parallel duplicate enqueue requests serialize to exactly one active execution.
+- **Latest observed PR run, passed:** [40141230616](https://github.com/PushLabs-tech/projectx/actions/runs/40141230616) on `ee54fd7bbf503affa748ed7c1a2dfc226c7c448d`. It passed the npm/audit/test/build/browser suite and the new PostgreSQL migration test job. The SQL job applied the payment-webhook, per-action rate-limit and execution-enqueue migrations to a fresh disposable PostgreSQL 17 database, ran idempotency/rollback/credit preservation/RPC-grant checks, and confirmed parallel duplicate enqueue requests serialize to exactly one active execution.
 - **Not run locally:** `npm run build`, `npm test`, local Playwright, or a local PostgreSQL suite. GitHub Actions now runs the build and browser suite and performs migration-contract tests against a disposable PostgreSQL 17 service. Authenticated live-backend checks remain unverified.
 - The PR now commits an npm-generated `package-lock.json`, and CI uses `npm ci --ignore-scripts --no-audit --no-fund` followed by `npm audit --audit-level=high`; dependency resolution is pinned for the npm CI path. `bun.lock` remains in the repository and appears to describe a previous manifest, so confirm whether contributor workflows still rely on it before retiring or regenerating it.
 
@@ -139,7 +150,7 @@ Evidence status:
 
 ## 9. Recommended next batches, in order
 
-1. **CI snapshot:** run [40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994) passed both jobs on `e4481d80321d502409552f3201c92e5779aa71aa`, including disposable PostgreSQL migration contracts and a concurrent enqueue race. This report refresh triggers another CI run. Review the final unified diff as one logical patch; green CI is not production proof.
+1. **CI snapshot:** run [40141230616](https://github.com/PushLabs-tech/projectx/actions/runs/40141230616) passed both jobs on `ee54fd7bbf503affa748ed7c1a2dfc226c7c448d`, including disposable PostgreSQL migration contracts and a concurrent enqueue race. This report refresh triggers another CI run. Review the final unified diff as one logical patch; green CI is not production proof.
 2. **Rate-limit follow-through:** PostgreSQL migration application and isolated user/action-counter behavior now pass CI. Still check production migration history before applying, stress-test rate-limit concurrency/expiry on staging, and ensure `ACTION_RATE_LIMITS` matches cost/abuse exposure. Add a separate monthly credits/usage quota only if the product's stated credit rules require one.
 3. **Lock down dependency reproducibility:** establish one package manager, generate and commit its lockfile, update CI to use the frozen/locked install, and preserve npm audit.
 4. **External Supabase verification (read-only first):** verify current migrations and function deployment/config; confirm `PROJECTX_BILLING_ENABLED` is false for beta; confirm Vault token/cron function boundary; inspect RLS/grants/storage policies; test two-user isolation. Do not apply migrations or deploy new code without confirming backups/rollback and the actual target project.
