@@ -1088,7 +1088,9 @@ Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const raw = await readBoundedRequestBody(req, MAX_BODY_BYTES);
-    const body = JSON.parse(raw || "{}");
+    let body: any;
+    try { body = JSON.parse(raw || "{}"); }
+    catch { throw new Error("Invalid JSON"); }
     const action = String(body.action || "");
     if (!ACTIONS.has(action)) throw new Error("Unsupported action");
 
