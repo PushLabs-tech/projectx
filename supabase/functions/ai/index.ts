@@ -64,7 +64,11 @@ async function readBoundedRequestBody(req: Request, maxBytes: number): Promise<s
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error("Invalid request encoding");
+  }
 }
 const is429 = (e: unknown) => /(^|\s)429(\s|:|-|$)|too many requests|rate limit|quota|resource_exhausted/i.test(e instanceof Error ? e.message : String(e));
 const retryMs = (e: unknown) => {
@@ -87,6 +91,7 @@ function errorStatus(error: unknown) {
   if (/not authorized|forbidden/i.test(message)) return 403;
   if (/project not found/i.test(message)) return 404;
   if (/request is too large/i.test(message)) return 413;
+  if (/^invalid json$|^invalid request encoding$/i.test(message)) return 400;
   if (/rate limit reached/i.test(message) || is429(error)) return 429;
   if (/no compatible ai model|no compatible model|provider unavailable|no compatible ai models are reachable/i.test(message)) return 502;
   if (/^Unsupported action$|^Unknown action:|^Invalid API key$|^Unsupported provider$/i.test(message)) return 400;
