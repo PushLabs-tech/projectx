@@ -5,6 +5,7 @@ create or replace function public.projectx_process_payment_webhook(
   p_event_id text,
   p_event_type text,
   p_payload jsonb,
+  p_billing_enabled boolean,
   p_user_id uuid,
   p_subscription_id text,
   p_status text,
@@ -32,6 +33,12 @@ begin
 
   if v_inserted_id is null then
     return false;
+  end if;
+
+  -- During free beta, accept and record signed delivery IDs but never grant paid entitlements.
+  -- If billing is enabled later, old ignored events require deliberate reconciliation, not replay.
+  if not coalesce(p_billing_enabled, false) then
+    return true;
   end if;
 
   if p_user_id is not null and p_subscription_id is not null then
@@ -87,8 +94,8 @@ end;
 $$;
 
 revoke all on function public.projectx_process_payment_webhook(
-  text, text, jsonb, uuid, text, text, text, integer, timestamptz, text, jsonb
+  text, text, jsonb, boolean, uuid, text, text, text, integer, timestamptz, text, jsonb
 ) from public, anon, authenticated;
 grant execute on function public.projectx_process_payment_webhook(
-  text, text, jsonb, uuid, text, text, text, integer, timestamptz, text, jsonb
+  text, text, jsonb, boolean, uuid, text, text, text, integer, timestamptz, text, jsonb
 ) to service_role;
