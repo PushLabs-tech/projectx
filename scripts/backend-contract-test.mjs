@@ -103,6 +103,8 @@ assert.ok(github.includes('if(repoSyncError)throw repoSyncError'), 'Repository s
 assert.ok(github.includes('if(disconnectError)throw disconnectError'), 'Disconnect failures must not be reported as success');
 assert.ok(collaboration.includes('if(!["admin","editor","viewer"].includes(role))throw new Error("INVALID_ROLE")'), 'Invitations must use a schema-valid workspace role');
 assert.ok(collaboration.includes('if(acceptedError)throw acceptedError'), 'Invitation acceptance persistence failures must be surfaced');
+assert.ok(collaboration.includes('emailSent=response.ok'), 'Email delivery must be based on provider response status');
+assert.ok(!collaboration.includes('emailSent:!!RESEND'), 'Configured mailer presence must not be treated as delivery confirmation');
 assert.ok(collaboration.includes('const {error:deleteError}=await admin.from("workspace_invitations").delete()'), 'Invitation replacement must not ignore a failed delete');
 
 
