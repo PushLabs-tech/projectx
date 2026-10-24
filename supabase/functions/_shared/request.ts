@@ -34,13 +34,16 @@ export async function readBoundedRequestText(req: Request, maxBytes: number): Pr
   }
 }
 
-export async function readBoundedJson(req: Request, maxBytes: number): Promise<any> {
-  const raw = await readBoundedRequestText(req, maxBytes);
+export function parseJsonText(raw: string, emptyAsObject = true): any {
   try {
-    return JSON.parse(raw || "{}");
+    return JSON.parse(emptyAsObject ? (raw || "{}") : raw);
   } catch {
     throw new Error("Invalid JSON");
   }
+}
+
+export async function readBoundedJson(req: Request, maxBytes: number): Promise<any> {
+  return parseJsonText(await readBoundedRequestText(req, maxBytes));
 }
 
 const REQUEST_ERROR_STATUS: Record<string, number> = Object.freeze({
