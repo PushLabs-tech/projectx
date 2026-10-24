@@ -9,6 +9,7 @@ const deploy = read('supabase/functions/deploy/index.ts');
 const schema = read('supabase/schema.sql');
 const paymentWebhookMigration = read('supabase/migrations/20261025120000_payment_webhook_idempotency.sql');
 const atomicRateLimitMigration = read('supabase/migrations/20261025130000_atomic_ai_rate_limits.sql');
+const projectExecutionConcurrencyMigration = read('supabase/migrations/20261025140000_project_execution_concurrency.sql');
 const boundedRequestHelper = read('supabase/functions/_shared/request.ts');
 const collaboration = read('supabase/functions/collaboration/index.ts');
 const resourceIngest = read('supabase/functions/resource-ingest/index.ts');
@@ -46,12 +47,20 @@ assert.doesNotMatch(aiHandlerForRateLimit, /const { count } = await admin\.from\
 assert.ok(atomicRateLimitMigration.toLowerCase().includes('on conflict (user_id, window_start) do update'));
 assert.ok(atomicRateLimitMigration.includes('return v_request_count <= p_limit'));
 assert.ok(atomicRateLimitMigration.includes('grant execute on function public.projectx_consume_rate_limit'));
+assert.ok(projectExecutionConcurrencyMigration.includes("pg_advisory_xact_lock(hashtext(p_project_id::text))"));
+assert.ok(projectExecutionConcurrencyMigration.includes("An execution job is already active for this project"));
+assert.ok(projectExecutionConcurrencyMigration.includes("grant execute on function public.enqueue_project_execution_job"));
+const enqueueFunction = ai.slice(ai.indexOf("async function enqueueJob"), ai.indexOf("async function getJob"));
+assert.ok(enqueueFunction.includes('admin.rpc("enqueue_project_execution_job"'));
+assert.ok(enqueueFunction.includes('if(kind==="execution")'));
+assert.ok(enqueueFunction.includes('if(!projectId) throw new Error("Execution jobs require a project.")'));
 assert.ok(atomicRateLimitMigration.includes('revoke all on table') === false || atomicRateLimitMigration.includes('revoke all on public.projectx_api_rate_limits'));
 assert.ok(!/grant execute on function public\.projectx_consume_rate_limit[\s\S]*?to anon/i.test(atomicRateLimitMigration));
 
 
 
 assert.match(boundedRequestHelper, /req\.body\?\.getReader\(\)/);
+assert.match(boundedRequestHelper, /\/\^\\\\d\+\$\//);
 assert.match(boundedRequestHelper, /totalBytes \+= value\.byteLength/);
 assert.match(boundedRequestHelper, /if \(totalBytes > maxBytes\)/);
 assert.match(boundedRequestHelper, /Request is too large/);
