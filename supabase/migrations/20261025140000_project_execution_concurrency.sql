@@ -1,4 +1,6 @@
 -- Serialize execution-job enqueue per project and prevent overlapping queued/running execution jobs.
+-- All job creation must pass through the server-side enqueue contract; direct Data API inserts bypass its concurrency gate.
+revoke insert, update, delete on public.job_queue from anon, authenticated;
 -- The advisory lock makes the active-job check and insert atomic under concurrent requests.
 create or replace function public.enqueue_project_execution_job(
   p_project_id uuid,
