@@ -21,6 +21,7 @@ set search_path = ''
 as $$
 declare
   v_inserted_id bigint;
+  v_affected_rows integer;
 begin
   if p_event_id is null or length(trim(p_event_id)) = 0 then
     raise exception 'Payment webhook event id is required';
@@ -49,11 +50,16 @@ begin
       p_plan_key, p_period_end, now()
     )
     on conflict (provider_subscription_id) do update set
-      user_id = excluded.user_id,
       status = excluded.status,
       plan_key = excluded.plan_key,
       current_period_end = excluded.current_period_end,
-      updated_at = now();
+      updated_at = now()
+    where public.billing_subscriptions.user_id = excluded.user_id;
+
+    get diagnostics v_affected_rows = row_count;
+    if v_affected_rows = 0 then
+      raise exception 'Payment subscription owner mismatch';
+    end if;
 
     insert into public.billing_entitlements(
       user_id, plan_key, status, monthly_credits, provider, provider_subscription_id, period_end, updated_at
