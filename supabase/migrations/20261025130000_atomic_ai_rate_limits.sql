@@ -40,10 +40,10 @@ begin
     floor(extract(epoch from clock_timestamp()) / p_window_seconds) * p_window_seconds
   );
 
-  insert into public.projectx_api_rate_limits(user_id, window_start, request_count)
+  insert into public.projectx_api_rate_limits as current_limit(user_id, window_start, request_count)
   values (p_user_id, v_window_start, 1)
   on conflict (user_id, window_start) do update
-    set request_count = public.projectx_api_rate_limits.request_count + 1
+    set request_count = current_limit.request_count + 1
   returning request_count into v_request_count;
 
   -- Retain only a small rolling history of fixed windows; this is not a billing ledger.
