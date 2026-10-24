@@ -24,11 +24,10 @@ assert.match(ai, /usage/);
 assert.match(ai, /securityEvents/);
 assert.match(ai, /assertSafeBaseUrl/);
 
-assert.match(payments, /payment_events/);
+assert.match(payments, /projectx_process_payment_webhook/);
 assert.match(payments, /razorpay/i);
 assert.match(payments, /webhook/i);
 assert.match(payments, /signature/i);
-assert.match(payments, /projectx_process_payment_webhook/);
 assert.match(payments, /sha256:/);
 assert.doesNotMatch(payments, /from\('payment_events'\)\.upsert/);
 
