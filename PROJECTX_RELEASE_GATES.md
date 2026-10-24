@@ -29,7 +29,7 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 - [x] Add atomic per-user/per-action fixed-window rate limiting before costly AI action dispatch.
 - [x] Route internal runQueuedJob through a dedicated worker-token check before ordinary user JWT auth.
 - [x] Add source-level regression contracts for billing, worker auth, rate limits, request caps and webhook processing.
-- [ ] Confirm CI on the latest PR head, including E2E.
+- [x] Confirm CI on latest PR head `c693badf1764f0f8eea7849c15b0e8ee6c63314f`: PR-triggered workflow run 40138571213 passed dependency install, high-severity npm audit, `npm test`, production build, Chromium install, and browser E2E. E2E result: 7 passed, 2 authenticated tests skipped because `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD` are not configured. This is source/CI evidence only, not authenticated live-backend verification.
 - [ ] Run database-backed tests for webhook duplicates, owner mismatch, transaction rollback and credit preservation.
 - [x] Add an atomic per-project execution enqueue gate using a transaction-scoped advisory lock; per-user rate limits are not a substitute.
 - [ ] Run database-backed concurrency tests proving two simultaneous enqueue calls for one project yield at most one active execution job.
@@ -76,7 +76,7 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 
 - [x] Add npm high-severity dependency audit to CI.
 - [x] Add weekly Dependabot checks for npm and GitHub Actions.
-- [ ] Confirm latest head's npm audit, npm test, and E2E all pass.
+- [x] Confirm latest head's npm audit, npm test, production build, and browser E2E pass in PR workflow run 40138571213 (7 passed, 2 authenticated tests skipped due to absent E2E credentials).
 - [ ] Add/verify structured logs, metrics, alerting and incident response for AI, worker, payment and deploy failures.
 - [ ] Configure staging and production separation and verify actual Edge Function secrets without exposing values.
 - [ ] Enable and test database backups and rehearse restore.
