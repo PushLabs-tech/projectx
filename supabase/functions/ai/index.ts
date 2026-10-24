@@ -951,10 +951,20 @@ async function enqueueJob(user:any, body:any) {
   const kind=String(body?.kind || "").trim().slice(0,80);
   if(!kind) throw new Error("Job kind is required.");
   const payload=body?.payload && typeof body.payload==="object" ? body.payload : {};
+  const maxAttempts=Math.max(1,Math.min(10,Number(body?.maxAttempts || 3)));
+  const timeoutSeconds=Math.max(10,Math.min(300,Number(body?.timeoutSeconds || 120)));
+  if(kind==="execution"){
+    if(!projectId) throw new Error("Execution jobs require a project.");
+    const {data,error}=await admin.rpc("enqueue_project_execution_job",{
+      p_project_id:projectId,p_user_id:user.id,p_payload:payload,
+      p_max_attempts:maxAttempts,p_timeout_seconds:timeoutSeconds
+    });
+    if(error) throw error;
+    return {ok:true,job:data};
+  }
   const {data,error}=await admin.from("job_queue").insert({
     project_id:projectId,user_id:user.id,kind,payload,
-    max_attempts:Math.max(1,Math.min(10,Number(body?.maxAttempts || 3))),
-    timeout_seconds:Math.max(10,Math.min(300,Number(body?.timeoutSeconds || 120)))
+    max_attempts:maxAttempts,timeout_seconds:timeoutSeconds
   }).select("id,project_id,kind,status,attempts,max_attempts,available_at,created_at").single();
   if(error) throw error;
   return {ok:true,job:data};
