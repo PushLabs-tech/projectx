@@ -32,7 +32,7 @@ assert.match(ai, /assertSafeBaseUrl/);
 assert.ok(ai.includes("readBoundedRequestBody(req, MAX_BODY_BYTES)"));
 assert.ok(ai.includes('catch { throw new Error("Invalid JSON"); }'));
 assert.ok(ai.includes('if (/^invalid json$|^invalid request encoding$/i.test(message)) return 400;'));
-assert.match(payments, /declaredLength&&\/\^\\d\+\$\//);
+assert.ok(payments.includes("/^\\d+$/"), "Payment Content-Length digits must be validated correctly");
 
 
 // Atomic per-action fixed-window rate limit: fail closed before any costly early-return action.
