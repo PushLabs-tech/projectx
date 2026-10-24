@@ -2,7 +2,7 @@
 export async function readBoundedRequestText(req: Request, maxBytes: number): Promise<string> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new Error("Invalid request limit");
   const declaredLength = req.headers.get("content-length");
-  if (declaredLength && /^\\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
+  if (declaredLength && /^\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
     try { await req.body?.cancel(); } catch {}
     throw new Error("Request is too large");
   }
