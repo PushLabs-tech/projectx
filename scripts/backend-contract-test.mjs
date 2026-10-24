@@ -8,6 +8,7 @@ const payments = read('supabase/functions/payments/index.ts');
 const deploy = read('supabase/functions/deploy/index.ts');
 const schema = read('supabase/schema.sql');
 const paymentWebhookMigration = read('supabase/migrations/20261025120000_payment_webhook_idempotency.sql');
+const atomicRateLimitMigration = read('supabase/migrations/20261025130000_atomic_ai_rate_limits.sql');
 
 assert.match(ai, /corsHeaders/);
 assert.match(cors, /Access-Control-Allow-Origin/);
@@ -23,6 +24,24 @@ assert.match(ai, /research_findings/);
 assert.match(ai, /usage/);
 assert.match(ai, /securityEvents/);
 assert.match(ai, /assertSafeBaseUrl/);
+
+// Atomic per-action fixed-window rate limit: fail closed before any costly early-return action.
+assert.match(ai, /const ACTION_RATE_LIMITS: Record<string, number>/);
+assert.ok(ai.includes('admin.rpc("projectx_consume_rate_limit"'));
+const aiHandlerForRateLimit = ai.slice(ai.indexOf("Deno.serve(async req =>"));
+const authIndexForRateLimit = aiHandlerForRateLimit.indexOf("const user = await requireUser(req);");
+const rpcIndexForRateLimit = aiHandlerForRateLimit.indexOf('admin.rpc("projectx_consume_rate_limit"');
+const firstCostlyActionIndex = aiHandlerForRateLimit.indexOf('if (action === "createProjectFromIntent")');
+assert.ok(authIndexForRateLimit >= 0 && rpcIndexForRateLimit > authIndexForRateLimit && firstCostlyActionIndex > rpcIndexForRateLimit,
+  "Rate limiting must run after user auth but before costly action dispatch");
+assert.doesNotMatch(aiHandlerForRateLimit, /const { count } = await admin\.from\("ai_usage"\)/,
+  "The raceable count-then-run rate gate must not be used in the handler");
+assert.ok(atomicRateLimitMigration.toLowerCase().includes('on conflict (user_id, window_start) do update'));
+assert.ok(atomicRateLimitMigration.includes('return v_request_count <= p_limit'));
+assert.ok(atomicRateLimitMigration.includes('grant execute on function public.projectx_consume_rate_limit'));
+assert.ok(atomicRateLimitMigration.includes('revoke all on table') === false || atomicRateLimitMigration.includes('revoke all on public.projectx_api_rate_limits'));
+assert.ok(!/grant execute on function public\.projectx_consume_rate_limit[\s\S]*?to anon/i.test(atomicRateLimitMigration));
+
 
 assert.match(payments, /projectx_process_payment_webhook/);
 assert.ok(payments.includes("readBoundedRequestBody(req,MAX_REQUEST_BYTES)"));
