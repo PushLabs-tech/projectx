@@ -20,7 +20,7 @@ In Supabase Auth:
 
 The schema and migrations are a sequence, not just two files. The repository currently contains legacy migration filenames as well as timestamped migrations, so do **not** assume a normal `supabase db push` will apply the full history correctly without first validating the migration ledger.
 
-For a **disposable staging project only**, start with `supabase/schema.sql`, then review and apply every file under `supabase/migrations/` in dependency order. The current list includes security/RLS, analytics, canonical project brain, durable jobs, worker RPCs, billing entitlements, remote execution, execution transactions/control plane, deployment metadata, foreign-key/index hardening, payment webhook idempotency, and atomic AI rate limits. Confirm the exact order against dependencies and test from a clean database before adopting a repeatable production migration workflow.
+For a **disposable staging project only**, start with `supabase/schema.sql`, then review and apply every file under `supabase/migrations/` in dependency order. The current list includes security/RLS, analytics, canonical project brain, durable jobs, worker RPCs, billing entitlements, remote execution, execution transactions/control plane, deployment metadata, foreign-key/index hardening, payment webhook idempotency, atomic AI rate limits, and per-project execution concurrency. Confirm the exact order against dependencies and test from a clean database before adopting a repeatable production migration workflow.
 
 Before any production migration:
 - Normalize and review the migration history using Supabase CLI against a disposable project.
