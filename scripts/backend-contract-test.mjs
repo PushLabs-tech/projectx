@@ -96,6 +96,12 @@ for (const [name, source, limit] of [
   assert.ok(source.includes("requestErrorStatus(e)"), name + " must return the correct size-limit status");
 }
 
+assert.ok(github.includes('const {data:claimedState,error:claimError}'), 'GitHub OAuth state must be atomically consumed');
+assert.ok(github.includes('if(claimError)throw claimError'), 'OAuth state deletion errors must not be ignored');
+assert.ok(github.includes('if(connectionError)throw connectionError'), 'OAuth connection persistence errors must not be ignored');
+assert.ok(github.includes('if(repoSyncError)throw repoSyncError'), 'Repository sync failures must not be reported as success');
+assert.ok(github.includes('if(disconnectError)throw disconnectError'), 'Disconnect failures must not be reported as success');
+
 assert.match(payments, /projectx_process_payment_webhook/);
 assert.ok(payments.includes("readBoundedRequestBody(req,MAX_REQUEST_BYTES)"));
 assert.match(payments, /MAX_REQUEST_BYTES=1_000_000/);
