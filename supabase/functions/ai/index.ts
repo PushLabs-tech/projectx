@@ -11,6 +11,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
 const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "getUsageSummary", "enqueueJob", "getJob", "cancelJob"]);
+const RATE_LIMITED_ACTIONS = new Set(["createProjectFromIntent", "applyBrainMutation", "generateDiscoveryPoll", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "enqueueJob", "cancelJob", "persistProject", "deleteProject", "deleteCredential", "saveCredential", "testCredential", "listModels", "research", "chat"]);
 const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
@@ -1064,6 +1065,15 @@ Deno.serve(async req => {
     if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
 
     const user = await requireUser(req);
+    if (RATE_LIMITED_ACTIONS.has(action)) {
+      const { data: allowed, error: limitError } = await admin.rpc("projectx_consume_rate_limit", {
+        p_user_id: user.id,
+        p_limit: 30,
+        p_window_seconds: 60
+      });
+      if (limitError) throw new Error("Rate-limit validation is temporarily unavailable. Please retry.");
+      if (allowed !== true) throw new Error("Rate limit reached. Please wait a minute and try again.");
+    }
     if (action === "createProjectFromIntent") return json(await createProjectFromIntent(user, body));
     if (action === "applyBrainMutation") return json(await applyBrainMutation(user, body));
     if (action === "generateDiscoveryPoll") return json(await generateDiscoveryPoll(user, body));
@@ -1084,9 +1094,6 @@ Deno.serve(async req => {
       if (!p || p.owner_id !== user.id) throw new Error("Not authorized");
       const { error } = await admin.from("projects").delete().eq("id", projectId); if (error) throw error; return json({ ok: true });
     }
-
-    const { count } = await admin.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", new Date(Date.now() - 60000).toISOString());
-    if ((count || 0) >= 30) throw new Error("Rate limit reached. Please wait a minute and try again.");
 
     if (action === "listCredentials") {
       const { data, error } = await admin.from("ai_provider_credentials").select("provider,label,key_hint,base_url,updated_at").eq("user_id", user.id).order("updated_at", { ascending: false });
@@ -1118,11 +1125,7 @@ Deno.serve(async req => {
       const all = await modelsForCredentials(creds, String(body.task || "chat"));
       return json({ ok: true, models: [...new Map(all.map(m => [String(m.provider) + ":" + String(m.id), m])).values()].slice(0, 250) });
     }
-    if (action === "research") {
-      const { count } = await admin.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", new Date(Date.now() - 60000).toISOString());
-      if ((count || 0) >= 30) throw new Error("Rate limit reached. Please wait a minute and try again.");
-      return json(await research(user, body));
-    }
+    if (action === "research") return json(await research(user, body));
     if (action === "usage") return json(await usage(user));
     if (action === "securityEvents") return json(await securityEvents(user));
     if (action === "chat") return json(await chat(user, body));
