@@ -7,3 +7,9 @@ verify_jwt = false
 # It performs its own JWT and webhook-signature validation.
 [functions.payments]
 verify_jwt = false
+
+
+# The worker is invoked by pg_cron/pg_net with a dedicated Vault token rather than a user JWT.
+# The function validates X-ProjectX-Worker-Token against the server-only Vault secret.
+[functions.projectx-worker]
+verify_jwt = false
