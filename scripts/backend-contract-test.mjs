@@ -101,6 +101,10 @@ assert.ok(github.includes('if(claimError)throw claimError'), 'OAuth state deleti
 assert.ok(github.includes('if(connectionError)throw connectionError'), 'OAuth connection persistence errors must not be ignored');
 assert.ok(github.includes('if(repoSyncError)throw repoSyncError'), 'Repository sync failures must not be reported as success');
 assert.ok(github.includes('if(disconnectError)throw disconnectError'), 'Disconnect failures must not be reported as success');
+assert.ok(collaboration.includes('if(!["admin","editor","viewer"].includes(role))throw new Error("INVALID_ROLE")'), 'Invitations must use a schema-valid workspace role');
+assert.ok(collaboration.includes('if(acceptedError)throw acceptedError'), 'Invitation acceptance persistence failures must be surfaced');
+assert.ok(collaboration.includes('const {error:deleteError}=await admin.from("workspace_invitations").delete()'), 'Invitation replacement must not ignore a failed delete');
+
 
 assert.match(payments, /projectx_process_payment_webhook/);
 assert.ok(payments.includes("readBoundedRequestBody(req,MAX_REQUEST_BYTES)"));
