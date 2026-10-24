@@ -11,7 +11,17 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
 const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "getUsageSummary", "enqueueJob", "getJob", "cancelJob"]);
-const RATE_LIMITED_ACTIONS = new Set(["createProjectFromIntent", "applyBrainMutation", "generateDiscoveryPoll", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "enqueueJob", "cancelJob", "persistProject", "deleteProject", "deleteCredential", "saveCredential", "testCredential", "listModels", "research", "chat"]);
+const ACTION_RATE_LIMITS: Record<string, number> = {
+  createProjectFromIntent: 10,
+  generateDiscoveryPoll: 20,
+  createPlan: 20,
+  enqueueJob: 10,
+  saveCredential: 10,
+  testCredential: 10,
+  listModels: 30,
+  research: 10,
+  chat: 30
+};
 const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
@@ -1065,14 +1075,15 @@ Deno.serve(async req => {
     if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
 
     const user = await requireUser(req);
-    if (RATE_LIMITED_ACTIONS.has(action)) {
+    const actionRateLimit = ACTION_RATE_LIMITS[action];
+    if (actionRateLimit !== undefined) {
       const { data: allowed, error: limitError } = await admin.rpc("projectx_consume_rate_limit", {
         p_user_id: user.id,
-        p_limit: 30,
+        p_limit: actionRateLimit,
         p_window_seconds: 60
       });
       if (limitError) throw new Error("Rate-limit validation is temporarily unavailable. Please retry.");
-      if (allowed !== true) throw new Error("Rate limit reached. Please wait a minute and try again.");
+      if (allowed !== true) throw new Error("Rate limit reached for this action. Please wait a minute and try again.");
     }
     if (action === "createProjectFromIntent") return json(await createProjectFromIntent(user, body));
     if (action === "applyBrainMutation") return json(await applyBrainMutation(user, body));
