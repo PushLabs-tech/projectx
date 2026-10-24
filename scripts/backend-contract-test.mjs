@@ -28,6 +28,22 @@ assert.match(payments, /razorpay/i);
 assert.match(payments, /webhook/i);
 assert.match(payments, /signature/i);
 
+// Beta safety: payment collection must remain disabled unless explicitly enabled.
+assert.match(payments, /PROJECTX_BILLING_ENABLED.*===\s*["']true["']/);
+const createSubscriptionStart = payments.indexOf("if(action==='createSubscription')");
+const createSubscriptionProviderCall = payments.indexOf("https://api.razorpay.com/v1/subscriptions", createSubscriptionStart);
+const createSubscriptionGuard = payments.indexOf("if(!BILLING_ENABLED)", createSubscriptionStart);
+assert.ok(createSubscriptionStart >= 0 && createSubscriptionGuard > createSubscriptionStart && createSubscriptionGuard < createSubscriptionProviderCall,
+  'createSubscription must be guarded before the Razorpay API call');
+
+// Cancellation: ownership must be checked before calling the external provider.
+const cancelSubscriptionStart = payments.indexOf("if(action==='cancelSubscription')");
+const cancelOwnershipCheck = payments.indexOf("ownedSubscription", cancelSubscriptionStart);
+const cancelProviderCall = payments.indexOf("/cancel", cancelSubscriptionStart);
+assert.ok(cancelSubscriptionStart >= 0 && cancelOwnershipCheck > cancelSubscriptionStart && cancelOwnershipCheck < cancelProviderCall,
+  'cancelSubscription must verify the authenticated user owns the subscription before the provider call');
+assert.match(payments, /eq\('provider_subscription_id',sid\)\.eq\('user_id',u\.id\)/);
+
 assert.match(schema, /create table/i);
 assert.match(schema, /projects/i);
 
@@ -41,6 +57,8 @@ assert.match(deploy, /WORKSPACE_REQUIRED|FORBIDDEN/);
 
 console.log('PASS AI edge-function contract');
 console.log('PASS CORS contract');
+console.log('PASS beta billing guard');
+console.log('PASS subscription cancellation ownership contract');
 console.log('PASS payment webhook contract');
 console.log('PASS database schema contract');
 console.log('BACKEND CONTRACT CHECKS PASSED');
