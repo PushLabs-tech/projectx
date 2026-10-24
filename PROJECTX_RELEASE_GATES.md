@@ -9,7 +9,8 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 - [x] Record unknown live-state claims rather than infer them from source.
 - [x] Keep work isolated on fix/beta-billing-guard-cancellation-ownership; main remains unchanged.
 - [ ] Obtain a clean local checkout and reproduce install/build/check/E2E; current session could not clone locally.
-- [ ] Resolve package-manager/lockfile policy (package.json + package-lock.json vs bun.lock) and standardize CI on reproducible install (npm ci only if npm lockfile is canonical).
+- [x] Commit the npm-resolver-generated `package-lock.json` and standardize CI on the locked `npm ci` install.
+- [ ] Confirm whether the legacy `bun.lock` is used by any contributor workflow; retire or regenerate it only after a repository-wide search.
 
 ## Gate 1 — MVP acceptance and threat model
 
@@ -29,7 +30,7 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 - [x] Add atomic per-user/per-action fixed-window rate limiting before costly AI action dispatch.
 - [x] Route internal runQueuedJob through a dedicated worker-token check before ordinary user JWT auth.
 - [x] Add source-level regression contracts for billing, worker auth, rate limits, request caps and webhook processing.
-- [x] Confirm CI on latest PR head `c693badf1764f0f8eea7849c15b0e8ee6c63314f`: PR-triggered workflow run 40138571213 passed dependency install, high-severity npm audit, `npm test`, production build, Chromium install, and browser E2E. E2E result: 7 passed, 2 authenticated tests skipped because `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD` are not configured. This is source/CI evidence only, not authenticated live-backend verification.
+- [x] Confirm latest source/workflow head `500924eed7d251f9f46fcdabbb583d873fed7474`: PR-triggered run [40139856259](https://github.com/PushLabs-tech/projectx/actions/runs/40139856259) passed locked `npm ci`, high-severity npm audit, `npm test`, production build, Chromium install and browser E2E. E2E: 7 passed, 2 authenticated tests skipped because `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD` are not configured. This is source/CI evidence only, not authenticated live-backend verification.
 - [ ] Run database-backed tests for webhook duplicates, owner mismatch, transaction rollback and credit preservation.
 - [x] Add an atomic per-project execution enqueue gate using a transaction-scoped advisory lock; per-user rate limits are not a substitute.
 - [ ] Run database-backed concurrency tests proving two simultaneous enqueue calls for one project yield at most one active execution job.
@@ -76,11 +77,11 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 
 - [x] Add npm high-severity dependency audit to CI.
 - [x] Add weekly Dependabot checks for npm and GitHub Actions.
-- [x] Confirm latest head's npm audit, npm test, production build, and browser E2E pass in PR workflow run 40138571213 (7 passed, 2 authenticated tests skipped due to absent E2E credentials).
+- [x] Confirm code/workflow head `500924eed7d251f9f46fcdabbb583d873fed7474` passes `npm ci`, npm audit, `npm test`, production build, and browser E2E in run [40139856259](https://github.com/PushLabs-tech/projectx/actions/runs/40139856259) (7 passed, 2 authenticated tests skipped due to absent E2E credentials). The documentation refresh creates a new head and requires one final CI verification.
 - [ ] Add/verify structured logs, metrics, alerting and incident response for AI, worker, payment and deploy failures.
 - [ ] Configure staging and production separation and verify actual Edge Function secrets without exposing values.
 - [ ] Enable and test database backups and rehearse restore.
-- [ ] Verify exact Supabase Auth Site URL/redirect allowlist, email policy, leaked-password protection and storage RLS.
+- [ ] Verify exact Supabase Auth Site URL/redirect allowlist, email policy and leaked-password protection. Verify intended private-storage access: live `builder-assets` and `builder-attachments` are private and no `storage` schema policies were found; branch ingestion uses a service-role Edge Function, so do not add broad client policies without proving a direct-client flow needs them.
 - [ ] Verify privacy policy and terms against actual data/provider behavior.
 - [ ] Test AI, worker and deployment kill switches and rollback.
 - [ ] Keep payments disabled and do not sell subscriptions in beta.
@@ -95,7 +96,7 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 ## Commands for a reproducible checkout
 
 ~~~bash
-npm install
+npm ci
 npm run build
 npm test
 npm run e2e:ci
