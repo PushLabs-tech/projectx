@@ -31,7 +31,8 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 - [x] Add source-level regression contracts for billing, worker auth, rate limits, request caps and webhook processing.
 - [ ] Confirm CI on the latest PR head, including E2E.
 - [ ] Run database-backed tests for webhook duplicates, owner mismatch, transaction rollback and credit preservation.
-- [ ] Add and test per-project execution concurrency reservation; per-user rate limits are not a substitute.
+- [x] Add an atomic per-project execution enqueue gate using a transaction-scoped advisory lock; per-user rate limits are not a substitute.
+- [ ] Run database-backed concurrency tests proving two simultaneous enqueue calls for one project yield at most one active execution job.
 - [ ] Audit every service-role operation for ownership/RBAC checks and add two-user integration tests.
 - [ ] Test malformed JSON, body caps, cancellation, stale version, lease expiry, duplicate dispatch and worker restart against staging.
 - [ ] Verify billing flag and webhook behavior on a disposable Supabase project with billing disabled; never enable real payment collection for beta.
