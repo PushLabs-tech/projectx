@@ -19,6 +19,7 @@ async function trackPayment(userId:string,eventName:string,meta:Record<string,un
 
 async function user(req:Request){const a=req.headers.get("Authorization");if(!a)throw new Error("Missing session");const c=createClient(SUPABASE_URL,ANON_KEY,{global:{headers:{Authorization:a}}});const {data,error}=await c.auth.getUser();if(error||!data.user)throw new Error("Invalid session");return data.user;}
 async function hmac(secret:string,body:string){const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);const sig=await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(body));return [...new Uint8Array(sig)].map(x=>x.toString(16).padStart(2,"0")).join("");}
+async function sha256(value:string){const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");}
 function timingSafe(a:string,b:string){if(a.length!==b.length)return false;let x=0;for(let i=0;i<a.length;i++)x|=a.charCodeAt(i)^b.charCodeAt(i);return x===0;}
 
 Deno.serve(async req=>{
@@ -30,10 +31,35 @@ Deno.serve(async req=>{
       if(!RAZORPAY_WEBHOOK_SECRET)throw new Error('Webhook secret is not configured');
       const expected=await hmac(RAZORPAY_WEBHOOK_SECRET,raw);
       if(!timingSafe(expected,isWebhook))return json({ok:false,error:'Invalid webhook signature'},401);
-      const body=JSON.parse(raw);const eventId=req.headers.get('x-razorpay-event-id')|| (body?.payload?.subscription?.entity?.id?`${body.event}:${body.payload.subscription.entity.id}`:`${body.event}:${body.created_at||Date.now()}`);
-      const {error}=await admin.from('payment_events').upsert({event_id:eventId,event_type:body.event,payload:body,received_at:new Date().toISOString()},{onConflict:'event_id'});if(error)throw error;
-      const sub=body?.payload?.subscription?.entity;const userId=sub?.notes?.user_id||sub?.notes?.userId;if(userId){await trackPayment(userId,`payment.webhook.${String(body.event||'unknown').replace(/[^a-z0-9_.-]/gi,'_')}`,{plan:sub?.notes?.plan||null,externalId:sub?.id||null,status:sub?.status||null});await admin.from('billing_subscriptions').upsert({user_id:userId,provider:'razorpay',provider_subscription_id:sub.id,status:String(sub.status||'unknown'),plan_key:sub?.notes?.plan||null,current_period_end:sub?.end_at?new Date(sub.end_at*1000).toISOString():null,updated_at:new Date().toISOString()},{onConflict:'provider_subscription_id'});await entitlement(userId,String(sub?.notes?.plan||'free'),String(sub?.status||'unknown'),sub?.id||undefined,sub?.end_at?new Date(sub.end_at*1000).toISOString():null);await admin.from('audit_logs').insert({user_id:userId,action:'payment.webhook',metadata:{event:body.event,subscription_id:sub.id}});}
-      return json({ok:true});
+      const body=JSON.parse(raw);
+      // Razorpay's event ID is authoritative. Hash the signed raw body as a deterministic fallback;
+      // never use timestamps generated at receipt time for idempotency.
+      const eventId=req.headers.get('x-razorpay-event-id')||`sha256:${await sha256(raw)}`;
+      const sub=body?.payload?.subscription?.entity;
+      const userId=sub?.notes?.user_id||sub?.notes?.userId||null;
+      const planKey=String(sub?.notes?.plan||'free');
+      const status=String(sub?.status||'unknown');
+      const periodEnd=sub?.end_at?new Date(sub.end_at*1000).toISOString():null;
+      const eventName=`payment.webhook.${String(body.event||'unknown').replace(/[^a-z0-9_.-]/gi,'_')}`;
+      const metadata={plan:sub?.notes?.plan||null,externalId:sub?.id||null,status:sub?.status||null};
+      const plan=PLANS[planKey as keyof typeof PLANS]||PLANS.free;
+      // One database transaction claims the event and applies all DB side effects.
+      // Duplicate deliveries return processed:false; a failed transaction rolls back the claim.
+      const {data:processed,error}=await admin.rpc('projectx_process_payment_webhook',{
+        p_event_id:eventId,
+        p_event_type:String(body.event||'unknown'),
+        p_payload:body,
+        p_user_id:userId,
+        p_subscription_id:sub?.id?String(sub.id):null,
+        p_status:status,
+        p_plan_key:planKey,
+        p_monthly_credits:plan.credits,
+        p_period_end:periodEnd,
+        p_event_name:eventName,
+        p_metadata:metadata
+      });
+      if(error)throw error;
+      return json({ok:true,duplicate:processed===false});
     }
     const u=await user(req);const body=JSON.parse(raw||'{}');const action=String(body.action||'');
     if(action==='createSubscription'){
