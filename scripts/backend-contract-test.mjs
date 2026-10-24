@@ -25,6 +25,10 @@ assert.match(ai, /securityEvents/);
 assert.match(ai, /assertSafeBaseUrl/);
 
 assert.match(payments, /projectx_process_payment_webhook/);
+assert.match(payments, /readBoundedRequestBody\\(req,MAX_REQUEST_BYTES\\)/);
+assert.match(payments, /MAX_REQUEST_BYTES=1_000_000/);
+assert.match(payments, /totalBytes>maxBytes/);
+assert.match(payments, /message==="Request is too large"\\?413:400/);
 assert.match(payments, /razorpay/i);
 assert.match(payments, /webhook/i);
 assert.match(payments, /signature/i);
