@@ -12,7 +12,7 @@ const MAX_REQUEST_BYTES = 64_000;
 
 async function readBoundedRequestBody(req:Request,maxBytes:number):Promise<string>{
   const declaredLength=req.headers.get("content-length");
-  if(declaredLength&&/^\\d+$/.test(declaredLength)&&Number(declaredLength)>maxBytes){
+  if(declaredLength&&/^\d+$/.test(declaredLength)&&Number(declaredLength)>maxBytes){
     try{await req.body?.cancel();}catch{}
     throw new Error("Request is too large");
   }
