@@ -34,7 +34,7 @@ async function readBoundedRequestBody(req:Request,maxBytes:number):Promise<strin
   const bytes=new Uint8Array(totalBytes);
   let offset=0;
   for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
-  return new TextDecoder("utf-8",{fatal:true}).decode(bytes);
+  try{return new TextDecoder("utf-8",{fatal:true}).decode(bytes);}catch{throw new Error("Invalid request encoding");}
 }
 
 function json(data: unknown, status = 200) {
@@ -212,6 +212,6 @@ Deno.serve(async req=>{
     return json({...await run(limit,await workerToken()),requestedLimit:limit});
   }catch(error){
     const message=error instanceof Error?error.message:String(error);
-    return json({ok:false,error:message},message==="Request is too large"?413:500);
+    return json({ok:false,error:message},message==="Request is too large"?413:(message==="Invalid request encoding"?400:500));
   }
 });
