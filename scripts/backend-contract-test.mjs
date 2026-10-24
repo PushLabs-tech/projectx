@@ -154,6 +154,11 @@ assert.match(deploy, /health_status/);
 assert.match(deploy, /previous_deployment_id/);
 assert.match(deploy, /rollbackDeployment/);
 assert.match(deploy, /WORKSPACE_REQUIRED|FORBIDDEN/);
+assert.ok(deploy.includes('if(targetSaveError)throw targetSaveError'), 'Deployment target persistence failures must not be reported as success');
+assert.ok(deploy.includes('if(memberError)throw memberError'), 'Deployment membership query failures must surface as server errors');
+assert.ok(deploy.includes('if(currentStatusError)throw currentStatusError'), 'Rollback metadata write failures must not be reported as success');
+assert.ok(deploy.includes('if(previousStatusError)throw previousStatusError'), 'Previous deployment metadata write failures must not be reported as success');
+
 
 console.log('PASS AI edge-function contract');
 console.log('PASS CORS contract');
