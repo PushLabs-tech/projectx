@@ -1024,11 +1024,17 @@ async function chat(user: any, body: any) {
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const user = await requireUser(req);
-    const raw = await req.clone().text(); if (raw.length > MAX_BODY_BYTES) throw new Error("Request is too large");
-    const body = JSON.parse(raw || "{}"); const action = String(body.action || "");
+    const raw = await req.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) throw new Error("Request is too large");
+    const body = JSON.parse(raw || "{}");
+    const action = String(body.action || "");
     if (!ACTIONS.has(action)) throw new Error("Unsupported action");
 
+    // Internal worker requests authenticate with the dedicated worker token, not an end-user JWT.
+    // Dispatch this action before requiring a browser/user session; runQueuedJob performs its own token check.
+    if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
+
+    const user = await requireUser(req);
     if (action === "createProjectFromIntent") return json(await createProjectFromIntent(user, body));
     if (action === "applyBrainMutation") return json(await applyBrainMutation(user, body));
     if (action === "generateDiscoveryPoll") return json(await generateDiscoveryPoll(user, body));
@@ -1040,7 +1046,6 @@ Deno.serve(async req => {
     if (action === "enqueueJob") return json(await enqueueJob(user, body));
     if (action === "getJob") return json(await getJob(user, body));
     if (action === "cancelJob") return json(await cancelJob(user, body));
-    if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
     if (action === "persistProject") return json(await persistProject(user, body.project || {}));
     if (action === "listProjects") return json(await listProjects(user));
     if (action === "getProject") return json({ ok: true, project: await getProject(user, String(body.projectId || "")) });
