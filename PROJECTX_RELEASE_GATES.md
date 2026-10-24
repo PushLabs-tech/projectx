@@ -30,20 +30,21 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 - [x] Add atomic per-user/per-action fixed-window rate limiting before costly AI action dispatch.
 - [x] Route internal runQueuedJob through a dedicated worker-token check before ordinary user JWT auth.
 - [x] Add source-level regression contracts for billing, worker auth, rate limits, request caps and webhook processing.
-- [x] Confirm latest source/workflow head `500924eed7d251f9f46fcdabbb583d873fed7474`: PR-triggered run [40139856259](https://github.com/PushLabs-tech/projectx/actions/runs/40139856259) passed locked `npm ci`, high-severity npm audit, `npm test`, production build, Chromium install and browser E2E. E2E: 7 passed, 2 authenticated tests skipped because `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD` are not configured. This is source/CI evidence only, not authenticated live-backend verification.
-- [ ] Run database-backed tests for webhook duplicates, owner mismatch, transaction rollback and credit preservation.
+- [x] Confirm latest PR head `e4481d80321d502409552f3201c92e5779aa71aa`: run [40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994) passed locked `npm ci`, high-severity npm audit, `npm test`, production build, browser E2E, disposable PostgreSQL migration execution, webhook/rate-limit/grant assertions, and parallel enqueue race. E2E: 7 passed, 2 authenticated tests skipped because `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD` are not configured. This is CI evidence only, not authenticated live-backend verification.
+- [x] Run disposable PostgreSQL tests for webhook duplicate delivery, owner mismatch/rollback, credit preservation, billing-disabled entitlement behavior, and service-role-only RPC grants (run [40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994)).
 - [x] Add an atomic per-project execution enqueue gate using a transaction-scoped advisory lock; per-user rate limits are not a substitute.
-- [ ] Run database-backed concurrency tests proving two simultaneous enqueue calls for one project yield at most one active execution job.
+- [x] Race two concurrent enqueue calls in disposable PostgreSQL; CI confirmed exactly one active execution job per project in [run 40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994).
 - [ ] Audit every service-role operation for ownership/RBAC checks and add two-user integration tests.
 - [ ] Test malformed JSON, body caps, cancellation, stale version, lease expiry, duplicate dispatch and worker restart against staging.
-- [ ] Verify billing flag and webhook behavior on a disposable Supabase project with billing disabled; never enable real payment collection for beta.
+- [x] Exercise billing-disabled webhook handling against disposable PostgreSQL in CI; signed event is recorded but no paid entitlement/subscription is created.
+- [ ] Verify deployed billing flag and webhook behavior on a disposable Supabase project with billing disabled; never enable real payment collection for beta.
 
 ## Gate 3 — Durable job engine
 
 - [x] Source includes atomic claim/lease, heartbeat, cancellation and timeout handling.
 - [x] Source includes transaction/idempotency and rollback controls.
 - [x] Worker contract tests cover the token boundary and execution tool constraints.
-- [ ] Test lease races, expired lease reclaim, duplicate dispatch and cancellation while running against a real test database.
+- [ ] Test lease races, expired lease reclaim, duplicate dispatch and cancellation while running against a disposable Supabase/staging database.
 - [ ] Add bounded retry/dead-letter visibility and ensure terminal failures are visible to the user.
 - [ ] Test multiple worker instances concurrently against staging.
 
@@ -77,7 +78,7 @@ This is the active checklist for repository changes in draft PR #55. Statuses di
 
 - [x] Add npm high-severity dependency audit to CI.
 - [x] Add weekly Dependabot checks for npm and GitHub Actions.
-- [x] Confirm code/workflow head `500924eed7d251f9f46fcdabbb583d873fed7474` passes `npm ci`, npm audit, `npm test`, production build, and browser E2E in run [40139856259](https://github.com/PushLabs-tech/projectx/actions/runs/40139856259) (7 passed, 2 authenticated tests skipped due to absent E2E credentials). The documentation refresh creates a new head and requires one final CI verification.
+- [x] Confirm PR head `e4481d80321d502409552f3201c92e5779aa71aa` passes the locked npm/audit/test/build/E2E suite and disposable PostgreSQL migration contracts in [run 40140396994](https://github.com/PushLabs-tech/projectx/actions/runs/40140396994) (7 passed, 2 authenticated tests skipped due to absent E2E credentials). This documentation refresh creates a new head and requires one final CI verification.
 - [ ] Add/verify structured logs, metrics, alerting and incident response for AI, worker, payment and deploy failures.
 - [ ] Configure staging and production separation and verify actual Edge Function secrets without exposing values.
 - [ ] Enable and test database backups and rehearse restore.
