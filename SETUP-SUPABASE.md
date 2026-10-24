@@ -46,9 +46,10 @@ Supabase documents Edge Function secrets as environment variables available to s
 ```bash
 supabase functions deploy ai
 supabase functions deploy payments --no-verify-jwt
+supabase functions deploy projectx-worker --no-verify-jwt
 ```
 
-`ai` remains JWT-protected by the Supabase function gateway. `payments` validates authenticated requests and signed webhooks itself because a payment webhook does not carry a user JWT.
+`ai` validates ordinary user requests with Supabase Auth inside the function, and validates internal `runQueuedJob` requests with the dedicated worker token. `payments` validates authenticated requests and signed webhooks itself because a payment webhook does not carry a user JWT. `projectx-worker` validates the server-only `X-ProjectX-Worker-Token` because pg_cron/pg_net invokes it without a user JWT. The deployed worker token must be a random secret of at least 32 characters stored in Supabase Vault; never put it in browser config or the cron definition.
 
 ## 6. Tenant isolation test
 
