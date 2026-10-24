@@ -81,6 +81,9 @@ assert.ok(boundedRequestHelper.includes('return 500;'), 'Unknown infrastructure 
 assert.ok(payments.includes('requestErrorStatus(e)'), 'Payment handler must not classify backend failures as malformed requests');
 assert.ok(payments.includes('from "../_shared/request.ts"'), 'Payment handler must share canonical bounded-request/status mapping');
 assert.ok(boundedRequestHelper.includes('"Payment provider is not configured": 503'));
+assert.ok(boundedRequestHelper.includes('export function parseJsonText'));
+assert.ok(payments.includes('parseJsonText(raw,false)'), 'Webhook JSON parsing must convert malformed bodies to a 400-class error');
+assert.ok(payments.includes('Object.prototype.hasOwnProperty.call(PLANS,plan)'), 'Payment plans must not accept inherited object properties');
 for (const [name, source, limit] of [
   ["collaboration", collaboration, "128 * 1024"],
   ["resource-ingest", resourceIngest, "7 * 1024 * 1024"],
