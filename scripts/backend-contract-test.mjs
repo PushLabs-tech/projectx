@@ -37,6 +37,10 @@ assert.doesNotMatch(payments, /from\('payment_events'\)\.upsert/);
 
 // Webhook deduplication and side effects must share one database transaction.
 assert.ok(paymentWebhookMigration.toLowerCase().includes('on conflict (event_id) do nothing'));
+assert.ok(paymentWebhookMigration.includes('p_billing_enabled boolean'));
+assert.ok(paymentWebhookMigration.includes('if not coalesce(p_billing_enabled, false) then'));
+assert.ok(payments.includes('p_billing_enabled:BILLING_ENABLED'));
+assert.ok(payments.includes('ignored:!BILLING_ENABLED'));
 assert.ok(paymentWebhookMigration.includes('if v_inserted_id is null then'));
 assert.ok(paymentWebhookMigration.includes('insert into public.billing_entitlements'));
 assert.doesNotMatch(paymentWebhookMigration, /credits_used\s*=\s*excluded\.credits_used/i);
