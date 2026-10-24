@@ -13,9 +13,16 @@ const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "g
 const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "getUsageSummary", "enqueueJob", "getJob", "cancelJob"]);
 const ACTION_RATE_LIMITS: Record<string, number> = {
   createProjectFromIntent: 10,
+  applyBrainMutation: 30,
   generateDiscoveryPoll: 20,
   createPlan: 20,
+  createArtifactVersion: 20,
+  runVerification: 20,
+  rollbackExecutionTransaction: 10,
   enqueueJob: 10,
+  cancelJob: 30,
+  deleteProject: 10,
+  deleteCredential: 10,
   saveCredential: 10,
   testCredential: 10,
   listModels: 30,
