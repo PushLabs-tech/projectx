@@ -49,7 +49,10 @@ assert.ok(authIndexForRateLimit >= 0 && rpcIndexForRateLimit > authIndexForRateL
   "Rate limiting must run after user auth but before costly action dispatch");
 assert.doesNotMatch(aiHandlerForRateLimit, /const { count } = await admin\.from\("ai_usage"\)/,
   "The raceable count-then-run rate gate must not be used in the handler");
-assert.ok(atomicRateLimitMigration.toLowerCase().includes('on conflict (user_id, window_start) do update'));
+assert.ok(atomicRateLimitMigration.toLowerCase().includes('on conflict (user_id, action_key, window_start) do update'));
+assert.ok(atomicRateLimitMigration.includes('primary key (user_id, action_key, window_start)'));
+assert.ok(atomicRateLimitMigration.includes('p_action_key text'));
+assert.ok(ai.includes('p_action_key: action'), 'Rate limits must be isolated by action');
 assert.ok(atomicRateLimitMigration.includes('return v_request_count <= p_limit'));
 assert.ok(atomicRateLimitMigration.includes('grant execute on function public.projectx_consume_rate_limit'));
 assert.ok(projectExecutionConcurrencyMigration.includes("pg_advisory_xact_lock(hashtext(p_project_id::text))"));
