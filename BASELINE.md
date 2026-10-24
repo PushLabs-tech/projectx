@@ -6,7 +6,7 @@
 **Baseline source commit:** `0570b00b17e505ebff38d50133e6bcd417028af3`  
 **Working branch:** `fix/beta-billing-guard-cancellation-ownership`  
 **Review PR:** [#55 — security and beta reliability fixes](https://github.com/PushLabs-tech/projectx/pull/55)  
-**Snapshot branch head when this report was prepared:** `4c0c9e4b34f596f151efab21c9a3a34dfa178fe4`  
+**Snapshot branch head when this report was prepared:** `3e8587fd3aacbcd98aff9d95afdf3a4ee2c130be` (subsequent commits continue this draft patch)  
 **Status:** Draft PR; not merged; no database migration or function deployment performed.
 
 ## 1. Evidence boundary
@@ -22,7 +22,7 @@ The live GitHub Pages URL could not be retrieved by the browser inspection tool 
 - The draft PR is unmerged and nothing has been deployed.
 - Several GitHub API updates were committed as individual commits on the branch. The branch has more commits than the number of logical batches; before merging, review the final diff as a single patch and consider squashing only through a normal PR workflow.
 - GitHub Actions on `51bdbe83bb68dcd2e1219130ad0c8c8064cecbda` passed the project checks and browser E2E. The E2E log reported **7 passed, 2 skipped**; the skipped tests are authenticated-account flows requiring `PROJECTX_E2E_EMAIL` and `PROJECTX_E2E_PASSWORD`.
-- On branch head `4c0c9e4b34f596f151efab21c9a3a34dfa178fe4`, GitHub Actions had completed `npm audit --audit-level=high` and `npm test` successfully while Chromium installation was still in progress. See the [branch CI runs](https://github.com/PushLabs-tech/projectx/actions).
+- On branch head `4c0c9e4b34f596f151efab21c9a3a34dfa178fe4`, GitHub Actions passed `npm audit --audit-level=high`, `npm test`, and browser E2E (the run completed successfully after the earlier observation). See the [branch CI runs](https://github.com/PushLabs-tech/projectx/actions).
 - A full E2E pass has not yet been recorded for the latest branch head as of this report. Do not extend earlier green results to newer commits without checking their run.
 
 ## 3. Source / architecture map
@@ -79,7 +79,7 @@ Configured scripts:
 - CI now runs `npm audit --audit-level=high` after installing dependencies.
 
 Evidence status:
-- **Executed in GitHub Actions, passed:** `npm audit --audit-level=high` and `npm test` for branch head `4c0c9e4b34f596f151efab21c9a3a34dfa178fe4` at the last observation.
+- **Executed in GitHub Actions, passed:** `npm audit --audit-level=high`, `npm test`, and `npm run e2e:ci` for branch head `4c0c9e4b34f596f151efab21c9a3a34dfa178fe4`. This is a historical green result and must not be substituted for CI on later commits.
 - **Executed in GitHub Actions, passed on prior branch head:** `npm test` and `npm run e2e:ci` on `51bdbe83bb68dcd2e1219130ad0c8c8064cecbda` (7 passed, 2 authenticated tests skipped).
 - **Pending as of this snapshot:** full E2E on the newest head and re-running CI on the later report/documentation commit.
 - **Not run locally:** `npm run build`, `npm test`, local Playwright, database migration tests, or authenticated live integration checks in this session.
@@ -93,7 +93,7 @@ Evidence status:
 3. **Bounded HTTP request bodies (source fix in PR):** AI, payment and worker handlers now enforce byte limits during stream reads, not only after buffering an unlimited body. AI max is 5,000,000 bytes; payment max is 1,000,000 bytes; worker control request max is 64,000 bytes.
 4. **Payment webhook replay and free-beta guard (source + migration in PR):** duplicate event claims and DB side effects are processed in one transaction, preserving `credits_used` on entitlement conflict. With billing disabled, signed events are recorded but do not apply paid entitlement effects. The new RPC migration must be applied before deploying the new payments handler; that has not happened.
 5. **Subscription cancellation ownership (source fix in PR):** the authenticated caller's ownership is verified before the provider cancellation call; database update errors are surfaced.
-6. **Server-side rate limiting requires deeper verification:** the AI function counts recent `ai_usage` rows for some actions, but early-return action branches appear before that rate check. The cap can therefore fail to cover all costly project/verification actions. The counter also needs concurrent-request testing. Keep as a P0 follow-up until the action coverage and atomicity are proven.
+6. **Atomic server-side action rate limiter (source implementation added in this PR):** a new migration creates a service-role-only RPC with an atomic fixed-window counter; the AI handler calls it before the listed costly/user-triggered actions, fails closed if the RPC fails, and has per-action caps. Contract assertions were added. This is not a monthly credit cap, not a strict rolling 60-second window, and not yet verified against PostgreSQL or a deployed database. Live concurrent-request tests, migration application, and coverage review remain gates.
 
 ### Medium priority
 7. **Dependency reproducibility:** `bun.lock` is present but CI uses npm and there is no committed npm lockfile. CI does not yet use `npm ci`.
@@ -128,7 +128,7 @@ Evidence status:
 ## 9. Recommended next batches, in order
 
 1. **Finish this PR's validation:** wait for latest-head npm audit, project checks, security scan and browser E2E; fix any failures; review final unified diff. Do not merge until the report and all code in the final head have green CI.
-2. **Rate-limit coverage:** map every costly AI action, move/enforce the guard for those actions, fail closed if usage lookup errors, and add tests for early-return paths and concurrent callers. Prefer a database-atomic quota primitive if concurrency testing confirms the current count check can be bypassed.
+2. **Rate-limit validation:** run PostgreSQL migration/lint validation; test fixed-window boundary and concurrent calls on a disposable database; ensure the actions listed in `ACTION_RATE_LIMITS` match cost/abuse exposure. Add a separate monthly credits/usage quota only if the product's stated credit rules require one.
 3. **Lock down dependency reproducibility:** establish one package manager, generate and commit its lockfile, update CI to use the frozen/locked install, and preserve npm audit.
 4. **External Supabase verification (read-only first):** verify current migrations and function deployment/config; confirm `PROJECTX_BILLING_ENABLED` is false for beta; confirm Vault token/cron function boundary; inspect RLS/grants/storage policies; test two-user isolation. Do not apply migrations or deploy new code without confirming backups/rollback and the actual target project.
 5. **Live acceptance:** browser smoke on the actual deployed host, inspect headers/console/network, sign in with a dedicated test account if credentials are available, and test create → save → reopen → version/rollback. Record skipped tests honestly.
