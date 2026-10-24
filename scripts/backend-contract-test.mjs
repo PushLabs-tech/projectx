@@ -9,6 +9,10 @@ const deploy = read('supabase/functions/deploy/index.ts');
 const schema = read('supabase/schema.sql');
 const paymentWebhookMigration = read('supabase/migrations/20261025120000_payment_webhook_idempotency.sql');
 const atomicRateLimitMigration = read('supabase/migrations/20261025130000_atomic_ai_rate_limits.sql');
+const boundedRequestHelper = read('supabase/functions/_shared/request.ts');
+const collaboration = read('supabase/functions/collaboration/index.ts');
+const resourceIngest = read('supabase/functions/resource-ingest/index.ts');
+const github = read('supabase/functions/github/index.ts');
 
 assert.match(ai, /corsHeaders/);
 assert.match(cors, /Access-Control-Allow-Origin/);
@@ -45,6 +49,21 @@ assert.ok(atomicRateLimitMigration.includes('grant execute on function public.pr
 assert.ok(atomicRateLimitMigration.includes('revoke all on table') === false || atomicRateLimitMigration.includes('revoke all on public.projectx_api_rate_limits'));
 assert.ok(!/grant execute on function public\.projectx_consume_rate_limit[\s\S]*?to anon/i.test(atomicRateLimitMigration));
 
+
+
+assert.match(boundedRequestHelper, /req\.body\?\.getReader\(\)/);
+assert.match(boundedRequestHelper, /totalBytes \+= value\.byteLength/);
+assert.match(boundedRequestHelper, /if \(totalBytes > maxBytes\)/);
+assert.match(boundedRequestHelper, /Request is too large/);
+for (const [name, source, limit] of [
+  ["collaboration", collaboration, "128 * 1024"],
+  ["resource-ingest", resourceIngest, "7 * 1024 * 1024"],
+  ["deploy", deploy, "1 * 1024 * 1024"],
+  ["github", github, "8 * 1024 * 1024"]
+]) {
+  assert.ok(source.includes("readBoundedJson(req, " + limit + ")"), name + " must parse through a bounded streaming reader");
+  assert.ok(source.includes("requestErrorStatus(e)"), name + " must return the correct size-limit status");
+}
 
 assert.match(payments, /projectx_process_payment_webhook/);
 assert.ok(payments.includes("readBoundedRequestBody(req,MAX_REQUEST_BYTES)"));
