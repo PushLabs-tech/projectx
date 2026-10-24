@@ -54,6 +54,7 @@ assert.ok(atomicRateLimitMigration.includes('return v_request_count <= p_limit')
 assert.ok(atomicRateLimitMigration.includes('grant execute on function public.projectx_consume_rate_limit'));
 assert.ok(projectExecutionConcurrencyMigration.includes("pg_advisory_xact_lock(hashtext(p_project_id::text))"));
 assert.ok(projectExecutionConcurrencyMigration.includes("An execution job is already active for this project"));
+assert.ok(projectExecutionConcurrencyMigration.includes("revoke insert, update, delete on public.job_queue from anon, authenticated"));
 assert.ok(projectExecutionConcurrencyMigration.includes("grant execute on function public.enqueue_project_execution_job"));
 const enqueueFunction = ai.slice(ai.indexOf("async function enqueueJob"), ai.indexOf("async function getJob"));
 assert.ok(enqueueFunction.includes('admin.rpc("enqueue_project_execution_job"'));
