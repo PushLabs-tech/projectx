@@ -27,6 +27,9 @@ assert.match(ai, /assertSafeBaseUrl/);
 
 // Atomic per-action fixed-window rate limit: fail closed before any costly early-return action.
 assert.match(ai, /const ACTION_RATE_LIMITS: Record<string, number>/);
+for (const action of ["createProjectFromIntent", "applyBrainMutation", "generateDiscoveryPoll", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "enqueueJob", "cancelJob", "deleteProject", "deleteCredential", "saveCredential", "testCredential", "listModels", "research", "chat"]) {
+  assert.ok(ai.includes(action + ":"), "Action " + action + " must have a server-side rate limit");
+}
 assert.ok(ai.includes('admin.rpc("projectx_consume_rate_limit"'));
 const aiHandlerForRateLimit = ai.slice(ai.indexOf("Deno.serve(async req =>"));
 const authIndexForRateLimit = aiHandlerForRateLimit.indexOf("const user = await requireUser(req);");
