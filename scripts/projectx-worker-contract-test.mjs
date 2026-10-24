@@ -38,6 +38,16 @@ assert.match(ai,/kind === "execution"/);
 assert.match(ai,/remote execution planner/);
 assert.match(ai,/toolCalls/);
 assert.match(ai,/cancelJob/);
+
+// Worker calls carry the worker token, not a browser JWT; route before requireUser.
+// The handler must read/bound the request first, then dispatch runQueuedJob through its dedicated token check.
+const aiHandler=ai.slice(ai.indexOf("Deno.serve(async req =>"));
+const boundedBodyRead=aiHandler.indexOf("new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES");
+const workerDispatch=aiHandler.indexOf('if (action === "runQueuedJob") return json(await runQueuedJob(req, body));');
+const endUserAuth=aiHandler.indexOf("const user = await requireUser(req);");
+assert.ok(boundedBodyRead>=0 && boundedBodyRead<workerDispatch,"AI handler must size-check the request before worker dispatch");
+assert.ok(workerDispatch>=0 && workerDispatch<endUserAuth,"runQueuedJob must route through worker-token auth before end-user JWT auth");
+assert.match(ai,/requireWorkerUser\(req, String\(body\?\.userId \|\| ""\)\)/);
 assert.match(runtime,/enqueueRemoteExecutionJob/);
 assert.match(runtime,/waitForRemoteExecutionJob/);
 assert.match(runtime,/kind:'execution'/);
