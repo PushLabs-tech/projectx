@@ -54,6 +54,7 @@ const REQUEST_ERROR_STATUS: Record<string, number> = Object.freeze({
   "Unsupported plan": 400,
   "Subscription id required": 400,
   "Unknown payment action": 400,
+  "PROJECT_HAS_NO_FILES": 400,
   "Request is too large": 413,
   "FILE_TOO_LARGE": 413,
   "Invalid JSON": 400,
@@ -91,6 +92,7 @@ const REQUEST_ERROR_STATUS: Record<string, number> = Object.freeze({
 
 export function requestErrorStatus(error: unknown): number {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.startsWith("Missing Razorpay plan id for ")) return 503;
   if (Object.prototype.hasOwnProperty.call(REQUEST_ERROR_STATUS, message)) {
     return REQUEST_ERROR_STATUS[message];
   }
