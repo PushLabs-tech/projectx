@@ -77,6 +77,7 @@ Deno.serve(async req=>{
         p_event_id:eventId,
         p_event_type:String(body.event||'unknown'),
         p_payload:body,
+        p_billing_enabled:BILLING_ENABLED,
         p_user_id:userId,
         p_subscription_id:sub?.id?String(sub.id):null,
         p_status:status,
@@ -87,7 +88,7 @@ Deno.serve(async req=>{
         p_metadata:metadata
       });
       if(error)throw error;
-      return json({ok:true,duplicate:processed===false});
+      return json({ok:true,duplicate:processed===false,ignored:!BILLING_ENABLED});
     }
     const u=await user(req);const body=JSON.parse(raw||'{}');const action=String(body.action||'');
     if(action==='createSubscription'){
