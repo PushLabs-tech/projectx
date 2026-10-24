@@ -7,6 +7,8 @@ const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||Deno.env.get("SUPAB
 const RAZORPAY_KEY_ID=Deno.env.get("RAZORPAY_KEY_ID")||"";
 const RAZORPAY_KEY_SECRET=Deno.env.get("RAZORPAY_KEY_SECRET")||"";
 const RAZORPAY_WEBHOOK_SECRET=Deno.env.get("RAZORPAY_WEBHOOK_SECRET")||"";
+// Billing is opt-in only after an explicit release decision; default beta behavior is free.
+const BILLING_ENABLED=Deno.env.get("PROJECTX_BILLING_ENABLED")==="true";
 const PLANS={free:{id:"",name:"Free",amount:0,credits:20},pro:{id:Deno.env.get("RAZORPAY_PRO_PLAN_ID")||"",name:"Pro",amount:39900,credits:150},max:{id:Deno.env.get("RAZORPAY_MAX_PLAN_ID")||"",name:"Max",amount:99900,credits:500}} as const;
 const admin=createClient(SUPABASE_URL,SERVICE_KEY);
 async function entitlement(userId:string,planKey:string,status:string,subscriptionId?:string,periodEnd?:string|null){const p=PLANS[planKey as keyof typeof PLANS]||PLANS.free;await admin.from('billing_entitlements').upsert({user_id:userId,plan_key:planKey,status,monthly_credits:p.credits,credits_used:0,provider:'razorpay',provider_subscription_id:subscriptionId||null,period_end:periodEnd||null,updated_at:new Date().toISOString()},{onConflict:'user_id'});}
@@ -35,6 +37,7 @@ Deno.serve(async req=>{
     }
     const u=await user(req);const body=JSON.parse(raw||'{}');const action=String(body.action||'');
     if(action==='createSubscription'){
+      if(!BILLING_ENABLED) return json({ok:false,error:'ProjectX billing is disabled during beta'},403);
       if(!RAZORPAY_KEY_ID||!RAZORPAY_KEY_SECRET)throw new Error('Payment provider is not configured');
       const plan=String(body.plan||'');if(!(plan in PLANS))throw new Error('Unsupported plan');const p=PLANS[plan as keyof typeof PLANS];if(!p.id)throw new Error(`Missing Razorpay plan id for ${plan}`);
       const token=btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
@@ -46,7 +49,23 @@ Deno.serve(async req=>{
       return json({ok:true,subscriptionId:j.id,checkoutUrl:j.short_url||null,keyId:RAZORPAY_KEY_ID});
     }
     if(action==='billingStatus'){const [{data:subs,error:se},{data:ent,error:ee}]=await Promise.all([admin.from('billing_subscriptions').select('provider,provider_subscription_id,status,plan_key,current_period_end').eq('user_id',u.id).order('updated_at',{ascending:false}).limit(5),admin.from('billing_entitlements').select('plan_key,status,monthly_credits,credits_used,period_start,period_end,provider,provider_subscription_id').eq('user_id',u.id).maybeSingle()]);if(se)throw se;if(ee)throw ee;return json({ok:true,subscriptions:subs||[],entitlement:ent||{plan_key:'free',status:'active',monthly_credits:20,credits_used:0}});}
-if(action==='cancelSubscription'){if(!RAZORPAY_KEY_ID||!RAZORPAY_KEY_SECRET)throw new Error('Payment provider is not configured');const sid=String(body.subscriptionId||'');if(!sid)throw new Error('Subscription id required');const token=btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);const r=await fetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(sid)}/cancel`,{method:'POST',headers:{Authorization:`Basic ${token}`,'Content-Type':'application/json'},body:JSON.stringify({cancel_at_cycle_end:body.cancelAtCycleEnd!==false})});const j=await r.json();if(!r.ok)throw new Error(j?.error?.description||'Subscription cancellation failed');await admin.from('billing_subscriptions').update({status:String(j.status||'cancelled'),updated_at:new Date().toISOString()}).eq('provider_subscription_id',sid).eq('user_id',u.id);await admin.from('billing_entitlements').update({status:String(j.status||'cancelled'),updated_at:new Date().toISOString()}).eq('user_id',u.id);await trackPayment(u.id,'payment.subscription_cancelled',{externalId:sid});return json({ok:true,status:j.status||'cancelled'});}
+    if(action==='cancelSubscription'){
+      if(!RAZORPAY_KEY_ID||!RAZORPAY_KEY_SECRET)throw new Error('Payment provider is not configured');
+      const sid=String(body.subscriptionId||'');if(!sid)throw new Error('Subscription id required');
+      // Verify ownership before making any external cancellation request.
+      const {data:ownedSubscription,error:ownershipError}=await admin.from('billing_subscriptions').select('provider_subscription_id').eq('provider_subscription_id',sid).eq('user_id',u.id).maybeSingle();
+      if(ownershipError)throw ownershipError;
+      if(!ownedSubscription)return json({ok:false,error:'Subscription not found'},404);
+      const token=btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
+      const r=await fetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(sid)}/cancel`,{method:'POST',headers:{Authorization:`Basic ${token}`,'Content-Type':'application/json'},body:JSON.stringify({cancel_at_cycle_end:body.cancelAtCycleEnd!==false})});
+      const j=await r.json();if(!r.ok)throw new Error(j?.error?.description||'Subscription cancellation failed');
+      const {error:updateError}=await admin.from('billing_subscriptions').update({status:String(j.status||'cancelled'),updated_at:new Date().toISOString()}).eq('provider_subscription_id',sid).eq('user_id',u.id);
+      if(updateError)throw updateError;
+      const {error:entitlementError}=await admin.from('billing_entitlements').update({status:String(j.status||'cancelled'),updated_at:new Date().toISOString()}).eq('provider_subscription_id',sid).eq('user_id',u.id);
+      if(entitlementError)throw entitlementError;
+      await trackPayment(u.id,'payment.subscription_cancelled',{externalId:sid});
+      return json({ok:true,status:j.status||'cancelled'});
+    }
     throw new Error('Unknown payment action');
   }catch(e){return json({ok:false,error:e instanceof Error?e.message:String(e)},400);}
 });
