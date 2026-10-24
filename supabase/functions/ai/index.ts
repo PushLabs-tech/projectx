@@ -18,6 +18,36 @@ const MODEL_CACHE_TTL = 5 * 60 * 1000;
 
 const limitText = (v: unknown, n: number) => String(v ?? "").slice(0, n);
 const boundedJson = (v: unknown, n: number) => limitText(JSON.stringify(v ?? {}), n);
+
+async function readBoundedRequestBody(req: Request, maxBytes: number): Promise<string> {
+  const declaredLength = req.headers.get("content-length");
+  if (declaredLength && /^\\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
+    try { await req.body?.cancel(); } catch {}
+    throw new Error("Request is too large");
+  }
+  const reader = req.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      try { await reader.cancel(); } catch {}
+      throw new Error("Request is too large");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
 const is429 = (e: unknown) => /(^|\s)429(\s|:|-|$)|too many requests|rate limit|quota|resource_exhausted/i.test(e instanceof Error ? e.message : String(e));
 const retryMs = (e: unknown) => {
   const m = (e instanceof Error ? e.message : String(e)).match(/retry(?:-after|Delay)?[^0-9]*(\d+(?:\.\d+)?)s/i);
@@ -1024,8 +1054,7 @@ async function chat(user: any, body: any) {
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const raw = await req.text();
-    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) throw new Error("Request is too large");
+    const raw = await readBoundedRequestBody(req, MAX_BODY_BYTES);
     const body = JSON.parse(raw || "{}");
     const action = String(body.action || "");
     if (!ACTIONS.has(action)) throw new Error("Unsupported action");
