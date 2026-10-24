@@ -10,6 +10,11 @@ const transactionMigration=fs.readFileSync(new URL("../supabase/migrations/20260
 const runtime=fs.readFileSync(new URL("../px-final.js",import.meta.url),"utf8");
 
 assert.match(worker,/projectx_worker_token_valid/);
+assert.match(worker,/MAX_REQUEST_BYTES = 64_000/);
+assert.match(worker,/readBoundedRequestBody\(req,MAX_REQUEST_BYTES\)/);
+assert.match(worker,/Invalid JSON/);
+assert.match(worker,/Invalid batch limit/);
+assert.match(worker,/Method not allowed/);
 assert.match(worker,/claim_project_job/);
 assert.match(worker,/finish_project_job/);
 assert.match(worker,/commit_project_execution/);
