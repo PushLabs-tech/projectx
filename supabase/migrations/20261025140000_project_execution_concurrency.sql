@@ -30,7 +30,7 @@ begin
     raise exception 'Project not found';
   end if;
 
-  if v_project_owner <> p_user_id then
+  if v_project_owner is distinct from p_user_id then
     select role into v_role
     from public.workspace_members
     where workspace_id = v_workspace_id and user_id = p_user_id
