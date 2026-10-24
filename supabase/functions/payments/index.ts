@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { readBoundedRequestText, requestErrorStatus } from "../_shared/request.ts";
+import { parseJsonText, readBoundedRequestText, requestErrorStatus } from "../_shared/request.ts";
 
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
@@ -35,7 +35,7 @@ Deno.serve(async req=>{
       if(!RAZORPAY_WEBHOOK_SECRET)throw new Error('Webhook secret is not configured');
       const expected=await hmac(RAZORPAY_WEBHOOK_SECRET,raw);
       if(!timingSafe(expected,isWebhook))return json({ok:false,error:'Invalid webhook signature'},401);
-      const body=JSON.parse(raw);
+      const body=parseJsonText(raw,false);
       // Razorpay's event ID is authoritative. Hash the signed raw body as a deterministic fallback;
       // never use timestamps generated at receipt time for idempotency.
       const eventId=req.headers.get('x-razorpay-event-id')||`sha256:${await sha256(raw)}`;
@@ -66,11 +66,11 @@ Deno.serve(async req=>{
       if(error)throw error;
       return json({ok:true,duplicate:processed===false,ignored:!BILLING_ENABLED});
     }
-    const u=await user(req);const body=JSON.parse(raw||'{}');const action=String(body.action||'');
+    const u=await user(req);const body=parseJsonText(raw);const action=String(body.action||'');
     if(action==='createSubscription'){
       if(!BILLING_ENABLED) return json({ok:false,error:'ProjectX billing is disabled during beta'},403);
       if(!RAZORPAY_KEY_ID||!RAZORPAY_KEY_SECRET)throw new Error('Payment provider is not configured');
-      const plan=String(body.plan||'');if(!(plan in PLANS))throw new Error('Unsupported plan');const p=PLANS[plan as keyof typeof PLANS];if(!p.id)throw new Error(`Missing Razorpay plan id for ${plan}`);
+      const plan=String(body.plan||'');if(!Object.prototype.hasOwnProperty.call(PLANS,plan))throw new Error('Unsupported plan');const p=PLANS[plan as keyof typeof PLANS];if(!p.id)throw new Error(`Missing Razorpay plan id for ${plan}`);
       const token=btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
       const r=await fetch('https://api.razorpay.com/v1/subscriptions',{method:'POST',headers:{Authorization:`Basic ${token}`,'Content-Type':'application/json'},body:JSON.stringify({plan_id:p.id,total_count:12,customer_notify:1,notes:{user_id:u.id,plan}})});
       const j=await r.json();if(!r.ok)throw new Error(j?.error?.description||'Razorpay subscription creation failed');
