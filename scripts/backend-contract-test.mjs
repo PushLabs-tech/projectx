@@ -70,6 +70,11 @@ assert.ok(boundedRequestHelper.includes("/^\\d+$/"), "Content-Length digits must
 assert.match(boundedRequestHelper, /totalBytes \+= value\.byteLength/);
 assert.match(boundedRequestHelper, /if \(totalBytes > maxBytes\)/);
 assert.match(boundedRequestHelper, /Request is too large/);
+assert.ok(boundedRequestHelper.includes('"Invalid request encoding": 400'));
+assert.ok(boundedRequestHelper.includes('"SIGN_IN_REQUIRED": 401'));
+assert.ok(boundedRequestHelper.includes('"FORBIDDEN": 403'));
+assert.ok(boundedRequestHelper.includes('"PROJECT_NOT_FOUND": 404'));
+assert.ok(boundedRequestHelper.includes('return 500;'), 'Unknown infrastructure errors must map to 500');
 for (const [name, source, limit] of [
   ["collaboration", collaboration, "128 * 1024"],
   ["resource-ingest", resourceIngest, "7 * 1024 * 1024"],
