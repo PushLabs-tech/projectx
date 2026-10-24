@@ -97,8 +97,8 @@ for (const [name, source, limit] of [
 assert.match(payments, /projectx_process_payment_webhook/);
 assert.ok(payments.includes("readBoundedRequestBody(req,MAX_REQUEST_BYTES)"));
 assert.match(payments, /MAX_REQUEST_BYTES=1_000_000/);
-assert.match(payments, /totalBytes>maxBytes/);
-assert.ok(payments.includes('message==="Request is too large"?413:400'));
+assert.ok(payments.includes("requestErrorStatus(e)"), "Payment handler must distinguish malformed requests from backend failures");
+assert.ok(payments.includes("parseJsonText(raw,false)"), "Webhook payload JSON must use the canonical parser");
 assert.match(payments, /razorpay/i);
 assert.match(payments, /webhook/i);
 assert.match(payments, /signature/i);
