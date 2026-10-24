@@ -7,6 +7,7 @@ const cors = read('supabase/functions/_shared/cors.ts');
 const payments = read('supabase/functions/payments/index.ts');
 const deploy = read('supabase/functions/deploy/index.ts');
 const schema = read('supabase/schema.sql');
+const paymentWebhookMigration = read('supabase/migrations/20261025120000_payment_webhook_idempotency.sql');
 
 assert.match(ai, /corsHeaders/);
 assert.match(cors, /Access-Control-Allow-Origin/);
@@ -27,6 +28,16 @@ assert.match(payments, /payment_events/);
 assert.match(payments, /razorpay/i);
 assert.match(payments, /webhook/i);
 assert.match(payments, /signature/i);
+assert.match(payments, /projectx_process_payment_webhook/);
+assert.match(payments, /sha256:\\$\\{await sha256\\(raw\\)\\}/);
+assert.doesNotMatch(payments, /from\\('payment_events'\\)\\.upsert/);
+
+// Webhook deduplication and side effects must share one database transaction.
+assert.match(paymentWebhookMigration, /on conflict \\(event_id\\) do nothing/i);
+assert.match(paymentWebhookMigration, /if v_inserted_id is null then\\s+return false/i);
+assert.match(paymentWebhookMigration, /insert into public\\.billing_entitlements/i);
+assert.doesNotMatch(paymentWebhookMigration, /credits_used\\s*=\\s*excluded\\.credits_used/i);
+assert.match(paymentWebhookMigration, /grant execute on function public\\.projectx_process_payment_webhook/i);
 
 // Beta safety: payment collection must remain disabled unless explicitly enabled.
 assert.match(payments, /PROJECTX_BILLING_ENABLED.*===\s*["']true["']/);
