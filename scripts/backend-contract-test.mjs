@@ -104,6 +104,10 @@ assert.ok(github.includes('if(disconnectError)throw disconnectError'), 'Disconne
 assert.ok(collaboration.includes('if(!["admin","editor","viewer"].includes(role))throw new Error("INVALID_ROLE")'), 'Invitations must use a schema-valid workspace role');
 assert.ok(collaboration.includes('if(acceptedError)throw acceptedError'), 'Invitation acceptance persistence failures must be surfaced');
 assert.ok(collaboration.includes('emailSent=response.ok'), 'Email delivery must be based on provider response status');
+assert.ok(!collaboration.includes('});}emailSent=response.ok'), 'Invitation email handler must not close try before reading provider response');
+assert.ok(collaboration.includes('});emailSent=response.ok;}catch'), 'Invitation email handler must read response status inside try');
+assert.ok(payments.includes('if(subscriptionSaveError)throw subscriptionSaveError'), 'Subscription persistence failures must not be reported as successful creation');
+
 assert.ok(!collaboration.includes('emailSent:!!RESEND'), 'Configured mailer presence must not be treated as delivery confirmation');
 assert.ok(collaboration.includes('const {error:deleteError}=await admin.from("workspace_invitations").delete()'), 'Invitation replacement must not ignore a failed delete');
 
