@@ -74,7 +74,7 @@ Deno.serve(async req=>{
       const token=btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
       const r=await fetch('https://api.razorpay.com/v1/subscriptions',{method:'POST',headers:{Authorization:`Basic ${token}`,'Content-Type':'application/json'},body:JSON.stringify({plan_id:p.id,total_count:12,customer_notify:1,notes:{user_id:u.id,plan}})});
       const j=await r.json();if(!r.ok)throw new Error(j?.error?.description||'Razorpay subscription creation failed');
-      await admin.from('billing_subscriptions').upsert({user_id:u.id,provider:'razorpay',provider_subscription_id:j.id,status:String(j.status||'created'),plan_key:plan,updated_at:new Date().toISOString()},{onConflict:'provider_subscription_id'});
+      const {error:subscriptionSaveError}=await admin.from('billing_subscriptions').upsert({user_id:u.id,provider:'razorpay',provider_subscription_id:j.id,status:String(j.status||'created'),plan_key:plan,updated_at:new Date().toISOString()},{onConflict:'provider_subscription_id'});if(subscriptionSaveError)throw subscriptionSaveError;
       await trackPayment(u.id,'payment.checkout_started',{plan,amountPaise:p.amount,externalId:j.id});
       await admin.from('audit_logs').insert({user_id:u.id,action:'payment.subscription_created',metadata:{plan,subscription_id:j.id}});
       return json({ok:true,subscriptionId:j.id,checkoutUrl:j.short_url||null,keyId:RAZORPAY_KEY_ID});
