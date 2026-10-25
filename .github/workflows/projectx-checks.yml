@@ -38,6 +38,9 @@ jobs:
       - name: Run ProjectX checks
         run: npm test
 
+      - name: Parse Supabase Edge Function TypeScript
+        run: bash scripts/check-edge-function-syntax.sh
+
       - name: Build production artifact
         run: npm run build
 
