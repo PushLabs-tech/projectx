@@ -8,8 +8,20 @@ const ai=fs.readFileSync(new URL("../supabase/functions/ai/index.ts",import.meta
 const migration=fs.readFileSync(new URL("../supabase/migrations/20260925150000_projectx_remote_execution_worker.sql",import.meta.url),"utf8");
 const transactionMigration=fs.readFileSync(new URL("../supabase/migrations/20260925170000_projectx_execution_transactions.sql",import.meta.url),"utf8");
 const runtime=fs.readFileSync(new URL("../px-final.js",import.meta.url),"utf8");
+const supabaseConfig=fs.readFileSync(new URL("../supabase/config.toml",import.meta.url),"utf8");
+const setupGuide=fs.readFileSync(new URL("../SETUP-SUPABASE.md",import.meta.url),"utf8");
 
 assert.match(worker,/projectx_worker_token_valid/);
+// pg_cron calls the worker with its dedicated token but no user JWT, so the edge gateway
+// must defer auth to this function's token-validation boundary.
+assert.match(supabaseConfig,/\[functions\.projectx-worker\][\s\S]*?verify_jwt = false/);
+assert.match(setupGuide,/projectx-worker --no-verify-jwt/);
+assert.match(setupGuide,/X-ProjectX-Worker-Token/);
+assert.match(worker,/MAX_REQUEST_BYTES = 64_000/);
+assert.match(worker,/readBoundedRequestBody\(req,MAX_REQUEST_BYTES\)/);
+assert.match(worker,/Invalid JSON/);
+assert.match(worker,/Invalid batch limit/);
+assert.match(worker,/Method not allowed/);
 assert.match(worker,/claim_project_job/);
 assert.match(worker,/finish_project_job/);
 assert.match(worker,/commit_project_execution/);
@@ -38,6 +50,19 @@ assert.match(ai,/kind === "execution"/);
 assert.match(ai,/remote execution planner/);
 assert.match(ai,/toolCalls/);
 assert.match(ai,/cancelJob/);
+
+// Worker calls carry the worker token, not a browser JWT; route before requireUser.
+// The handler must read/bound the request first, then dispatch runQueuedJob through its dedicated token check.
+const aiHandler=ai.slice(ai.indexOf("Deno.serve(async req =>"));
+const boundedBodyRead=aiHandler.indexOf("readBoundedRequestBody(req, MAX_BODY_BYTES)");
+const workerDispatch=aiHandler.indexOf('if (action === "runQueuedJob") return json(await runQueuedJob(req, body));');
+const endUserAuth=aiHandler.indexOf("const user = await requireUser(req);");
+assert.ok(boundedBodyRead>=0 && boundedBodyRead<workerDispatch,"AI handler must size-check the request before worker dispatch");
+assert.match(ai,/const reader = req\.body\?\.getReader\(\)/);
+assert.match(ai,/totalBytes \+= value\.byteLength/);
+assert.match(ai,/if \(totalBytes > maxBytes\)/);
+assert.ok(workerDispatch>=0 && workerDispatch<endUserAuth,"runQueuedJob must route through worker-token auth before end-user JWT auth");
+assert.match(ai,/requireWorkerUser\(req, String\(body\?\.userId \|\| ""\)\)/);
 assert.match(runtime,/enqueueRemoteExecutionJob/);
 assert.match(runtime,/waitForRemoteExecutionJob/);
 assert.match(runtime,/kind:'execution'/);

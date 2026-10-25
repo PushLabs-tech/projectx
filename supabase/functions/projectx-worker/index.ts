@@ -8,6 +8,34 @@ const corsHeaders={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Heade
 const MAX_BATCH = 5;
 const DEFAULT_TIMEOUT_SECONDS = 120;
 const MAX_TIMEOUT_SECONDS = 300;
+const MAX_REQUEST_BYTES = 64_000;
+
+async function readBoundedRequestBody(req:Request,maxBytes:number):Promise<string>{
+  const declaredLength=req.headers.get("content-length");
+  if(declaredLength&&/^\d+$/.test(declaredLength)&&Number(declaredLength)>maxBytes){
+    try{await req.body?.cancel();}catch{}
+    throw new Error("Request is too large");
+  }
+  const reader=req.body?.getReader();
+  if(!reader)return "";
+  const chunks:Uint8Array[]=[];
+  let totalBytes=0;
+  while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    if(!value)continue;
+    totalBytes+=value.byteLength;
+    if(totalBytes>maxBytes){
+      try{await reader.cancel();}catch{}
+      throw new Error("Request is too large");
+    }
+    chunks.push(value);
+  }
+  const bytes=new Uint8Array(totalBytes);
+  let offset=0;
+  for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+  try{return new TextDecoder("utf-8",{fatal:true}).decode(bytes);}catch{throw new Error("Invalid request encoding");}
+}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -170,6 +198,20 @@ async function run(limit:number,token:string) {
 }
 Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response("ok",{headers:corsHeaders});
-  try{if(req.method!=="POST" || !(await authorized(req)))return json({ok:false,error:"Unauthorized"},401);const body=await req.json().catch(()=>({}));const limit=Math.max(1,Math.min(MAX_BATCH,Number(body?.limit||MAX_BATCH)));return json({...await run(limit,await workerToken()),requestedLimit:limit});}
-  catch(error){return json({ok:false,error:error instanceof Error?error.message:String(error)},500);}
+  if(req.method!=="POST")return json({ok:false,error:"Method not allowed"},405);
+  try{
+    if(!(await authorized(req)))return json({ok:false,error:"Unauthorized"},401);
+    const raw=await readBoundedRequestBody(req,MAX_REQUEST_BYTES);
+    let body:any={};
+    try{body=JSON.parse(raw||"{}");}catch{return json({ok:false,error:"Invalid JSON"},400);}
+    const rawLimit=body?.limit??MAX_BATCH;
+    if(!((typeof rawLimit==="number")||(typeof rawLimit==="string"&&rawLimit.trim()))||!Number.isInteger(Number(rawLimit))){
+      return json({ok:false,error:"Invalid batch limit"},400);
+    }
+    const limit=Math.max(1,Math.min(MAX_BATCH,Number(rawLimit)));
+    return json({...await run(limit,await workerToken()),requestedLimit:limit});
+  }catch(error){
+    const message=error instanceof Error?error.message:String(error);
+    return json({ok:false,error:message},message==="Request is too large"?413:(message==="Invalid request encoding"?400:500));
+  }
 });

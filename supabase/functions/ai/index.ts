@@ -11,6 +11,24 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
 const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "getUsageSummary", "enqueueJob", "getJob", "cancelJob"]);
+const ACTION_RATE_LIMITS: Record<string, number> = {
+  createProjectFromIntent: 10,
+  applyBrainMutation: 30,
+  generateDiscoveryPoll: 20,
+  createPlan: 20,
+  createArtifactVersion: 20,
+  runVerification: 20,
+  rollbackExecutionTransaction: 10,
+  enqueueJob: 10,
+  cancelJob: 30,
+  deleteProject: 10,
+  deleteCredential: 10,
+  saveCredential: 10,
+  testCredential: 10,
+  listModels: 30,
+  research: 10,
+  chat: 30
+};
 const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
@@ -18,6 +36,40 @@ const MODEL_CACHE_TTL = 5 * 60 * 1000;
 
 const limitText = (v: unknown, n: number) => String(v ?? "").slice(0, n);
 const boundedJson = (v: unknown, n: number) => limitText(JSON.stringify(v ?? {}), n);
+
+async function readBoundedRequestBody(req: Request, maxBytes: number): Promise<string> {
+  const declaredLength = req.headers.get("content-length");
+  if (declaredLength && /^\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
+    try { await req.body?.cancel(); } catch {}
+    throw new Error("Request is too large");
+  }
+  const reader = req.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      try { await reader.cancel(); } catch {}
+      throw new Error("Request is too large");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error("Invalid request encoding");
+  }
+}
 const is429 = (e: unknown) => /(^|\s)429(\s|:|-|$)|too many requests|rate limit|quota|resource_exhausted/i.test(e instanceof Error ? e.message : String(e));
 const retryMs = (e: unknown) => {
   const m = (e instanceof Error ? e.message : String(e)).match(/retry(?:-after|Delay)?[^0-9]*(\d+(?:\.\d+)?)s/i);
@@ -39,6 +91,7 @@ function errorStatus(error: unknown) {
   if (/not authorized|forbidden/i.test(message)) return 403;
   if (/project not found/i.test(message)) return 404;
   if (/request is too large/i.test(message)) return 413;
+  if (/^invalid json$|^invalid request encoding$/i.test(message)) return 400;
   if (/rate limit reached/i.test(message) || is429(error)) return 429;
   if (/no compatible ai model|no compatible model|provider unavailable|no compatible ai models are reachable/i.test(message)) return 502;
   if (/^Unsupported action$|^Unknown action:|^Invalid API key$|^Unsupported provider$/i.test(message)) return 400;
@@ -903,10 +956,20 @@ async function enqueueJob(user:any, body:any) {
   const kind=String(body?.kind || "").trim().slice(0,80);
   if(!kind) throw new Error("Job kind is required.");
   const payload=body?.payload && typeof body.payload==="object" ? body.payload : {};
+  const maxAttempts=Math.max(1,Math.min(10,Number(body?.maxAttempts || 3)));
+  const timeoutSeconds=Math.max(10,Math.min(300,Number(body?.timeoutSeconds || 120)));
+  if(kind==="execution"){
+    if(!projectId) throw new Error("Execution jobs require a project.");
+    const {data,error}=await admin.rpc("enqueue_project_execution_job",{
+      p_project_id:projectId,p_user_id:user.id,p_payload:payload,
+      p_max_attempts:maxAttempts,p_timeout_seconds:timeoutSeconds
+    });
+    if(error) throw error;
+    return {ok:true,job:data};
+  }
   const {data,error}=await admin.from("job_queue").insert({
     project_id:projectId,user_id:user.id,kind,payload,
-    max_attempts:Math.max(1,Math.min(10,Number(body?.maxAttempts || 3))),
-    timeout_seconds:Math.max(10,Math.min(300,Number(body?.timeoutSeconds || 120)))
+    max_attempts:maxAttempts,timeout_seconds:timeoutSeconds
   }).select("id,project_id,kind,status,attempts,max_attempts,available_at,created_at").single();
   if(error) throw error;
   return {ok:true,job:data};
@@ -1024,11 +1087,29 @@ async function chat(user: any, body: any) {
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const user = await requireUser(req);
-    const raw = await req.clone().text(); if (raw.length > MAX_BODY_BYTES) throw new Error("Request is too large");
-    const body = JSON.parse(raw || "{}"); const action = String(body.action || "");
+    const raw = await readBoundedRequestBody(req, MAX_BODY_BYTES);
+    let body: any;
+    try { body = JSON.parse(raw || "{}"); }
+    catch { throw new Error("Invalid JSON"); }
+    const action = String(body.action || "");
     if (!ACTIONS.has(action)) throw new Error("Unsupported action");
 
+    // Internal worker requests authenticate with the dedicated worker token, not an end-user JWT.
+    // Dispatch this action before requiring a browser/user session; runQueuedJob performs its own token check.
+    if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
+
+    const user = await requireUser(req);
+    const actionRateLimit = ACTION_RATE_LIMITS[action];
+    if (actionRateLimit !== undefined) {
+      const { data: allowed, error: limitError } = await admin.rpc("projectx_consume_rate_limit", {
+        p_user_id: user.id,
+        p_action_key: action,
+        p_limit: actionRateLimit,
+        p_window_seconds: 60
+      });
+      if (limitError) throw new Error("Rate-limit validation is temporarily unavailable. Please retry.");
+      if (allowed !== true) throw new Error("Rate limit reached for this action. Please wait a minute and try again.");
+    }
     if (action === "createProjectFromIntent") return json(await createProjectFromIntent(user, body));
     if (action === "applyBrainMutation") return json(await applyBrainMutation(user, body));
     if (action === "generateDiscoveryPoll") return json(await generateDiscoveryPoll(user, body));
@@ -1040,7 +1121,6 @@ Deno.serve(async req => {
     if (action === "enqueueJob") return json(await enqueueJob(user, body));
     if (action === "getJob") return json(await getJob(user, body));
     if (action === "cancelJob") return json(await cancelJob(user, body));
-    if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
     if (action === "persistProject") return json(await persistProject(user, body.project || {}));
     if (action === "listProjects") return json(await listProjects(user));
     if (action === "getProject") return json({ ok: true, project: await getProject(user, String(body.projectId || "")) });
@@ -1050,9 +1130,6 @@ Deno.serve(async req => {
       if (!p || p.owner_id !== user.id) throw new Error("Not authorized");
       const { error } = await admin.from("projects").delete().eq("id", projectId); if (error) throw error; return json({ ok: true });
     }
-
-    const { count } = await admin.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", new Date(Date.now() - 60000).toISOString());
-    if ((count || 0) >= 30) throw new Error("Rate limit reached. Please wait a minute and try again.");
 
     if (action === "listCredentials") {
       const { data, error } = await admin.from("ai_provider_credentials").select("provider,label,key_hint,base_url,updated_at").eq("user_id", user.id).order("updated_at", { ascending: false });
@@ -1084,11 +1161,7 @@ Deno.serve(async req => {
       const all = await modelsForCredentials(creds, String(body.task || "chat"));
       return json({ ok: true, models: [...new Map(all.map(m => [String(m.provider) + ":" + String(m.id), m])).values()].slice(0, 250) });
     }
-    if (action === "research") {
-      const { count } = await admin.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", new Date(Date.now() - 60000).toISOString());
-      if ((count || 0) >= 30) throw new Error("Rate limit reached. Please wait a minute and try again.");
-      return json(await research(user, body));
-    }
+    if (action === "research") return json(await research(user, body));
     if (action === "usage") return json(await usage(user));
     if (action === "securityEvents") return json(await securityEvents(user));
     if (action === "chat") return json(await chat(user, body));
