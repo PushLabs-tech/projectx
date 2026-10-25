@@ -11,7 +11,7 @@ fi
 
 for file in "${files[@]}"; do
   echo "Syntax-checking $file"
-  ./node_modules/.bin/esbuild "$file" --loader=ts --outfile=/tmp/projectx-edge-syntax-check.js >/dev/null
+  ./node_modules/.bin/esbuild "$file" --outfile=/tmp/projectx-edge-syntax-check.js >/dev/null
 done
 
 echo "PASS: parsed ${#files[@]} Supabase Edge Function TypeScript files"
