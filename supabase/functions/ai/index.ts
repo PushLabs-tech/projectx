@@ -1024,9 +1024,14 @@ async function chat(user: any, body: any) {
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    const declaredLength = Number(req.headers.get("content-length") || 0);
+    if (declaredLength > MAX_BODY_BYTES) throw new Error("Request is too large");
+    const raw = await req.clone().text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) throw new Error("Request is too large");
+    const body = JSON.parse(raw || "{}");
+    const action = String(body.action || "");
+    // Worker calls use a one-time database-validated worker token, not an end-user session.
     const user = await requireUser(req);
-    const raw = await req.clone().text(); if (raw.length > MAX_BODY_BYTES) throw new Error("Request is too large");
-    const body = JSON.parse(raw || "{}"); const action = String(body.action || "");
     if (!ACTIONS.has(action)) throw new Error("Unsupported action");
 
     if (action === "createProjectFromIntent") return json(await createProjectFromIntent(user, body));
