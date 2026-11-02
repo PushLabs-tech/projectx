@@ -14,6 +14,8 @@ assert.match(cors, /https:\/\/pushlabs-tech\.github\.io/);
 assert.doesNotMatch(cors, /https:\/\/pushlabs-tech\.github\.io\/projectx/);
 assert.match(ai, /Authorization/);
 assert.match(ai, /persistProject/);
+assert.match(ai, /"runQueuedJob"/);
+assert.match(ai, /action === "runQueuedJob"/);
 assert.match(ai, /429/);
 assert.match(ai, /providerListModels/);
 assert.match(ai, /project_id/);
