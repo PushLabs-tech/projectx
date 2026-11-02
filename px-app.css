@@ -2573,3 +2573,101 @@ html, body {
   .px-home-shortcuts{width:100%;overflow:visible;flex-wrap:wrap;white-space:normal}
   .px-shortcut{white-space:normal;max-width:100%}
 }
+
+
+/* Mobile workspace repair — based on the 2026-11-03 device recording. */
+@media (max-width: 620px) {
+  /* Keep Studio and Agent inside the app viewport instead of extending below it. */
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] {
+    height: 100%;
+    min-height: 0;
+    max-height: 100dvh;
+    overflow: hidden;
+    grid-template-rows: 56px minmax(180px, 42%) minmax(0, 1fr);
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .actual-replit-center {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .px-agent-body {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] #assistant-dock-log {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Grid forms need an explicit zero minimum width or the textarea collapses
+     to its min-content width on narrow Android viewports. */
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .px-agent-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    min-width: 0;
+    width: calc(100% - 24px);
+    box-sizing: border-box;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .px-agent-form textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 76px !important;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .px-agent-form button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0;
+  }
+}
+
+/* Settings categories become a horizontal, touch-scrollable tab strip on phones. */
+@media (max-width: 720px) {
+  #px-app .settings {
+    display: block;
+    min-width: 0;
+  }
+  #px-app .settings-nav {
+    display: flex;
+    gap: 6px;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 9px;
+    margin: 0 0 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--px-line);
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  #px-app .settings-nav button {
+    flex: 0 0 auto;
+    min-height: 40px;
+    white-space: nowrap;
+    border: 1px solid var(--px-line);
+    background: var(--px-surface);
+  }
+  #px-app .settings-nav button.active {
+    border-color: var(--px-accent);
+    background: var(--px-accent-light);
+  }
+  #px-app #settings-body {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
