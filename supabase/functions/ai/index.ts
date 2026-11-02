@@ -10,7 +10,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUB
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 const PROVIDERS = new Set(["auto", "bytez", "nvidia", "openrouter", "openai", "google", "anthropic", "generic"]);
-const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "getUsageSummary", "enqueueJob", "getJob", "cancelJob"]);
+const ACTIONS = new Set(["listCredentials", "deleteCredential", "saveCredential", "testCredential", "listModels", "chat", "research", "usage", "securityEvents", "persistProject", "listProjects", "getProject", "deleteProject", "createProjectFromIntent", "generateDiscoveryPoll", "applyBrainMutation", "createPlan", "createArtifactVersion", "runVerification", "rollbackExecutionTransaction", "getUsageSummary", "enqueueJob", "getJob", "cancelJob", "runQueuedJob"]);
 const MAX_BODY_BYTES = 5000000;
 const RATE = globalThis.__projectxRate || (globalThis.__projectxRate = new Map<string, number>());
 const MODEL_CACHE = globalThis.__projectxModelCache || (globalThis.__projectxModelCache = new Map<string, { at:number; models:any[] }>());
