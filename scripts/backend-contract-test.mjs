@@ -17,6 +17,7 @@ assert.match(ai, /persistProject/);
 assert.match(ai, /"runQueuedJob"/);
 assert.match(ai, /action === "runQueuedJob"/);
 assert.match(ai, /action === "runQueuedJob"[\s\S]*?runQueuedJob\(req, body\)/);
+assert.ok(ai.indexOf('if (action === "runQueuedJob") return json(await runQueuedJob(req, body));') < ai.indexOf("const user = await requireUser(req);"), "worker dispatch must validate its worker token before requiring a user session");
 assert.match(ai, /429/);
 assert.match(ai, /providerListModels/);
 assert.match(ai, /project_id/);
