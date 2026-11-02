@@ -2671,3 +2671,62 @@ html, body {
     overflow-wrap: anywhere;
   }
 }
+
+
+/* Mobile Studio grid correction:
+   The desktop Studio grid reserves a rail column and a separate Agent column.
+   On a phone the rail is intentionally hidden, so collapse the grid to one
+   column and place the preview and Agent in stacked, independently scrollable rows. */
+@media (max-width: 760px) {
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 56px minmax(220px, 1fr) minmax(260px, 42dvh);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-rail {
+    display: none;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .actual-replit-topbar {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .actual-replit-center {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .replit-agent {
+    grid-column: 1;
+    grid-row: 3;
+    position: relative;
+    inset: auto;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-left: 0;
+    border-top: 1px solid var(--px-border);
+    box-shadow: none;
+  }
+  #px-shell.actual-replit-shell[data-ui-mode="studio"] .px-agent-body {
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* When Agent is closed/omitted, let the preview occupy the entire space. */
+  #px-shell.actual-replit-shell[data-ui-mode="studio"]:not(:has(.replit-agent)),
+  #px-shell.actual-replit-shell[data-ui-mode="studio"].hide-right {
+    grid-template-rows: 56px minmax(0, 1fr);
+  }
+}
