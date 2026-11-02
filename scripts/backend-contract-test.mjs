@@ -28,6 +28,12 @@ assert.match(ai, /securityEvents/);
 assert.match(ai, /assertSafeBaseUrl/);
 
 assert.match(payments, /payment_events/);
+assert.match(payments, /from\('payment_events'\)\.insert/);
+assert.match(payments, /eventError\?\.code==='23505'/);
+assert.match(payments, /MAX_BODY_BYTES/);
+assert.match(payments, /billing_subscriptions'\)\.select\('id'\)/);
+assert.ok(payments.indexOf("eq('provider_subscription_id',sid).eq('user_id',u.id)") < payments.indexOf("api.razorpay.com/v1/subscriptions/"));
+
 assert.match(payments, /razorpay/i);
 assert.match(payments, /webhook/i);
 assert.match(payments, /signature/i);
