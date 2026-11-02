@@ -1030,7 +1030,8 @@ Deno.serve(async req => {
     if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) throw new Error("Request is too large");
     const body = JSON.parse(raw || "{}");
     const action = String(body.action || "");
-    // Worker calls use a one-time database-validated worker token, not an end-user session.
+    // Worker calls use a database-validated worker token, not an end-user session.
+    if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
     const user = await requireUser(req);
     if (!ACTIONS.has(action)) throw new Error("Unsupported action");
 
@@ -1045,7 +1046,6 @@ Deno.serve(async req => {
     if (action === "enqueueJob") return json(await enqueueJob(user, body));
     if (action === "getJob") return json(await getJob(user, body));
     if (action === "cancelJob") return json(await cancelJob(user, body));
-    if (action === "runQueuedJob") return json(await runQueuedJob(req, body));
     if (action === "persistProject") return json(await persistProject(user, body.project || {}));
     if (action === "listProjects") return json(await listProjects(user));
     if (action === "getProject") return json({ ok: true, project: await getProject(user, String(body.projectId || "")) });
