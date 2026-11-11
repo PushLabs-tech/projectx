@@ -204,7 +204,7 @@
 
       if (isArchitecture) {
         const nodeName = architecturePath[architecturePath.length - 1] || 'Architecture';
-        const node = architectureTree[nodeName] || architectureTree.Architecture;
+        const node = architectureTree[nodeName] || { description: nodeName + ' is a nested part of ' + (architecturePath[architecturePath.length - 2] || 'the project architecture') + '. This layer can hold its own requirements, decisions, and resources.', children: [] };
         title = nodeName;
         description = node.description;
         children = node.children;
