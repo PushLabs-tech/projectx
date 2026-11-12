@@ -142,18 +142,27 @@ export function publicMarkup() {
   </section>
 
   <section class="pxl-section pxl-purpose-section pxl-reveal-up px-reveal-up" id="pxl-purpose">
-    <div class="pxl-centered-intro"><div class="pxl-section-label"><span></span> THE IDEA TO OUTCOME</div><h2>Your idea is only the <em>beginning.</em></h2><p>ProjectX turns human intent into real, working, measurable outcomes — from the first thought to something you can actually ship.</p></div>
-    <div class="pxl-purpose-flow" role="group" aria-label="ProjectX creation lifecycle">
-      <button type="button" data-lifecycle-step="intent" aria-pressed="true"><span class="purpose-icon">◎</span><strong>Intent</strong><small>Name the outcome</small></button>
-      <button type="button" data-lifecycle-step="understand" aria-pressed="false"><span class="purpose-icon">✳</span><strong>Understand</strong><small>Clarify the goal</small></button>
-      <button type="button" data-lifecycle-step="plan" aria-pressed="false"><span class="purpose-icon">≡</span><strong>Plan</strong><small>Map the work</small></button>
-      <button type="button" data-lifecycle-step="create" aria-pressed="false"><span class="purpose-icon">⌘</span><strong>Create</strong><small>Make it real</small></button>
-      <button type="button" data-lifecycle-step="verify" aria-pressed="false"><span class="purpose-icon">✓</span><strong>Verify</strong><small>Check the result</small></button>
-      <button type="button" data-lifecycle-step="ship" aria-pressed="false"><span class="purpose-icon">↗</span><strong>Ship</strong><small>Put it to use</small></button>
-      <button type="button" data-lifecycle-step="improve" aria-pressed="false"><span class="purpose-icon">↻</span><strong>Improve</strong><small>Keep evolving</small></button>
+    <div class="pxl-split-layout">
+      <div class="pxl-split-copy">
+        <div class="pxl-section-label"><span></span> PROJECTX</div>
+        <h2>Your idea is only<br>the <em>beginning.</em></h2>
+        <p>ProjectX turns human intent into real, working, measurable outcomes — from the first thought to something you can actually ship.</p>
+        <button class="pxl-outline-action" type="button" data-purpose-focus>How it works <span>→</span></button>
+      </div>
+      <div class="pxl-purpose-visual" aria-label="ProjectX creation lifecycle">
+        <div class="pxl-visual-aura"></div>
+        <svg class="pxl-purpose-lines" viewBox="0 0 700 470" aria-hidden="true"><path d="M92 240 C170 220 196 120 274 110"/><path d="M274 110 C340 92 372 84 430 72"/><path d="M430 72 C500 98 542 150 598 188"/><path d="M598 188 C560 238 560 300 604 350"/><path d="M604 350 C526 376 472 394 400 402"/><path d="M400 402 C320 392 252 368 178 346"/><path d="M178 346 C132 320 112 278 92 240"/></svg>
+        <button class="pxl-purpose-node n1" type="button" data-lifecycle-step="intent" aria-pressed="true"><span>◎</span><b>Intent</b></button>
+        <button class="pxl-purpose-node n2" type="button" data-lifecycle-step="understand" aria-pressed="false"><span>⌁</span><b>Understand</b></button>
+        <button class="pxl-purpose-node n3" type="button" data-lifecycle-step="plan" aria-pressed="false"><span>≡</span><b>Plan</b></button>
+        <button class="pxl-purpose-node n4" type="button" data-lifecycle-step="create" aria-pressed="false"><span>⌘</span><b>Create</b></button>
+        <button class="pxl-purpose-node n5" type="button" data-lifecycle-step="verify" aria-pressed="false"><span>◌</span><b>Verify</b></button>
+        <button class="pxl-purpose-node n6" type="button" data-lifecycle-step="ship" aria-pressed="false"><span>↗</span><b>Ship</b></button>
+        <button class="pxl-purpose-node n7" type="button" data-lifecycle-step="improve" aria-pressed="false"><span>▥</span><b>Improve</b></button>
+        <div class="pxl-stack-core" aria-hidden="true"><div class="pxl-stack-layer layer-a"></div><div class="pxl-stack-layer layer-b"></div><div class="pxl-stack-layer layer-c"></div><div class="pxl-stack-mark">×</div></div>
+      </div>
     </div>
     <div class="pxl-stage-explainer" id="pxl-lifecycle-description" aria-live="polite"><b>INTENT</b><p>Name the outcome and start from what you actually want to accomplish.</p></div>
-    <div class="pxl-section-note">One connected journey — from the first thought to the next meaningful result.</div>
   </section>
 
   <section class="pxl-section pxl-creation-section pxl-reveal-up px-reveal-up" id="pxl-create">
@@ -175,8 +184,9 @@ export function publicMarkup() {
   </section>
 
   <section class="pxl-section pxl-difference-section pxl-reveal-up px-reveal-up" id="pxl-difference">
-    <div class="pxl-difference-head"><div class="pxl-section-label"><span></span> THE PROJECTX APPROACH</div><h2>It doesn’t just generate.<br>It <em>understands.</em></h2><p>A prompt is only the starting point. ProjectX works toward the outcome — keeping the goal, decisions, creation, and verification connected.</p></div>
-    <div class="pxl-compare">
+    <div class="pxl-split-layout">
+      <div class="pxl-split-copy"><div class="pxl-section-label"><span></span> THE DIFFERENCE</div><h2>It doesn’t just<br>generate. It <em>understands.</em></h2><p>A prompt is only the starting point. ProjectX works toward the outcome — keeping the goal, decisions, creation, and verification connected.</p></div>
+      <div class="pxl-compare">
       <div class="pxl-compare-card">
         <span class="pxl-compare-label">A SIMPLE PROMPT-TO-OUTPUT FLOW</span><h3>Ask. Generate. Receive.</h3>
         <div class="pxl-simple-flow"><span><b>01</b>Prompt</span><span><b>02</b>Generate</span><span><b>03</b>Response</span></div>
@@ -194,6 +204,7 @@ export function publicMarkup() {
           <button type="button" data-flow-stage="improve" aria-pressed="false"><b>06</b>Improve</button>
         </div>
         <p id="pxl-flow-description" class="pxl-flow-description">Context stays connected as the work moves forward.</p>
+      </div>
       </div>
     </div>
   </section>
@@ -226,8 +237,9 @@ export function publicMarkup() {
   </section>
 
   <section class="pxl-section pxl-execution-section pxl-reveal-up px-reveal-up" id="pxl-execution">
-    <div class="pxl-centered-intro"><div class="pxl-section-label"><span></span> THE EXECUTION LOOP</div><h2>Build it. Test it.<br>Make it <em>better.</em></h2><p>A connected cycle that helps turn an idea into a usable outcome — then improves it with evidence and feedback.</p></div>
-    <div class="pxl-loop" role="group" aria-label="Execution loop">
+    <div class="pxl-split-layout">
+      <div class="pxl-split-copy"><div class="pxl-section-label"><span></span> THE EXECUTION LOOP</div><h2>Build it. Test it.<br>Make it <em>better.</em></h2><p>A connected cycle that helps turn an idea into a usable outcome — then improves it with evidence and feedback.</p></div>
+      <div class="pxl-loop-wrap"><div class="pxl-loop" role="group" aria-label="Execution loop">
       <div class="pxl-loop-line" aria-hidden="true"></div>
       <button class="pxl-loop-step" type="button" data-loop-stage="0" aria-pressed="true"><span>◎</span><b>Understand</b><small>Clarify the outcome</small></button>
       <button class="pxl-loop-step" type="button" data-loop-stage="1" aria-pressed="false"><span>≡</span><b>Plan</b><small>Map the work</small></button>
@@ -238,8 +250,8 @@ export function publicMarkup() {
       <button class="pxl-loop-step" type="button" data-loop-stage="6" aria-pressed="false"><span>↗</span><b>Ship</b><small>Make it available</small></button>
       <button class="pxl-loop-step" type="button" data-loop-stage="7" aria-pressed="false"><span>↻</span><b>Improve</b><small>Learn and iterate</small></button>
     </div>
-    <div class="pxl-loop-bottom"><span>DELIVER</span><b>↻</b><span>LEARN</span><b>↻</b><span>IMPROVE</span><b>↻</b><span>REPEAT</span></div>
-    <div class="pxl-loop-controls"><p id="pxl-loop-description">Clarify the outcome and make sure the project is solving the right problem.</p><button class="pxl-button pxl-button-dark" id="pxl-play-loop" type="button">Play loop ↗</button></div>
+        <div class="pxl-loop-bottom"><span>DELIVER</span><b>↻</b><span>LEARN</span><b>↻</b><span>IMPROVE</span><b>↻</b><span>REPEAT</span></div>
+        <div class="pxl-loop-controls"><p id="pxl-loop-description">Clarify the outcome and make sure the project is solving the right problem.</p><button class="pxl-button pxl-button-dark" id="pxl-play-loop" type="button">Play loop ↗</button></div>
   </section>
 
   <section class="pxl-section pxl-final-section pxl-reveal-up px-reveal-up" id="pxl-final">
