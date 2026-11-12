@@ -59,7 +59,7 @@ test("hero creation type controls update the real composer context", async ({ pa
 test("auth screen exposes login and signup controls", async ({ page }) => {
   await page.goto("/");
   await page.locator("#public-signin").click();
-  const signup = page.locator("#public-signup");
+  const signup = page.locator("#auth-signup-mode");
   await expect(signup).toBeVisible();
   await signup.click();
   await expect(page.locator("#auth-email")).toBeVisible();
