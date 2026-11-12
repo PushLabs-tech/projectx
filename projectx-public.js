@@ -1,3 +1,4 @@
+import { initCore } from './projectx-canvas-3d.js';
 /* ProjectX public-page interactions. This module only enhances .px-public;
    the authenticated workspace runtime is not touched. */
 (() => {
@@ -184,6 +185,22 @@
     // The Brain modules are meaningful controls, not decorative labels.
     const brainStage = $('#pxl-brain-stage');
     const brainDetail = $('#pxl-brain-detail');
+    const brainCanvas = $('#pxl-brain-canvas');
+    if (brainCanvas && !brainCanvas.dataset.ready) {
+      try {
+        const brainEngine = initCore(brainCanvas);
+        brainCanvas.dataset.ready = 'true';
+        brainStage?.classList.add('has-3d-engine');
+        brainCanvas._projectxEngine = brainEngine;
+      } catch {}
+    }
+
+    const purposeFocus = $('[data-purpose-focus]');
+    purposeFocus?.addEventListener('click', () => {
+      const first = $('[data-lifecycle-step="intent"]');
+      first?.focus();
+      selectLifecycle('intent');
+    });
     const brainButtons = $$('[data-brain-module]');
     let activeModule = '';
     let architecturePath = [];
