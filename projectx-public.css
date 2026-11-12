@@ -1,8 +1,8 @@
 /* ProjectX public landing — reference-faithful editorial system. */
 #px-app.px-public .pxl-page{
   --ink:#151518;--muted:#6d6d73;--soft:#96969b;--line:#ebe7e8;--coral:#ff5d58;
-  --coral-soft:#fff2f1;--paper:#fff;--serif:Georgia,"Times New Roman",serif;
-  background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --coral-soft:#fff2f1;--paper:#fff;--serif:"DM Serif Display",Georgia,"Times New Roman",serif;
+  background:var(--paper);color:var(--ink);font-family:"DM Sans",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   min-height:100%;overflow:visible;-webkit-font-smoothing:antialiased
 }
 #px-app.px-public .pxl-page *,#px-app.px-public .pxl-page *::before,#px-app.px-public .pxl-page *::after{box-sizing:border-box}
@@ -527,3 +527,6 @@
 @media (prefers-reduced-motion:reduce){
   #px-app.px-public .pxl-purpose-lines path,#px-app.px-public .pxl-stack-core,#px-app.px-public .pxl-purpose-visual .pxl-visual-aura{animation:none!important}
 }
+
+#px-app.px-public .pxl-page .pxl-brand,#px-app.px-public .pxl-page button,#px-app.px-public .pxl-page textarea{font-family:"DM Sans",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#px-app.px-public .pxl-page .pxl-card-number,#px-app.px-public .pxl-page .pxl-brain-detail-label,#px-app.px-public .pxl-page .pxl-compare-label{font-family:"DM Mono",ui-monospace,monospace}
