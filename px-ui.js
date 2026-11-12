@@ -221,7 +221,7 @@ export function publicMarkup() {
   <section class="pxl-section pxl-brain-section pxl-reveal-up px-reveal-up" id="pxl-brain">
     <div class="pxl-brain-layout">
       <div class="pxl-brain-copy"><div class="pxl-section-label"><span></span> PROJECT BRAIN</div><h2>One project.<br>One <em>persistent brain.</em></h2><p>ProjectX keeps the context of your project — goals, requirements, decisions, resources, and progress — so you can continue without starting over.</p><ul><li>Remember why decisions were made</li><li>Keep important project context connected</li><li>Build on previous work as the project evolves</li></ul></div>
-      <div class="pxl-brain-visual" id="pxl-brain-stage">
+      <div class="pxl-brain-visual" id="pxl-brain-stage"><canvas class="pxl-brain-canvas" id="pxl-brain-canvas" aria-hidden="true"></canvas>
         <svg class="pxl-brain-connectors" viewBox="0 0 760 520" aria-hidden="true"><path d="M120 84 C260 84 292 170 366 240"/><path d="M120 260 C260 260 292 260 366 260"/><path d="M120 436 C260 436 292 350 366 280"/><path d="M640 84 C500 84 468 170 394 240"/><path d="M640 260 C500 260 468 260 394 260"/><path d="M640 436 C500 436 468 350 394 280"/><path d="M380 88 C380 142 380 168 380 200"/></svg>
         <button class="pxl-brain-module brain-left brain-top" type="button" data-brain-module="requirements" aria-pressed="false"><span>≡</span><b>Requirements</b></button>
         <button class="pxl-brain-module brain-left brain-mid" type="button" data-brain-module="decisions" aria-pressed="false"><span>◇</span><b>Decisions</b></button>
@@ -252,6 +252,8 @@ export function publicMarkup() {
     </div>
         <div class="pxl-loop-bottom"><span>DELIVER</span><b>↻</b><span>LEARN</span><b>↻</b><span>IMPROVE</span><b>↻</b><span>REPEAT</span></div>
         <div class="pxl-loop-controls"><p id="pxl-loop-description">Clarify the outcome and make sure the project is solving the right problem.</p><button class="pxl-button pxl-button-dark" id="pxl-play-loop" type="button">Play loop ↗</button></div>
+      </div>
+    </div>
   </section>
 
   <section class="pxl-section pxl-final-section pxl-reveal-up px-reveal-up" id="pxl-final">
