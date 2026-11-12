@@ -896,6 +896,7 @@ function publicHome(){
   $('#public-start-arrow').onclick=startFromLanding;
   $('#start-input').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}};
   $('#public-workspace').onclick=openWorkspace;
+  $('#public-final-start')?.addEventListener('click', startFromLanding);
   $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
   $('#public-examples').onclick=()=>$('#pxl-create')?.scrollIntoView({behavior:'smooth'});
   $('button[data-domain]').forEach(button=>button.onclick=()=>{
