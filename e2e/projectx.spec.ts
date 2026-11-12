@@ -47,7 +47,7 @@ test("get started focuses the idea box and placeholder actions explain their sta
   await page.locator(".header-actions [data-app-action='get-started']").click();
   await expect(page.locator("#idea-input")).toBeFocused();
 
-  await page.getByRole("button", { name: "Pricing" }).click();
+  await page.getByRole("button", { name: "Pricing", exact: true }).click();
   await expect(page.locator("#site-notice")).toContainText("Pricing details are being prepared");
 });
 
