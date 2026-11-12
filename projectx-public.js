@@ -1,3 +1,4 @@
+import { initCreationCore } from './projectx-canvas-3d.js';
 /* ProjectX public-page interactions. This module only enhances .px-public;
    the authenticated workspace runtime is not touched. */
 (() => {
@@ -5,6 +6,9 @@
 
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const wait = ms => new Promise(resolve => window.setTimeout(resolve, ms));
+  const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[char]);
 
   const lifecycle = {
     intent: ['Intent', 'Start with the outcome the person wants—not a prescribed prompt format.'],
@@ -184,6 +188,22 @@
     // The Brain modules are meaningful controls, not decorative labels.
     const brainStage = $('#pxl-brain-stage');
     const brainDetail = $('#pxl-brain-detail');
+    const brainCanvas = $('#pxl-brain-canvas');
+    if (brainCanvas && !brainCanvas.dataset.ready) {
+      try {
+        const brainEngine = initCreationCore(brainCanvas);
+        brainCanvas.dataset.ready = 'true';
+        brainStage?.classList.add('has-3d-engine');
+        brainCanvas._projectxEngine = brainEngine;
+      } catch {}
+    }
+
+    const purposeFocus = $('[data-purpose-focus]');
+    purposeFocus?.addEventListener('click', () => {
+      const first = $('[data-lifecycle-step="intent"]');
+      first?.focus();
+      selectLifecycle('intent');
+    });
     const brainButtons = $$('[data-brain-module]');
     let activeModule = '';
     let architecturePath = [];
