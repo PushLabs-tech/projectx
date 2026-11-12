@@ -892,14 +892,14 @@ function publicHome(){
     $('#public-start-arrow')?.classList.add('is-loading');
     beginCreation(intent);
   };
-  $('#public-start').onclick=startFromLanding;
-  $('#public-start-arrow').onclick=startFromLanding;
-  $('#start-input').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}};
+  $('#public-start')?.addEventListener('click', startFromLanding);
+  $('#public-start-arrow')?.addEventListener('click', startFromLanding);
+  $('#start-input')?.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}});
   $('#public-workspace').onclick=openWorkspace;
   $('#public-final-start')?.addEventListener('click', startFromLanding);
   $('#public-footer-signin')?.addEventListener('click',e=>{e.preventDefault();authScreen('signin');});
   $('#public-examples')?.addEventListener('click',()=>$('#pxl-create')?.scrollIntoView({behavior:'smooth'}));
-  $('button[data-domain]').forEach(button=>button.onclick=()=>{
+  $('button[data-domain]').forEach(button=>button.addEventListener('click',()=>{
     $('button[data-domain]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
     const input=$('#start-input');
     if(input){input.dataset.domain=button.dataset.domain||'';input.placeholder=button.dataset.placeholder||'What do you want to make happen?';input.focus();}
