@@ -283,17 +283,12 @@
         const rect = brainStage.getBoundingClientRect();
         const nx = (event.clientX - rect.left) / rect.width - .5;
         const ny = (event.clientY - rect.top) / rect.height - .5;
-        const scene = $('.pxl-brain-scene');
-        if (!scene) return;
-        scene.style.setProperty('--brain-tilt-x', (nx * 3.2).toFixed(2) + 'deg');
-        scene.style.setProperty('--brain-tilt-y', (-ny * 2.4).toFixed(2) + 'deg');
+        brainStage.style.transform = 'perspective(1200px) rotateX(' + (-ny * 2.2).toFixed(2) + 'deg) rotateY(' + (nx * 3.2).toFixed(2) + 'deg)';
+
       }, { passive:true });
       brainStage.addEventListener('pointerleave', () => {
-        const scene = $('.pxl-brain-scene');
-        if (scene) {
-          scene.style.setProperty('--brain-tilt-x', '0deg');
-          scene.style.setProperty('--brain-tilt-y', '0deg');
-        }
+        brainStage.style.transform = '';
+
       });
     }
 
@@ -343,6 +338,51 @@
       });
     }
 
+
+    // Reference-faithful entrance motion: each section reveals once as it enters the viewport.
+    const revealTargets = $$('.pxl-reveal-up, .pxl-reveal-stagger');
+    if (reducedMotion || !('IntersectionObserver' in window)) {
+      revealTargets.forEach(el => el.classList.add('px-in-view'));
+    } else {
+      const revealObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('px-in-view');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: .12, rootMargin: '0px 0px -8% 0px' });
+      revealTargets.forEach(el => revealObserver.observe(el));
+    }
+
+    // Small pointer response on the hero glow keeps the otherwise-static composition alive.
+    if (!reducedMotion && window.matchMedia?.('(pointer:fine)').matches) {
+      const hero = $('.pxl-hero');
+      const glow = $('.pxl-hero-glow');
+      if (hero && glow) {
+        hero.addEventListener('pointermove', event => {
+          const rect = hero.getBoundingClientRect();
+          const x = ((event.clientX - rect.left) / rect.width - .5) * 18;
+          const y = ((event.clientY - rect.top) / rect.height - .5) * 10;
+          glow.style.marginLeft = x.toFixed(1) + 'px';
+          glow.style.marginTop = y.toFixed(1) + 'px';
+        }, { passive:true });
+        hero.addEventListener('pointerleave', () => { glow.style.marginLeft='0'; glow.style.marginTop='0'; });
+      }
+    }
+
+    // Scroll-linked active navigation gives the continuous page a quiet sense of place.
+    const sectionIds = ['pxl-hero','pxl-purpose','pxl-create','pxl-difference','pxl-experience','pxl-brain','pxl-execution','pxl-final'];
+    const navLinks = $$('.pxl-links a');
+    if ('IntersectionObserver' in window) {
+      const sectionObserver = new IntersectionObserver(entries => {
+        const visible = entries.filter(entry => entry.isIntersecting).sort((a,b) => b.intersectionRatio-a.intersectionRatio)[0];
+        if (!visible) return;
+        navLinks.forEach(link => link.classList.toggle('is-current', link.getAttribute('href') === '#' + visible.target.id));
+      }, { threshold:[.18,.35,.55,.75], rootMargin:'-18% 0px -48% 0px' });
+      sectionIds.map(id => $('#' + id)).filter(Boolean).forEach(section => sectionObserver.observe(section));
+    }
+
     // Native anchor behavior is retained; this adds a small guard for empty fragments.
     page.addEventListener('click', event => {
       const link = event.target.closest('a[href^="#"]');
@@ -359,6 +399,72 @@
     const page = document.querySelector('#px-app.px-public .pxl-page');
     if (page) mount(page);
   }
+
+
+  // Resilient Brain event delegation: keeps the flagship interaction alive even if
+  // the landing is mounted after the module script's first scan.
+  const fallbackBrain = {
+    requirements:['Requirements','Goals, constraints, acceptance criteria, and priorities.',['Goals','Constraints','Acceptance criteria','Priorities']],
+    decisions:['Decisions','Choices, reasons, alternatives, and consequences.',['Chosen approach','Reasoning summary','Alternatives','Consequences']],
+    architecture:['Architecture','The structural map of the project. Explore it level by level.',['Frontend','Backend','AI','Database']],
+    capabilities:['Capabilities','What the project can actually do and which capabilities are available.',['Creation','Research','Agents','Testing','Deployment']],
+    resources:['Resources','Files, APIs, repositories, models, and integrations connected to the project.',['Files','APIs','GitHub','Models','Integrations']],
+    context:['Context','Intent, preferences, constraints, research, and confirmed facts.',['Intent','Preferences','Constraints','Research']],
+    history:['History','Requirements, decisions, versions, builds, tests, fixes, and the current state.',['Idea','Requirement','Decision','Version','Build','Test','Fix','Current']]
+  };
+  const fallbackTree = {
+    Architecture:['The top-level project architecture.',['Frontend','Backend','AI','Database']],
+    Frontend:['The user-facing product structure.',['Landing','Dashboard','Workspace','Components']],
+    Landing:['The public-facing ProjectX experience.',['Hero','Purpose','Project Brain','Execution Loop']],
+    Hero:['The first interaction and creation entry point.',['Composer','Navigation','Capability controls']],
+    Composer:['The intent entry point where a person describes the desired outcome.',['Prompt field','Capability controls','Send action']]
+  };
+  let fallbackArchitecturePath=[];
+  const fallbackRender = (page, title, description, children, architecture) => {
+    const detail=page.querySelector('#pxl-brain-detail');
+    if(!detail)return;
+    const buttons=(children||[]).map(child=>architecture
+      ? '<button type="button" data-brain-path="'+escapeHTML(child)+'">'+escapeHTML(child)+' <span aria-hidden="true">↗</span></button>'
+      : '<span class="pxl-brain-tag">'+escapeHTML(child)+'</span>').join('');
+    detail.innerHTML='<div class="pxl-brain-detail-copy"><span class="pxl-brain-detail-label">PROJECT BRAIN / '+escapeHTML(title.toUpperCase())+'</span><h3>'+escapeHTML(title)+'</h3><p>'+escapeHTML(description)+'</p><div class="pxl-brain-drill">'+buttons+'</div></div><button class="pxl-brain-back" type="button" data-brain-reset>Return to Core</button>';
+    detail.style.display='flex';
+  };
+  document.addEventListener('click', event => {
+    const moduleButton=event.target.closest('#px-app.px-public [data-brain-module]');
+    const page=document.querySelector('#px-app.px-public .pxl-page');
+    if(!page)return;
+    if(moduleButton){
+      const key=moduleButton.dataset.brainModule;
+      const entry=fallbackBrain[key];
+      if(!entry)return;
+      const stage=page.querySelector('#pxl-brain-stage');
+      stage?.classList.add('has-selection');
+      page.querySelectorAll('[data-brain-module]').forEach(button=>{
+        const selected=button===moduleButton;
+        button.classList.toggle('is-selected',selected);
+        button.setAttribute('aria-pressed',String(selected));
+      });
+      fallbackArchitecturePath=[];
+      fallbackRender(page,entry[0],entry[1],entry[2],key==='architecture');
+      return;
+    }
+    const pathButton=event.target.closest('#px-app.px-public [data-brain-path]');
+    if(pathButton){
+      const node=pathButton.dataset.brainPath;
+      const parent=fallbackArchitecturePath.at(-1)||'Architecture';
+      const entry=fallbackTree[node]||[''+node,'A nested architecture layer of the ProjectX system.',[]];
+      fallbackArchitecturePath.push(node);
+      fallbackRender(page,node,entry[0],entry[1],entry[1].length>0);
+      return;
+    }
+    if(event.target.closest('#px-app.px-public [data-brain-reset]')){
+      const stage=page.querySelector('#pxl-brain-stage');
+      stage?.classList.remove('has-selection');
+      page.querySelectorAll('[data-brain-module]').forEach(button=>{button.classList.remove('is-selected');button.setAttribute('aria-pressed','false');});
+      const detail=page.querySelector('#pxl-brain-detail');
+      if(detail)detail.style.display='';
+    }
+  });
 
   const observer = new MutationObserver(scan);
   observer.observe(document.documentElement, { childList:true, subtree:true });

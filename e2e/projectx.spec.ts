@@ -13,7 +13,7 @@ test("public shell renders", async ({ page }) => {
   await expect(page.locator("#pxl-brain")).toBeAttached();
   await expect(page.locator("#pxl-execution")).toBeAttached();
   await expect(page.locator("#pxl-final")).toBeAttached();
-  await expect(page.locator("#public-start")).toBeVisible();
+  await expect(page.locator("#public-start-arrow")).toBeVisible();
   await expect(page.locator("#px-app")).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -33,7 +33,8 @@ test("public landing sections form one continuous scroll page", async ({ page })
 
 test("Project Brain modules and architecture drill-down are interactive", async ({ page }) => {
   await page.goto("/");
-  await page.locator('[data-brain-module="architecture"]').click();
+  await page.locator("#pxl-brain").evaluate((el:any) => el.scrollIntoView({block:"center"}));
+  await page.locator('[data-brain-module="architecture"]').evaluate((el:any) => el.click());
   await expect(page.locator("#pxl-brain-stage")).toHaveClass(/has-selection/);
   await expect(page.locator("#pxl-brain-detail h3")).toHaveText("Architecture");
   await page.locator('[data-brain-path="Frontend"]').click();
@@ -58,7 +59,8 @@ test("hero creation type controls update the real composer context", async ({ pa
 
 test("auth screen exposes login and signup controls", async ({ page }) => {
   await page.goto("/");
-  const signup = page.locator("#public-signup");
+  await page.locator("#public-signin").click();
+  const signup = page.locator("#auth-signup-mode");
   await expect(signup).toBeVisible();
   await signup.click();
   await expect(page.locator("#auth-email")).toBeVisible();
@@ -99,7 +101,7 @@ test("project shell can open guest creation flow and expose execution workspace"
 
   await page.goto("/");
   await page.locator("#start-input").fill("Create a small personal portfolio website with an introduction and projects section.");
-  await page.locator("#public-start").click();
+  await page.locator("#public-start-arrow").click();
 
   await expect(page.locator("#px-app")).toBeVisible();
   const appText = await page.locator("#px-app").innerText();
@@ -142,7 +144,7 @@ test("runs navigation contract is wired into the project UI", async ({ page }) =
 test("public mobile shell remains usable after observability release", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.locator("#public-start")).toBeVisible();
+  await expect(page.locator("#public-start-arrow")).toBeVisible();
 
   const metrics = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,

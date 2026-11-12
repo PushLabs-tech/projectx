@@ -881,8 +881,8 @@ function publicHome(){
   root.classList.remove('px-auth-page');
   root.innerHTML=UI.publicMarkup();
   const openWorkspace=()=>{state.forceWorkspace=true;history.replaceState(null,'',location.pathname+'#workspace');workspaceHome();};
-  $('#public-signin').onclick=()=>authScreen('signin');
-  $('#public-signup').onclick=()=>authScreen('signup');
+  $('#public-signin')?.addEventListener('click',()=>authScreen('signin'));
+  $('#public-signup')?.addEventListener('click',()=>authScreen('signup'));
   const startFromLanding=()=>{
     const prompt=$('#start-input');
     const rawIntent=String(prompt?.value||'').trim();
@@ -892,17 +892,18 @@ function publicHome(){
     $('#public-start-arrow')?.classList.add('is-loading');
     beginCreation(intent);
   };
-  $('#public-start').onclick=startFromLanding;
-  $('#public-start-arrow').onclick=startFromLanding;
-  $('#start-input').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}};
+  $('#public-start')?.addEventListener('click', startFromLanding);
+  $('#public-start-arrow')?.addEventListener('click', startFromLanding);
+  $('#start-input')?.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}});
   $('#public-workspace').onclick=openWorkspace;
-  $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
-  $('#public-examples').onclick=()=>$('#pxl-create')?.scrollIntoView({behavior:'smooth'});
-  $('button[data-domain]').forEach(button=>button.onclick=()=>{
-    $('button[data-domain]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
+  $('#public-final-start')?.addEventListener('click', startFromLanding);
+  $('#public-footer-signin')?.addEventListener('click',e=>{e.preventDefault();authScreen('signin');});
+  $('#public-examples')?.addEventListener('click',()=>$('#pxl-create')?.scrollIntoView({behavior:'smooth'}));
+  $$('button[data-domain]').forEach(button=>button.addEventListener('click',()=>{
+    $$('button[data-domain]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
     const input=$('#start-input');
     if(input){input.dataset.domain=button.dataset.domain||'';input.placeholder=button.dataset.placeholder||'What do you want to make happen?';input.focus();}
-  });
+  }));
   $$('[data-example]').forEach(btn=>btn.onclick=()=>{
     try{sessionStorage.setItem('projectx_pending_intent',btn.dataset.example||'');sessionStorage.setItem('projectx_pending_domain',btn.dataset.example?.includes('game')?'games':'web');}catch{}
     state.forceWorkspace=true;
