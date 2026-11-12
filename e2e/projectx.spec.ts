@@ -33,8 +33,8 @@ test("public landing sections form one continuous scroll page", async ({ page })
 
 test("Project Brain modules and architecture drill-down are interactive", async ({ page }) => {
   await page.goto("/");
-  await page.locator("#pxl-brain").scrollIntoViewIfNeeded();
-  await page.locator('[data-brain-module="architecture"]').click({force:true});
+  await page.locator("#pxl-brain").evaluate((el:any) => el.scrollIntoView({block:"center"}));
+  await page.locator('[data-brain-module="architecture"]').evaluate((el:any) => el.click());
   await expect(page.locator("#pxl-brain-stage")).toHaveClass(/has-selection/);
   await expect(page.locator("#pxl-brain-detail h3")).toHaveText("Architecture");
   await page.locator('[data-brain-path="Frontend"]').click();
