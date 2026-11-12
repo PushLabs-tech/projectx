@@ -105,7 +105,7 @@ export function navForProject(project) {
 }
 
 export function publicMarkup() {
-  return String.raw\`<div class="pxl-page" id="pxl-top">
+  return `<div class="pxl-page" id="pxl-top">
 <header class="pxl-nav">
   <a class="pxl-brand" href="./" aria-label="ProjectX home"><span class="pxl-brand-mark" aria-hidden="true"><i></i><i></i></span><span>Project<span class="pxl-brand-x">X</span></span></a>
   <nav class="pxl-links" aria-label="Main navigation">
@@ -251,7 +251,7 @@ export function publicMarkup() {
     <footer class="pxl-footer"><div class="pxl-footer-brand"><a class="pxl-brand" href="./"><span class="pxl-brand-mark" aria-hidden="true"><i></i><i></i></span><span>Project<span class="pxl-brand-x">X</span></span></a><p>The Universal Creation Engine.<br>From human intent to real outcomes.</p></div><div class="pxl-footer-column"><b>Product</b><a href="#pxl-purpose">Overview</a><a href="#pxl-create">Creation types</a><a href="#pxl-difference">How it works</a><a href="./billing.html">Pricing</a></div><div class="pxl-footer-column"><b>Resources</b><a href="#pxl-experience">Documentation</a><a href="#pxl-brain">Guides</a><a href="#pxl-create">Examples</a><a href="#pxl-execution">Support</a></div><div class="pxl-footer-column"><b>Company</b><a href="#pxl-final">About</a><a href="#pxl-final">Contact</a><a href="#pxl-final">Updates</a><a href="#pxl-final">Community</a></div><div class="pxl-footer-bottom"><span>© 2026 ProjectX. All rights reserved.</span><span><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a><a href="./security.html">Security</a></span></div></footer>
   </section>
 </main>
-</div>\`;
+</div>`;
 }
 export function interviewMarkup() {
   return `<div class="interview poll-interview px-creation-chat">
