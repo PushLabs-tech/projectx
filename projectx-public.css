@@ -256,9 +256,9 @@
 #px-app.px-public .pxl-footer-column a:hover{color:var(--coral)}
 #px-app.px-public .pxl-footer-bottom{grid-column:1/-1;border-top:1px solid #ebe6e7;margin-top:15px;padding:17px 0 25px;display:flex;justify-content:space-between;color:#a0a0a6;font-size:11px}
 #px-app.px-public .pxl-footer-bottom span:last-child{display:flex;gap:25px}
-#px-app.px-public .pxl-reveal-up{opacity:0;transform:translateY(30px);transition:opacity .75s ease,transform .9s cubic-bezier(.2,.8,.2,1)}
+#px-app.px-public .pxl-reveal-up{opacity:1;transform:translateY(30px);transition:opacity .75s ease,transform .9s cubic-bezier(.2,.8,.2,1)}
 #px-app.px-public .pxl-reveal-up.px-in-view{opacity:1;transform:none}
-#px-app.px-public .pxl-reveal-stagger>*{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .65s cubic-bezier(.2,.8,.2,1)}
+#px-app.px-public .pxl-reveal-stagger>*{opacity:1;transform:translateY(18px);transition:opacity .55s ease,transform .65s cubic-bezier(.2,.8,.2,1)}
 #px-app.px-public .pxl-reveal-stagger.px-in-view>*{opacity:1;transform:none}
 #px-app.px-public .pxl-reveal-stagger.px-in-view>*:nth-child(2){transition-delay:50ms}
 #px-app.px-public .pxl-reveal-stagger.px-in-view>*:nth-child(3){transition-delay:100ms}
