@@ -1,7 +1,6 @@
 const icon = (name, extraClass = '') =>
   '<i class="icon ' + extraClass + '" data-lucide="' + name + '" aria-hidden="true"></i>';
-const landingBase = import.meta.env?.BASE_URL || '/projectx/';
-const asset = (name) => `${landingBase}landing-assets/${name}`;
+const asset = (name) => `/projectx/landing-assets/${name}`;
 
 const createItems = [
   ['Websites', 'layers'],
