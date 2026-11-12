@@ -5,10 +5,55 @@ test("public shell renders", async ({ page }) => {
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
   await page.goto("/");
   await expect(page).toHaveTitle(/ProjectX/);
-  await expect(page.getByText("Tell it what you want to accomplish")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Turn any idea into a real product/i })).toBeVisible();
+  await expect(page.locator("#pxl-purpose")).toBeAttached();
+  await expect(page.locator("#pxl-create")).toBeAttached();
+  await expect(page.locator("#pxl-difference")).toBeAttached();
+  await expect(page.locator("#pxl-experience")).toBeAttached();
+  await expect(page.locator("#pxl-brain")).toBeAttached();
+  await expect(page.locator("#pxl-execution")).toBeAttached();
+  await expect(page.locator("#pxl-final")).toBeAttached();
   await expect(page.locator("#public-start")).toBeVisible();
   await expect(page.locator("#px-app")).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+
+test("public landing sections form one continuous scroll page", async ({ page }) => {
+  await page.goto("/");
+  const sections = await page.locator("main > section").evaluateAll(nodes =>
+    nodes.map(node => ({ id: node.id, top: node.getBoundingClientRect().top + window.scrollY }))
+  );
+  expect(sections.map(section => section.id)).toEqual([
+    "pxl-hero", "pxl-purpose", "pxl-create", "pxl-difference",
+    "pxl-experience", "pxl-brain", "pxl-execution", "pxl-final"
+  ]);
+  expect(sections.every((section, index) => index === 0 || section.top > sections[index - 1].top)).toBe(true);
+});
+
+test("Project Brain modules and architecture drill-down are interactive", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('[data-brain-module="architecture"]').click();
+  await expect(page.locator("#pxl-brain-stage")).toHaveClass(/has-selection/);
+  await expect(page.locator("#pxl-brain-detail h3")).toHaveText("Architecture");
+  await page.locator('[data-brain-path="Frontend"]').click();
+  await expect(page.locator("#pxl-brain-detail h3")).toHaveText("Frontend");
+  await page.locator('[data-brain-path="Landing"]').click();
+  await expect(page.locator("#pxl-brain-detail h3")).toHaveText("Landing");
+  await page.locator('[data-brain-path="Hero"]').click();
+  await page.locator('[data-brain-path="Composer"]').click();
+  await expect(page.locator("#pxl-brain-detail h3")).toHaveText("Composer");
+  await page.locator("[data-brain-back]").click();
+  await expect(page.locator("#pxl-brain-detail h3")).toHaveText("Hero");
+});
+
+test("hero creation type controls update the real composer context", async ({ page }) => {
+  await page.goto("/");
+  const input = page.locator("#start-input");
+  await page.locator('button[data-domain="agent"]').click();
+  await expect(input).toHaveAttribute("data-domain", "agent");
+  await expect(input).toHaveAttribute("placeholder", /AI agent/i);
+  await expect(page.locator('button[data-domain="agent"]')).toHaveAttribute("aria-pressed", "true");
 });
 
 test("auth screen exposes login and signup controls", async ({ page }) => {
@@ -53,6 +98,7 @@ test("project shell can open guest creation flow and expose execution workspace"
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
 
   await page.goto("/");
+  await page.locator("#start-input").fill("Create a small personal portfolio website with an introduction and projects section.");
   await page.locator("#public-start").click();
 
   await expect(page.locator("#px-app")).toBeVisible();

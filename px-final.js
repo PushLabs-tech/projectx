@@ -897,9 +897,9 @@ function publicHome(){
   $('#start-input').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}};
   $('#public-workspace').onclick=openWorkspace;
   $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
-  $('#public-examples').onclick=()=>$('#px-examples')?.scrollIntoView({behavior:'smooth'});
-  $$('[data-domain]').forEach(button=>button.onclick=()=>{
-    $$('[data-domain]').forEach(item=>item.classList.toggle('active',item===button));
+  $('#public-examples').onclick=()=>$('#pxl-create')?.scrollIntoView({behavior:'smooth'});
+  $('button[data-domain]').forEach(button=>button.onclick=()=>{
+    $('button[data-domain]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
     const input=$('#start-input');
     if(input){input.dataset.domain=button.dataset.domain||'';input.placeholder=button.dataset.placeholder||'What do you want to make happen?';input.focus();}
   });
@@ -952,7 +952,7 @@ function initLandingMotion(){
       const pio=new IntersectionObserver(entries=>{entries.forEach(en=>{if(en.isIntersecting){const i=Number(en.target.dataset.pipelineStage||0);pipeline?.setStage?.(i);stages.forEach(s=>s.classList.toggle('active',Number(s.dataset.pipelineStage)<=i));if(status)status.innerHTML='<i></i>STAGE 0'+(i+1)+' / '+names[i];}});},{threshold:0.55});
       stages.forEach(s=>pio.observe(s));
     }
-    $$('[data-domain]').forEach(button=>button.addEventListener('click',()=>{
+    $('button[data-domain]').forEach(button=>button.addEventListener('click',()=>{
       button.classList.remove('px-pill-pop');void button.offsetWidth;button.classList.add('px-pill-pop');
       core?.pulse?.(button.dataset.domain||'web');
     }));
@@ -966,7 +966,7 @@ function initLandingMotion(){
         const r=magnet.getBoundingClientRect();
         const dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2);
         const dist=Math.hypot(dx,dy);
-        if(dist<120)magnet.style.transform='translate('+(dx*0.12)+'px,'+(dy*0.12)+'px)';
+        if(dist<120)magnet.style.transform='translate('+(dx*0.03)+'px,'+(dy*0.03)+'px)';
       });
       wrap.addEventListener('pointerleave',()=>{magnet.style.transform='';});
     }
