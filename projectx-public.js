@@ -6,6 +6,9 @@ import { initCreationCore } from './projectx-canvas-3d.js';
 
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const wait = ms => new Promise(resolve => window.setTimeout(resolve, ms));
+  const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[char]);
 
   const lifecycle = {
     intent: ['Intent', 'Start with the outcome the person wants—not a prescribed prompt format.'],
