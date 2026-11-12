@@ -283,17 +283,12 @@
         const rect = brainStage.getBoundingClientRect();
         const nx = (event.clientX - rect.left) / rect.width - .5;
         const ny = (event.clientY - rect.top) / rect.height - .5;
-        const scene = $('.pxl-brain-scene');
-        if (!scene) return;
-        scene.style.setProperty('--brain-tilt-x', (nx * 3.2).toFixed(2) + 'deg');
-        scene.style.setProperty('--brain-tilt-y', (-ny * 2.4).toFixed(2) + 'deg');
+        brainStage.style.transform = 'perspective(1200px) rotateX(' + (-ny * 2.2).toFixed(2) + 'deg) rotateY(' + (nx * 3.2).toFixed(2) + 'deg)';
+
       }, { passive:true });
       brainStage.addEventListener('pointerleave', () => {
-        const scene = $('.pxl-brain-scene');
-        if (scene) {
-          scene.style.setProperty('--brain-tilt-x', '0deg');
-          scene.style.setProperty('--brain-tilt-y', '0deg');
-        }
+        brainStage.style.transform = '';
+
       });
     }
 
@@ -341,6 +336,51 @@
         playLoop.textContent = 'Play loop again';
         playing = false;
       });
+    }
+
+
+    // Reference-faithful entrance motion: each section reveals once as it enters the viewport.
+    const revealTargets = $('.pxl-reveal-up, .pxl-reveal-stagger');
+    if (reducedMotion || !('IntersectionObserver' in window)) {
+      revealTargets.forEach(el => el.classList.add('px-in-view'));
+    } else {
+      const revealObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('px-in-view');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: .12, rootMargin: '0px 0px -8% 0px' });
+      revealTargets.forEach(el => revealObserver.observe(el));
+    }
+
+    // Small pointer response on the hero glow keeps the otherwise-static composition alive.
+    if (!reducedMotion && window.matchMedia?.('(pointer:fine)').matches) {
+      const hero = $('.pxl-hero');
+      const glow = $('.pxl-hero-glow');
+      if (hero && glow) {
+        hero.addEventListener('pointermove', event => {
+          const rect = hero.getBoundingClientRect();
+          const x = ((event.clientX - rect.left) / rect.width - .5) * 18;
+          const y = ((event.clientY - rect.top) / rect.height - .5) * 10;
+          glow.style.marginLeft = x.toFixed(1) + 'px';
+          glow.style.marginTop = y.toFixed(1) + 'px';
+        }, { passive:true });
+        hero.addEventListener('pointerleave', () => { glow.style.marginLeft='0'; glow.style.marginTop='0'; });
+      }
+    }
+
+    // Scroll-linked active navigation gives the continuous page a quiet sense of place.
+    const sectionIds = ['pxl-hero','pxl-purpose','pxl-create','pxl-difference','pxl-experience','pxl-brain','pxl-execution','pxl-final'];
+    const navLinks = $('.pxl-links a');
+    if ('IntersectionObserver' in window) {
+      const sectionObserver = new IntersectionObserver(entries => {
+        const visible = entries.filter(entry => entry.isIntersecting).sort((a,b) => b.intersectionRatio-a.intersectionRatio)[0];
+        if (!visible) return;
+        navLinks.forEach(link => link.classList.toggle('is-current', link.getAttribute('href') === '#' + visible.target.id));
+      }, { threshold:[.18,.35,.55,.75], rootMargin:'-18% 0px -48% 0px' });
+      sectionIds.map(id => $('#' + id)).filter(Boolean).forEach(section => sectionObserver.observe(section));
     }
 
     // Native anchor behavior is retained; this adds a small guard for empty fragments.
