@@ -1,4 +1,4 @@
-import { initCore } from './projectx-canvas-3d.js';
+import { initCreationCore } from './projectx-canvas-3d.js';
 /* ProjectX public-page interactions. This module only enhances .px-public;
    the authenticated workspace runtime is not touched. */
 (() => {
@@ -188,7 +188,7 @@ import { initCore } from './projectx-canvas-3d.js';
     const brainCanvas = $('#pxl-brain-canvas');
     if (brainCanvas && !brainCanvas.dataset.ready) {
       try {
-        const brainEngine = initCore(brainCanvas);
+        const brainEngine = initCreationCore(brainCanvas);
         brainCanvas.dataset.ready = 'true';
         brainStage?.classList.add('has-3d-engine');
         brainCanvas._projectxEngine = brainEngine;
