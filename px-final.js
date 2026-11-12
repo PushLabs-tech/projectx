@@ -881,8 +881,8 @@ function publicHome(){
   root.classList.remove('px-auth-page');
   root.innerHTML=UI.publicMarkup();
   const openWorkspace=()=>{state.forceWorkspace=true;history.replaceState(null,'',location.pathname+'#workspace');workspaceHome();};
-  $('#public-signin').onclick=()=>authScreen('signin');
-  $('#public-signup').onclick=()=>authScreen('signup');
+  $('#public-signin')?.addEventListener('click',()=>authScreen('signin'));
+  $('#public-signup')?.addEventListener('click',()=>authScreen('signup'));
   const startFromLanding=()=>{
     const prompt=$('#start-input');
     const rawIntent=String(prompt?.value||'').trim();
@@ -897,8 +897,8 @@ function publicHome(){
   $('#start-input').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();startFromLanding();}};
   $('#public-workspace').onclick=openWorkspace;
   $('#public-final-start')?.addEventListener('click', startFromLanding);
-  $('#public-footer-signin').onclick=e=>{e.preventDefault();authScreen('signin');};
-  $('#public-examples').onclick=()=>$('#pxl-create')?.scrollIntoView({behavior:'smooth'});
+  $('#public-footer-signin')?.addEventListener('click',e=>{e.preventDefault();authScreen('signin');});
+  $('#public-examples')?.addEventListener('click',()=>$('#pxl-create')?.scrollIntoView({behavior:'smooth'}));
   $('button[data-domain]').forEach(button=>button.onclick=()=>{
     $('button[data-domain]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
     const input=$('#start-input');
