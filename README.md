@@ -1,6 +1,8 @@
 # ProjectX — Universal Creation Engine
 
-This is the revised Builder package. It keeps the classic Builder UI language from the current PushLabs-tech/projectx interface while preserving the newer agent/model functionality.
+This is the ProjectX Universal Creation Engine repository. The GitHub Pages root is the eight-section ProjectX landing page. The existing workspace shell is retained at `app.html` while the product workflow is built out in later stages.
+
+The landing page preserves the supplied eight-section order and provides working page navigation, mobile navigation, format selection/reset, local idea capture, reveal motion, and footer form feedback. Project actions that require the future connected workspace are clearly marked as upcoming rather than pretending to create a project.
 
 ## What is included
 

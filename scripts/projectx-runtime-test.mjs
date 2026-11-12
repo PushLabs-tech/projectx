@@ -7,7 +7,7 @@ const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf
 const appShellCss = fs.readFileSync(new URL('../px-app.css', import.meta.url), 'utf8');
 const ui = fs.readFileSync(new URL('../px-ui.js', import.meta.url), 'utf8');
 const shellSource = runtime + appShellCss + ui;
-const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const index = fs.readFileSync(new URL('../app.html', import.meta.url), 'utf8');
 const vite = fs.readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
 
 assert.match(index, /config\.js/);

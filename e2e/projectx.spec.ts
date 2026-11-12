@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test("public shell renders", async ({ page }) => {
   const errors:string[]=[];
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
-  await page.goto("/");
+  await page.goto("/app.html");
   await expect(page).toHaveTitle(/ProjectX/);
   await expect(page.getByRole("heading", { name: /Turn any idea into a real product/i })).toBeVisible();
   await expect(page.locator("#pxl-purpose")).toBeAttached();
@@ -20,7 +20,7 @@ test("public shell renders", async ({ page }) => {
 
 
 test("public landing sections form one continuous scroll page", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   const sections = await page.locator("main > section").evaluateAll(nodes =>
     nodes.map(node => ({ id: node.id, top: node.getBoundingClientRect().top + window.scrollY }))
   );
@@ -32,7 +32,7 @@ test("public landing sections form one continuous scroll page", async ({ page })
 });
 
 test("Project Brain modules and architecture drill-down are interactive", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   await page.locator("#pxl-brain").evaluate((el:any) => el.scrollIntoView({block:"center"}));
   await page.locator('[data-brain-module="architecture"]').evaluate((el:any) => el.click());
   await expect(page.locator("#pxl-brain-stage")).toHaveClass(/has-selection/);
@@ -49,7 +49,7 @@ test("Project Brain modules and architecture drill-down are interactive", async 
 });
 
 test("hero creation type controls update the real composer context", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   const input = page.locator("#start-input");
   await page.locator('button[data-domain="agent"]').click();
   await expect(input).toHaveAttribute("data-domain", "agent");
@@ -58,7 +58,7 @@ test("hero creation type controls update the real composer context", async ({ pa
 });
 
 test("auth screen exposes login and signup controls", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   await page.locator("#public-signin").click();
   const signup = page.locator("#auth-signup-mode");
   await expect(signup).toBeVisible();
@@ -71,14 +71,14 @@ test("auth screen exposes login and signup controls", async ({ page }) => {
 
 test("responsive shell does not overflow horizontally", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/app.html");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
   expect(overflow).toBe(false);
 });
 
 test("mobile creation shortcuts wrap instead of requiring horizontal scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/#workspace");
+  await page.goto("/app.html#workspace");
   const shortcuts = page.locator(".px-home-shortcuts");
   await expect(shortcuts).toBeVisible();
   const layout = await shortcuts.evaluate(el => ({
@@ -99,7 +99,7 @@ test("project shell can open guest creation flow and expose execution workspace"
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
 
-  await page.goto("/");
+  await page.goto("/app.html");
   await page.locator("#start-input").fill("Create a small personal portfolio website with an introduction and projects section.");
   await page.locator("#public-start-arrow").click();
 
@@ -114,7 +114,7 @@ test("project shell can open guest creation flow and expose execution workspace"
 });
 
 test("runs navigation contract is wired into the project UI", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   await expect(page.locator("#px-app")).toBeVisible();
 
   const creationContract = await page.evaluate(async () => {
@@ -143,7 +143,7 @@ test("runs navigation contract is wired into the project UI", async ({ page }) =
 
 test("public mobile shell remains usable after observability release", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/app.html");
   await expect(page.locator("#public-start-arrow")).toBeVisible();
 
   const metrics = await page.evaluate(() => ({
@@ -169,7 +169,7 @@ test("authenticated workspace smoke path syncs a real account", async ({ page })
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
 
-  await page.goto("/?projectx_e2e_chaos=placeholder#login");
+  await page.goto("/app.html?projectx_e2e_chaos=placeholder#login");
   await page.locator("#auth-email").fill(email!);
   await page.locator("#auth-password").fill(password!);
   await page.locator("#auth-submit").click();
@@ -198,7 +198,7 @@ test("authenticated autonomous loop can discover, reconcile, and verify a real p
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if(m.type()==="error") errors.push(m.text()); });
 
-  await page.goto("/#login");
+  await page.goto("/app.html#login");
   await page.locator("#auth-email").fill(email!);
   await page.locator("#auth-password").fill(password!);
   await page.locator("#auth-submit").click();

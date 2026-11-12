@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const legacyEngine = fs.readFileSync(new URL('../universal-engine.js', import.meta.url), 'utf8');
 const fixedEngine = fs.readFileSync(new URL('../universal-engine-fixed.js', import.meta.url), 'utf8');
-const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const index = fs.readFileSync(new URL('../app.html', import.meta.url), 'utf8');
 const vite = fs.readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
 
 assert.ok(app.length > 100000, 'app.js should contain the production application');

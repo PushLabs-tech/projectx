@@ -6,7 +6,7 @@ const runtime = fs.readFileSync(new URL('../px-final.js', import.meta.url), 'utf
 const ui = fs.readFileSync(new URL('../px-ui.js', import.meta.url), 'utf8');
 const appCss = fs.readFileSync(new URL('../px-app.css', import.meta.url), 'utf8');
 const edge = fs.readFileSync(new URL('../supabase/functions/ai/index.ts', import.meta.url), 'utf8');
-const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const index = fs.readFileSync(new URL('../app.html', import.meta.url), 'utf8');
 const surface = runtime + ui;
 
 const domIds = [
