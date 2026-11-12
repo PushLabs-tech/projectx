@@ -340,7 +340,7 @@
 
 
     // Reference-faithful entrance motion: each section reveals once as it enters the viewport.
-    const revealTargets = $('.pxl-reveal-up, .pxl-reveal-stagger');
+    const revealTargets = $$('.pxl-reveal-up, .pxl-reveal-stagger');
     if (reducedMotion || !('IntersectionObserver' in window)) {
       revealTargets.forEach(el => el.classList.add('px-in-view'));
     } else {
@@ -373,7 +373,7 @@
 
     // Scroll-linked active navigation gives the continuous page a quiet sense of place.
     const sectionIds = ['pxl-hero','pxl-purpose','pxl-create','pxl-difference','pxl-experience','pxl-brain','pxl-execution','pxl-final'];
-    const navLinks = $('.pxl-links a');
+    const navLinks = $$('.pxl-links a');
     if ('IntersectionObserver' in window) {
       const sectionObserver = new IntersectionObserver(entries => {
         const visible = entries.filter(entry => entry.isIntersecting).sort((a,b) => b.intersectionRatio-a.intersectionRatio)[0];
